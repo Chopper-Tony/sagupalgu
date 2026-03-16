@@ -31,4 +31,5 @@ test-results/
 # playwright
 playwright-report/
 
-sessions/
+sessions/*
+!sessions/.gitkeep
