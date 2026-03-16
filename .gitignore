@@ -1,35 +1,64 @@
+# =========================
+# Python
+# =========================
 .venv/
 __pycache__/
 *.pyc
-.env
-.env.*
-*.log
+*.pyo
+*.pyd
+
+# Python cache / test
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+.envrc
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Build artifacts
+# =========================
 dist/
 build/
+
+# =========================
+# Node / Frontend
+# =========================
 node_modules/
+
+# =========================
+# OS files
+# =========================
 .DS_Store
 Thumbs.db
 
-playwright/.cache/
-test-results/
-
-# python env
-.envrc
-
+# =========================
 # IDE
+# =========================
 .vscode/
 .idea/
 
-# python cache
-*.pyo
-*.pyd
-
-# playwright
+# =========================
+# Playwright artifacts
+# =========================
 playwright-report/
+test-results/
+playwright/.cache/
+*.har
+trace.zip
 
+# =========================
+# Session storage (Playwright login)
+# =========================
 sessions/*
 !sessions/.gitkeep
