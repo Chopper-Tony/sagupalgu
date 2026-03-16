@@ -1,0 +1,32 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.log
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+node_modules/
+.DS_Store
+Thumbs.db
+
+playwright/.cache/
+test-results/
+
+# python env
+.envrc
+
+# IDE
+.vscode/
+.idea/
+
+# python cache
+*.pyo
+*.pyd
+
+# playwright
+playwright-report/
