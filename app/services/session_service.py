@@ -1,17 +1,17 @@
 import asyncio
 
 from app.repositories.session_repository import SessionRepository
-from app.services.listing_service import ListingService
 from app.services.product_service import ProductService
 from app.services.publish_service import PublishService
+from app.services.seller_copilot_service import SellerCopilotService
 
 
 class SessionService:
     def __init__(self, session_repository: SessionRepository):
         self.session_repository = session_repository
         self.product_service = ProductService()
-        self.listing_service = ListingService()
         self.publish_service = PublishService()
+        self.seller_copilot_service = SellerCopilotService()
 
     def _normalize_text(self, value: str | None) -> str:
         if not value:
@@ -293,38 +293,32 @@ class SessionService:
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        if session.get("status") != "product_confirmed":
+        if session.get("status") not in {
+            "product_confirmed",
+            "awaiting_product_confirmation",
+        }:
             raise ValueError(
                 f"Session not ready for listing generation: {session.get('status')}"
             )
 
-        product_data = session.get("product_data_jsonb", {}) or {}
-        confirmed_product = product_data.get("confirmed_product")
-
-        if not confirmed_product:
-            raise ValueError("No confirmed product found")
-
-        image_paths = product_data.get("image_paths", [])
-
         try:
-            listing_data = asyncio.run(
-                self.listing_service.build_listing_package(
-                    confirmed_product=confirmed_product,
-                    image_paths=image_paths,
-                )
+            result_payload = self.seller_copilot_service.run_product_analysis_and_listing_pipeline(
+                session_id=session_id,
+                session_record=session,
             )
         except Exception as e:
             raise ValueError(f"Listing generation failed: {str(e)}")
 
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
-        workflow_meta["checkpoint"] = "B_complete"
-
         updated = self.session_repository.update(
             session_id=session_id,
             payload={
-                "status": "draft_generated",
-                "listing_data_jsonb": listing_data,
-                "workflow_meta_jsonb": workflow_meta,
+                "status": result_payload["status"],
+                "selected_platforms_jsonb": result_payload.get(
+                    "selected_platforms_jsonb", []
+                ),
+                "product_data_jsonb": result_payload.get("product_data_jsonb", {}),
+                "listing_data_jsonb": result_payload.get("listing_data_jsonb", {}),
+                "workflow_meta_jsonb": result_payload.get("workflow_meta_jsonb", {}),
             },
         )
 
@@ -343,7 +337,10 @@ class SessionService:
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        if session.get("status") != "draft_generated":
+        if session.get("status") not in {
+            "draft_generated",
+            "awaiting_publish_approval",
+        }:
             raise ValueError(
                 f"Session not ready for publish preparation: {session.get('status')}"
             )
