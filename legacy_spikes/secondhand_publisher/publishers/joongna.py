@@ -20,14 +20,6 @@ CONDITION_MAP = {
     ProductCondition.POOR: "중고",
 }
 
-CATEGORY_MAP = {
-    "스마트폰": ["모바일/태블릿", "휴대폰/스마트폰"],
-    "노트북": ["노트북/PC"],
-    "태블릿": ["모바일/태블릿", "태블릿"],
-    "카메라": ["카메라/캠코더"],
-    "블록세트": ["출산/유아동", "유아동교구/완구", "블록/레고"],
-}
-
 
 class JoongnaPublisher(BasePublisher):
     platform = Platform.JOONGNA
@@ -65,37 +57,64 @@ class JoongnaPublisher(BasePublisher):
                 if await file_input.count() > 0:
                     await file_input.set_input_files(valid_paths)
                     await self._human_delay(1500, 2500)
+                    logger.info(f"[중고나라] 이미지 업로드 성공: {sel}")
                     return
             except Exception:
                 continue
 
         raise Exception("중고나라 파일 업로드 input을 찾지 못함")
 
-    async def _select_category(self, page: Page, category_str: str):
+    async def _select_recommended_category_first(self, page: Page) -> bool:
         """
-        중고나라 카테고리 3단 선택
+        중고나라 카테고리 선택 전략:
+        - 플랫폼 AI 추천/자동 추천을 우선 그대로 둠
+        - 카테고리가 선택되지 않은 경우에만 추천 카테고리 첫 항목 클릭
         """
-        category_str = (category_str or "").strip()
+        await self._human_delay(800, 1400)
 
-        if category_str in CATEGORY_MAP:
-            parts = CATEGORY_MAP[category_str]
-        else:
-            parts = [p.strip() for p in category_str.split(">") if p.strip()]
+        # 카테고리 UI가 렌더링될 때까지 대기
+        ready_selectors = [
+            "text='추천 카테고리'",
+            "div:has-text('추천 카테고리')",
+            "text='카테고리'",
+        ]
 
-        if not parts:
-            logger.warning("[중고나라] 카테고리 정보 없음")
-            return
+        is_ready = False
+        for sel in ready_selectors:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() > 0:
+                    await loc.wait_for(state="visible", timeout=5000)
+                    is_ready = True
+                    break
+            except Exception:
+                continue
 
-        for part in parts:
-            item = page.locator(
-                f"text='{part}', button:has-text('{part}'), div:has-text('{part}')"
-            ).first
-            if await item.count() > 0:
-                await item.scroll_into_view_if_needed()
-                await item.click()
-                await self._human_delay(500, 900)
-            else:
-                logger.warning(f"[중고나라] 카테고리 '{part}' 선택 실패")
+        if not is_ready:
+            logger.warning("[중고나라] 추천 카테고리 영역이 보이지 않음")
+            return False
+
+        fallback_locators = [
+            page.locator("text='추천 카테고리'").locator("xpath=following::button[1]"),
+            page.locator("text='추천 카테고리'").locator("xpath=following::*[@role='button'][1]"),
+            page.locator("text='추천 카테고리'").locator("xpath=following::div[1]"),
+            page.locator("div:has-text('추천 카테고리') button").first,
+            page.locator("div:has-text('추천 카테고리') [role='button']").first,
+        ]
+
+        for idx, loc in enumerate(fallback_locators, start=1):
+            try:
+                if await loc.count() > 0:
+                    await loc.scroll_into_view_if_needed()
+                    await loc.click(force=True)
+                    logger.info(f"[중고나라] 추천 카테고리 첫 항목 클릭 성공 (fallback #{idx})")
+                    await self._human_delay(800, 1400)
+                    return True
+            except Exception:
+                continue
+
+        logger.warning("[중고나라] 추천 카테고리 첫 항목 클릭 실패")
+        return False
 
     async def publish(self, package: ListingPackage) -> PublishResult:
         page = await self.new_page()
@@ -121,10 +140,13 @@ class JoongnaPublisher(BasePublisher):
 
             # ② 상품명
             await self._safe_fill(page, title_sel, package.title)
-            await self._human_delay()
+            await self._human_delay(1200, 2000)
 
             # ③ 카테고리
-            await self._select_category(page, package.category)
+            category_selected = await self._select_recommended_category_first(page)
+            if not category_selected:
+                logger.warning("[중고나라] 카테고리 fallback 선택 실패 - 이후 등록 실패 가능성 높음")
+            await self._human_delay(1200, 2000)
 
             # ④ 가격
             price_sel = "input[placeholder*='판매가격'], input[placeholder*='가격']"
@@ -145,17 +167,30 @@ class JoongnaPublisher(BasePublisher):
             condition_text = CONDITION_MAP.get(package.condition, "중고")
             cond = page.locator(f"text='{condition_text}'").first
             if await cond.count() > 0:
-                await cond.click()
-                await self._human_delay()
+                try:
+                    await cond.click(force=True)
+                    await self._human_delay()
+                except Exception:
+                    logger.warning(f"[중고나라] 상태 '{condition_text}' 선택 실패")
             else:
                 logger.warning(f"[중고나라] 상태 '{condition_text}' 선택 실패")
 
             # ⑦ 배송 거래
             if package.shipping_available:
-                delivery = page.locator("text='택배거래', text='배송비 포함', text='배송비 별도'").first
-                if await delivery.count() > 0:
-                    await delivery.click()
-                    await self._human_delay()
+                delivery_candidates = [
+                    "text='택배거래'",
+                    "text='배송비 포함'",
+                    "text='배송비 별도'",
+                ]
+                for sel in delivery_candidates:
+                    try:
+                        delivery = page.locator(sel).first
+                        if await delivery.count() > 0:
+                            await delivery.click(force=True)
+                            await self._human_delay()
+                            break
+                    except Exception:
+                        continue
 
             await self.screenshot(page, "before_submit")
 
@@ -165,18 +200,27 @@ class JoongnaPublisher(BasePublisher):
                 raise Exception("중고나라 판매하기 버튼을 찾지 못함")
 
             await submit_btn.scroll_into_view_if_needed()
-            await submit_btn.click()
+            await submit_btn.click(force=True)
             await self._human_delay(3000, 4500)
 
             current_url = page.url
 
-            # 성공 검증 강화
+            # 성공 검증
             if "form?type=regist" in current_url:
-                # 아직 폼에 머물면 실패
                 raise Exception("등록 후에도 중고나라 글쓰기 폼에 머뭄")
 
             match = re.search(r"/(\d+)(?:\?|$)", current_url)
-            shot = await self.screenshot(page, "publish_success")
+
+            try:
+                shot = await self.screenshot(page, "publish_success")
+            except Exception:
+                shot = None
+
+            # 디버깅용: 성공 화면 30초 유지
+            try:
+                await page.wait_for_timeout(30000)
+            except Exception:
+                pass
 
             return PublishResult(
                 platform=self.platform,
@@ -188,7 +232,18 @@ class JoongnaPublisher(BasePublisher):
 
         except Exception as e:
             logger.error(f"[중고나라] publish 실패: {e}")
-            shot = await self.screenshot(page, "publish_error")
+
+            try:
+                shot = await self.screenshot(page, "publish_error")
+            except Exception:
+                shot = None
+
+            # 디버깅용: 실패 화면 30초 유지
+            try:
+                await page.wait_for_timeout(30000)
+            except Exception:
+                pass
+
             return PublishResult(
                 platform=self.platform,
                 success=False,
@@ -196,4 +251,7 @@ class JoongnaPublisher(BasePublisher):
                 screenshot_path=shot,
             )
         finally:
-            await page.close()
+            try:
+                await page.close()
+            except Exception:
+                pass
