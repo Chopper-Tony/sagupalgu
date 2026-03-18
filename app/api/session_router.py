@@ -42,7 +42,7 @@ def _resolve_next_action(status: str, needs_user_input: bool) -> str | None:
         return "poll_status"
     if status == "completed":
         return "done"
-    if status in {"failed", "publishing_failed", "publish_partial_success"}:
+    if status in {"failed", "publishing_failed"}:
         return "retry_or_edit"
     return None
 

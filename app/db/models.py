@@ -13,6 +13,7 @@ SessionStatus = Literal[
     "awaiting_publish_approval",
     "publishing",
     "completed",
+    "publishing_failed",
     "failed",
 ]
 

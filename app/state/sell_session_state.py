@@ -1,10 +1,19 @@
 from typing import TypedDict, Literal, Any
 
 StateStatus = Literal[
-    "session_created","images_uploaded","awaiting_product_confirmation",
-    "product_confirmed","market_analyzing","draft_generated",
-    "awaiting_publish_approval","publishing","completed","failed"
+    "session_created",
+    "images_uploaded",
+    "awaiting_product_confirmation",
+    "product_confirmed",
+    "market_analyzing",
+    "draft_generated",
+    "awaiting_publish_approval",
+    "publishing",
+    "completed",
+    "publishing_failed",
+    "failed",
 ]
+
 
 class SellSessionState(TypedDict, total=False):
     session_id: str
