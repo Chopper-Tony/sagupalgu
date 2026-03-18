@@ -3,45 +3,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class CreateSessionResponse(BaseModel):
-    session_id: str
-    status: str
-
-
-class SessionDetailResponse(BaseModel):
-    id: str = Field(..., alias="session_id")
-    status: str
-    product_data_jsonb: dict[str, Any]
-    listing_data_jsonb: dict[str, Any]
-    workflow_meta_jsonb: dict[str, Any]
-
-    model_config = {"populate_by_name": True}
-
-
 class UploadImagesRequest(BaseModel):
     image_urls: list[str]
 
 
-class UploadImagesResponse(BaseModel):
-    session_id: str
-    status: str
-    product_data_jsonb: dict[str, Any]
-
-
-class AnalyzeSessionResponse(BaseModel):
-    session_id: str
-    status: str
-    product_data_jsonb: dict[str, Any]
-
-
 class ConfirmProductRequest(BaseModel):
     candidate_index: int
-
-
-class ConfirmProductResponse(BaseModel):
-    session_id: str
-    status: str
-    product_data_jsonb: dict[str, Any]
 
 
 class ProvideProductInfoRequest(BaseModel):
@@ -50,29 +17,56 @@ class ProvideProductInfoRequest(BaseModel):
     category: str | None = None
 
 
-class ProvideProductInfoResponse(BaseModel):
-    session_id: str
-    status: str
-    product_data_jsonb: dict[str, Any]
-
-
-class GenerateListingResponse(BaseModel):
-    session_id: str
-    status: str
-    listing_data_jsonb: dict[str, Any]
-
-
 class PreparePublishRequest(BaseModel):
     platform_targets: list[str]
 
 
-class PreparePublishResponse(BaseModel):
-    session_id: str
-    status: str
-    listing_data_jsonb: dict[str, Any]
+class ProductView(BaseModel):
+    image_paths: list[str] = Field(default_factory=list)
+    image_count: int = 0
+    analysis_source: str | None = None
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    confirmed_product: dict[str, Any] | None = None
 
 
-class PublishResponse(BaseModel):
+class ListingView(BaseModel):
+    market_context: dict[str, Any] | None = None
+    strategy: dict[str, Any] | None = None
+    canonical_listing: dict[str, Any] | None = None
+    platform_packages: dict[str, Any] = Field(default_factory=dict)
+
+
+class PublishView(BaseModel):
+    results: dict[str, Any] = Field(default_factory=dict)
+
+
+class DebugView(BaseModel):
+    graph_debug_logs: list[str] = Field(default_factory=list)
+    validation_result: dict[str, Any] | None = None
+    last_error: Any | None = None
+
+
+class SessionUIResponse(BaseModel):
     session_id: str
     status: str
-    workflow_meta_jsonb: dict[str, Any]
+    checkpoint: str | None = None
+    next_action: str | None = None
+    needs_user_input: bool = False
+    user_input_prompt: str | None = None
+    selected_platforms: list[str] = Field(default_factory=list)
+
+    product: ProductView
+    listing: ListingView
+    publish: PublishView
+    debug: DebugView
+
+
+CreateSessionResponse = SessionUIResponse
+SessionDetailResponse = SessionUIResponse
+UploadImagesResponse = SessionUIResponse
+AnalyzeSessionResponse = SessionUIResponse
+ConfirmProductResponse = SessionUIResponse
+ProvideProductInfoResponse = SessionUIResponse
+GenerateListingResponse = SessionUIResponse
+PreparePublishResponse = SessionUIResponse
+PublishResponse = SessionUIResponse
