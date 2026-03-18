@@ -293,32 +293,42 @@ class SessionService:
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        if session.get("status") not in {
-            "product_confirmed",
-            "awaiting_product_confirmation",
-        }:
+        if session.get("status") != "product_confirmed":
             raise ValueError(
                 f"Session not ready for listing generation: {session.get('status')}"
             )
 
         try:
-            result_payload = self.seller_copilot_service.run_product_analysis_and_listing_pipeline(
-                session_id=session_id,
-                session_record=session,
+            result_payload = (
+                self.seller_copilot_service.run_product_analysis_and_listing_pipeline(
+                    session_id=session_id,
+                    session_record=session,
+                )
             )
         except Exception as e:
             raise ValueError(f"Listing generation failed: {str(e)}")
 
+        product_data = result_payload.get("product_data_jsonb", {}) or {}
+        listing_data = result_payload.get("listing_data_jsonb", {}) or {}
+        workflow_meta = result_payload.get("workflow_meta_jsonb", {}) or {}
+
+        # generate 단계에서는 prepare 산출물을 제거한다.
+        listing_data.pop("platform_packages", None)
+
+        # generate 이후 상태 계약은 무조건 draft_generated로 고정한다.
+        if workflow_meta.get("checkpoint") in {"C_prepared", "C_complete"}:
+            workflow_meta["checkpoint"] = "B_complete"
+
+        workflow_meta.pop("publish_results", None)
+
         updated = self.session_repository.update(
             session_id=session_id,
             payload={
-                "status": result_payload["status"],
-                "selected_platforms_jsonb": result_payload.get(
-                    "selected_platforms_jsonb", []
-                ),
-                "product_data_jsonb": result_payload.get("product_data_jsonb", {}),
-                "listing_data_jsonb": result_payload.get("listing_data_jsonb", {}),
-                "workflow_meta_jsonb": result_payload.get("workflow_meta_jsonb", {}),
+                "status": "draft_generated",
+                "selected_platforms_jsonb": [],
+                "product_data_jsonb": product_data,
+                "listing_data_jsonb": listing_data,
+                "workflow_meta_jsonb": workflow_meta,
             },
         )
 
@@ -337,10 +347,7 @@ class SessionService:
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        if session.get("status") not in {
-            "draft_generated",
-            "awaiting_publish_approval",
-        }:
+        if session.get("status") != "draft_generated":
             raise ValueError(
                 f"Session not ready for publish preparation: {session.get('status')}"
             )
@@ -388,6 +395,7 @@ class SessionService:
 
         workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
         workflow_meta["checkpoint"] = "C_prepared"
+        workflow_meta.pop("publish_results", None)
 
         updated = self.session_repository.update(
             session_id=session_id,
@@ -428,6 +436,20 @@ class SessionService:
 
         if not platform_packages:
             raise ValueError("No platform packages found")
+
+        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
+        workflow_meta["checkpoint"] = "C_prepared"
+
+        publishing_updated = self.session_repository.update(
+            session_id=session_id,
+            payload={
+                "status": "publishing",
+                "workflow_meta_jsonb": workflow_meta,
+            },
+        )
+
+        if not publishing_updated:
+            raise ValueError("Failed to mark session as publishing")
 
         publish_results = {}
         any_failure = False
@@ -473,17 +495,17 @@ class SessionService:
                 }
                 any_failure = True
 
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
-        workflow_meta["checkpoint"] = "C_complete"
-        workflow_meta["publish_results"] = publish_results
+        final_workflow_meta = publishing_updated.get("workflow_meta_jsonb", {}) or {}
+        final_workflow_meta["checkpoint"] = "C_complete"
+        final_workflow_meta["publish_results"] = publish_results
 
-        final_status = "failed" if any_failure else "completed"
+        final_status = "publishing_failed" if any_failure else "completed"
 
         updated = self.session_repository.update(
             session_id=session_id,
             payload={
                 "status": final_status,
-                "workflow_meta_jsonb": workflow_meta,
+                "workflow_meta_jsonb": final_workflow_meta,
             },
         )
 

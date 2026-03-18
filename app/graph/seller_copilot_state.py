@@ -13,6 +13,7 @@ CheckpointLiteral = Literal[
     "B_validation_failed",
     "B_complete",
     "C_prepared",
+    "C_complete",
 ]
 
 StatusLiteral = Literal[
@@ -25,6 +26,7 @@ StatusLiteral = Literal[
     "awaiting_publish_approval",
     "publishing",
     "completed",
+    "publishing_failed",
     "failed",
 ]
 
