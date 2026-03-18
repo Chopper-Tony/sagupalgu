@@ -458,8 +458,8 @@ class BunjangPublisher(BasePublisher):
             listing_id = match.group(1)
             shot = await self.screenshot(page, "publish_success")
 
-            # 디버깅용: 성공 화면 2분 유지
-            await page.wait_for_timeout(120000)
+            # 디버깅용: 성공 화면 30초 유지
+            await page.wait_for_timeout(30000)
 
             return PublishResult(
                 platform=self.platform,
@@ -473,8 +473,8 @@ class BunjangPublisher(BasePublisher):
             logger.error(f"[번개장터] publish 실패: {e}")
             shot = await self.screenshot(page, "publish_error")
 
-            # 디버깅용: 실패 화면 2분 유지
-            await page.wait_for_timeout(120000)
+            # 디버깅용: 실패 화면 30초 유지
+            await page.wait_for_timeout(30000)
 
             return PublishResult(
                 platform=self.platform,
