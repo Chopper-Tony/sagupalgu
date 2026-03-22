@@ -1,72 +1,74 @@
-from typing import Any
-
-from pydantic import BaseModel, Field
-
-
-class UploadImagesRequest(BaseModel):
-    image_urls: list[str]
-
-
-class ConfirmProductRequest(BaseModel):
-    candidate_index: int
-
-
-class ProvideProductInfoRequest(BaseModel):
-    model: str
-    brand: str | None = None
-    category: str | None = None
-
-
-class PreparePublishRequest(BaseModel):
-    platform_targets: list[str]
-
-
-class ProductView(BaseModel):
-    image_paths: list[str] = Field(default_factory=list)
-    image_count: int = 0
-    analysis_source: str | None = None
-    candidates: list[dict[str, Any]] = Field(default_factory=list)
-    confirmed_product: dict[str, Any] | None = None
-
-
-class ListingView(BaseModel):
-    market_context: dict[str, Any] | None = None
-    strategy: dict[str, Any] | None = None
-    canonical_listing: dict[str, Any] | None = None
-    platform_packages: dict[str, Any] = Field(default_factory=dict)
-
-
-class PublishView(BaseModel):
-    results: dict[str, Any] = Field(default_factory=dict)
-
-
-class DebugView(BaseModel):
-    graph_debug_logs: list[str] = Field(default_factory=list)
-    validation_result: dict[str, Any] | None = None
-    last_error: Any | None = None
+from __future__ import annotations
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
 
 class SessionUIResponse(BaseModel):
     session_id: str
     status: str
-    checkpoint: str | None = None
-    next_action: str | None = None
+    checkpoint: Optional[str] = None
+    next_action: Optional[str] = None
     needs_user_input: bool = False
-    user_input_prompt: str | None = None
-    selected_platforms: list[str] = Field(default_factory=list)
+    user_input_prompt: Optional[str] = None
+    selected_platforms: List[str] = []
+    product: Dict[str, Any] = {}
+    listing: Dict[str, Any] = {}
+    publish: Dict[str, Any] = {}
+    agent_trace: Dict[str, Any] = {}
+    debug: Dict[str, Any] = {}
 
-    product: ProductView
-    listing: ListingView
-    publish: PublishView
-    debug: DebugView
+    model_config = {"extra": "allow"}
 
 
-CreateSessionResponse = SessionUIResponse
-SessionDetailResponse = SessionUIResponse
-UploadImagesResponse = SessionUIResponse
-AnalyzeSessionResponse = SessionUIResponse
-ConfirmProductResponse = SessionUIResponse
-ProvideProductInfoResponse = SessionUIResponse
-GenerateListingResponse = SessionUIResponse
-PreparePublishResponse = SessionUIResponse
-PublishResponse = SessionUIResponse
+class CreateSessionResponse(SessionUIResponse):
+    pass
+
+
+class SessionDetailResponse(SessionUIResponse):
+    pass
+
+
+class UploadImagesRequest(BaseModel):
+    image_urls: List[str]
+
+
+class UploadImagesResponse(SessionUIResponse):
+    pass
+
+
+class AnalyzeSessionResponse(SessionUIResponse):
+    pass
+
+
+class ConfirmProductRequest(BaseModel):
+    candidate_index: int = 0
+
+
+class ConfirmProductResponse(SessionUIResponse):
+    pass
+
+
+class ProvideProductInfoRequest(BaseModel):
+    model: str
+    brand: Optional[str] = None
+    category: Optional[str] = None
+
+
+class ProvideProductInfoResponse(SessionUIResponse):
+    pass
+
+
+class GenerateListingResponse(SessionUIResponse):
+    pass
+
+
+class PreparePublishRequest(BaseModel):
+    platform_targets: List[str]
+
+
+class PreparePublishResponse(SessionUIResponse):
+    pass
+
+
+class PublishResponse(SessionUIResponse):
+    pass

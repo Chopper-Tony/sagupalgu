@@ -6,12 +6,20 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
 
 # Python cache / test
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Python version
+.python-version
 
 # =========================
 # Environment variables
@@ -24,12 +32,6 @@ htmlcov/
 # Logs
 # =========================
 *.log
-
-# =========================
-# Build artifacts
-# =========================
-dist/
-build/
 
 # =========================
 # Node / Frontend
@@ -47,6 +49,10 @@ Thumbs.db
 # =========================
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
+*.bak
 
 # =========================
 # Playwright artifacts
@@ -62,3 +68,31 @@ trace.zip
 # =========================
 sessions/*
 !sessions/.gitkeep
+
+# =========================
+# Screenshots
+# =========================
+screenshots/*
+!screenshots/.gitkeep
+
+# =========================
+# Temp image processing
+# =========================
+tmp_processed/
+
+# =========================
+# Database
+# =========================
+*.sqlite3
+*.db
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Misc
+# =========================
+*.tmp
+*.bak

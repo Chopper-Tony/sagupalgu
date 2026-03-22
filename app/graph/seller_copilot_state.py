@@ -14,6 +14,8 @@ CheckpointLiteral = Literal[
     "B_complete",
     "C_prepared",
     "C_complete",
+    "D_publish_failed",
+    "D_recovering",
 ]
 
 StatusLiteral = Literal[
@@ -28,6 +30,8 @@ StatusLiteral = Literal[
     "completed",
     "publishing_failed",
     "failed",
+    "awaiting_sale_status_update",
+    "optimization_suggested",
 ]
 
 
@@ -37,6 +41,7 @@ class ProductCandidate(TypedDict, total=False):
     category: str
     confidence: float
     storage: str
+    source: str
 
 
 class ConfirmedProduct(TypedDict, total=False):
@@ -61,15 +66,6 @@ class PricingStrategy(TypedDict, total=False):
     negotiation_policy: str
 
 
-class CanonicalListingProduct(TypedDict, total=False):
-    brand: str
-    model: str
-    category: str
-    confidence: float
-    source: str
-    storage: str
-
-
 class CanonicalListing(TypedDict, total=False):
     title: str
     description: str
@@ -77,15 +73,7 @@ class CanonicalListing(TypedDict, total=False):
     price: int
     images: List[str]
     strategy: str
-    product: CanonicalListingProduct
-
-
-class PlatformPackage(TypedDict, total=False):
-    title: str
-    body: str
-    price: int
-    images: List[str]
-    category: str
+    product: Dict[str, Any]
 
 
 class ValidationIssue(TypedDict, total=False):
@@ -99,89 +87,98 @@ class ValidationResult(TypedDict, total=False):
     issues: List[ValidationIssue]
 
 
-class PublishResultSummary(TypedDict, total=False):
-    success: bool
-    platform: str
-    error_code: Optional[str]
-    error_message: Optional[str]
-    external_url: Optional[str]
-    external_listing_id: Optional[str]
-    evidence_path: Optional[str]
+# ── 에이전틱 워크플로우를 위한 추가 타입 ──────────────────────────────
 
+class ToolCall(TypedDict, total=False):
+    """에이전트가 실제로 어떤 도구를 호출했는지 기록"""
+    tool_name: str
+    input: Dict[str, Any]
+    output: Any
+    success: bool
+    error: Optional[str]
+
+
+class PublishDiagnostics(TypedDict, total=False):
+    """검증·복구 에이전트가 분석한 게시 실패 원인"""
+    platform: str
+    error_code: str
+    error_message: str
+    likely_cause: str          # "login_expired" | "content_policy" | "network" | "unknown"
+    patch_suggestion: str
+    auto_recoverable: bool
+
+
+class OptimizationSuggestion(TypedDict, total=False):
+    """판매 후 최적화 에이전트 출력"""
+    type: str                  # "price_drop" | "rewrite" | "platform_add"
+    current_price: int
+    suggested_price: int
+    reason: str
+    urgency: str               # "high" | "medium" | "low"
+
+
+# ── 메인 State ──────────────────────────────────────────────────────
 
 class SellerCopilotState(TypedDict, total=False):
-    """
-    Seller Copilot LangGraph 상태 정의.
-    """
-
-    # ------------------------------------------------------------------
     # Session / Workflow Meta
-    # ------------------------------------------------------------------
     session_id: str
     status: StatusLiteral
     checkpoint: CheckpointLiteral
     schema_version: int
 
-    # ------------------------------------------------------------------
     # Input
-    # ------------------------------------------------------------------
     image_paths: List[str]
     selected_platforms: List[str]
     user_product_input: Dict[str, Any]
 
-    # ------------------------------------------------------------------
     # Product Identification
-    # ------------------------------------------------------------------
     product_candidates: List[ProductCandidate]
     confirmed_product: Optional[ConfirmedProduct]
     analysis_source: str
     needs_user_input: bool
     clarification_prompt: Optional[str]
 
-    # ------------------------------------------------------------------
     # Market Intelligence
-    # ------------------------------------------------------------------
     search_queries: List[str]
     market_context: Optional[MarketContext]
 
-    # ------------------------------------------------------------------
     # Pricing Strategy
-    # ------------------------------------------------------------------
     strategy: Optional[PricingStrategy]
 
-    # ------------------------------------------------------------------
     # Listing Generation
-    # ------------------------------------------------------------------
     canonical_listing: Optional[CanonicalListing]
-    platform_packages: Dict[str, PlatformPackage]
+    platform_packages: Dict[str, Any]
+    rewrite_instruction: Optional[str]       # 사용자 피드백 기반 재작성 지시
 
-    # ------------------------------------------------------------------
     # Validation
-    # ------------------------------------------------------------------
     validation_passed: bool
     validation_result: ValidationResult
+    validation_retry_count: int              # 자동 refinement 재시도 횟수
 
-    # ------------------------------------------------------------------
-    # Publish Summary (optional, future connection)
-    # ------------------------------------------------------------------
-    publish_results: Dict[str, PublishResultSummary]
+    # ── 에이전틱 핵심 필드 ──────────────────────────────────────────
 
-    # ------------------------------------------------------------------
-    # Debug / Trace
-    # ------------------------------------------------------------------
-    debug_logs: List[str]
+    # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
+    tool_calls: List[ToolCall]
+
+    # 게시 실패 진단 (검증·복구 에이전트)
+    publish_diagnostics: List[PublishDiagnostics]
+    publish_retry_count: int                 # 게시 자동 재시도 횟수
+    publish_results: Dict[str, Any]
+
+    # 판매 후 최적화 (Agent 5)
+    sale_status: Optional[str]              # "sold" | "unsold" | "in_progress"
+    optimization_suggestion: Optional[OptimizationSuggestion]
+    followup_due_at: Optional[str]
+
+    # 에러 이력 (단순 last_error가 아닌 전체 히스토리)
+    error_history: List[Dict[str, Any]]
     last_error: Optional[str]
 
-    # ------------------------------------------------------------------
-    # Internal injected hooks
-    # ------------------------------------------------------------------
-    _product_identity_hook: Any
-    _market_intelligence_hook: Any
-    _copywriting_hook: Any
-    _package_builder_hook: Any
+    # Debug / Trace
+    debug_logs: List[str]
 
 
-def create_initial_seller_copilot_state(
+def create_initial_state(
     session_id: str,
     image_paths: List[str],
     selected_platforms: Optional[List[str]] = None,
@@ -191,7 +188,7 @@ def create_initial_seller_copilot_state(
         session_id=session_id,
         status="images_uploaded",
         checkpoint="A_before_confirm",
-        schema_version=1,
+        schema_version=2,
         image_paths=image_paths,
         selected_platforms=selected_platforms or ["bunjang", "joongna"],
         user_product_input=user_product_input or {},
@@ -205,12 +202,18 @@ def create_initial_seller_copilot_state(
         strategy=None,
         canonical_listing=None,
         platform_packages={},
+        rewrite_instruction=None,
         validation_passed=False,
-        validation_result=ValidationResult(
-            passed=False,
-            issues=[],
-        ),
+        validation_result=ValidationResult(passed=False, issues=[]),
+        validation_retry_count=0,
+        tool_calls=[],
+        publish_diagnostics=[],
+        publish_retry_count=0,
         publish_results={},
-        debug_logs=[],
+        sale_status=None,
+        optimization_suggestion=None,
+        followup_due_at=None,
+        error_history=[],
         last_error=None,
+        debug_logs=[],
     )

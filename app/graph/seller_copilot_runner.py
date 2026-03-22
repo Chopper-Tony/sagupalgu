@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from app.graph.seller_copilot_graph import seller_copilot_graph
 from app.graph.seller_copilot_state import (
     SellerCopilotState,
-    create_initial_seller_copilot_state,
+    create_initial_state,
 )
 
 
@@ -56,7 +56,6 @@ def _run_sync_or_async_callable(func: Any, **kwargs) -> Any:
         try:
             return asyncio.run(result)
         except RuntimeError:
-            # 이미 event loop가 도는 환경 fallback
             loop = asyncio.new_event_loop()
             try:
                 return loop.run_until_complete(result)
@@ -83,11 +82,6 @@ def _call_method_if_exists(service: Any, method_names: List[str], **kwargs) -> A
 
 
 class SellerCopilotServiceAdapter:
-    """
-    기존 Service Layer를 LangGraph hook 형태로 감싸는 어댑터.
-    sync/async 메서드를 모두 안전하게 처리한다.
-    """
-
     def __init__(
         self,
         product_service: Any = None,
@@ -101,7 +95,6 @@ class SellerCopilotServiceAdapter:
     def _try_create_product_service(self) -> Any:
         try:
             from app.services.product_service import ProductService
-
             return ProductService()
         except Exception:
             return None
@@ -109,7 +102,6 @@ class SellerCopilotServiceAdapter:
     def _try_create_market_service(self) -> Any:
         try:
             from app.services.market_service import MarketService
-
             return MarketService()
         except Exception:
             return None
@@ -117,7 +109,6 @@ class SellerCopilotServiceAdapter:
     def _try_create_listing_service(self) -> Any:
         try:
             from app.services.listing_service import ListingService
-
             return ListingService()
         except Exception:
             return None
@@ -125,12 +116,7 @@ class SellerCopilotServiceAdapter:
     def product_identity_hook(self, state: SellerCopilotState) -> Dict[str, Any]:
         result = _call_method_if_exists(
             self.product_service,
-            [
-                "analyze_product",
-                "analyze",
-                "analyze_images",
-                "run",
-            ],
+            ["analyze_product", "analyze", "analyze_images", "run"],
             session_id=state.get("session_id"),
             image_paths=state.get("image_paths"),
             user_product_input=state.get("user_product_input"),
@@ -167,12 +153,7 @@ class SellerCopilotServiceAdapter:
 
         result = _call_method_if_exists(
             self.market_service,
-            [
-                "get_market_context",
-                "analyze_market",
-                "analyze",
-                "run",
-            ],
+            ["get_market_context", "analyze_market", "analyze", "run"],
             session_id=state.get("session_id"),
             confirmed_product=confirmed_product,
             product=confirmed_product,
@@ -208,12 +189,7 @@ class SellerCopilotServiceAdapter:
 
         result = _call_method_if_exists(
             self.listing_service,
-            [
-                "build_canonical_listing",
-                "generate_listing",
-                "create_listing",
-                "run",
-            ],
+            ["build_canonical_listing", "generate_listing", "create_listing", "run"],
             session_id=state.get("session_id"),
             confirmed_product=confirmed_product,
             product=confirmed_product,
@@ -260,11 +236,7 @@ class SellerCopilotServiceAdapter:
 
         result = _call_method_if_exists(
             self.listing_service,
-            [
-                "build_platform_packages",
-                "prepare_platform_packages",
-                "build_publish_packages",
-            ],
+            ["build_platform_packages", "prepare_platform_packages", "build_publish_packages"],
             session_id=state.get("session_id"),
             canonical_listing=canonical_listing,
             selected_platforms=state.get("selected_platforms"),
@@ -302,7 +274,7 @@ class SellerCopilotRunner:
         product_candidates: Optional[List[Dict[str, Any]]] = None,
         market_context: Optional[Dict[str, Any]] = None,
     ) -> SellerCopilotState:
-        state = create_initial_seller_copilot_state(
+        state = create_initial_state(
             session_id=session_id,
             image_paths=image_paths,
             selected_platforms=selected_platforms,
@@ -315,7 +287,6 @@ class SellerCopilotRunner:
         if market_context:
             state["market_context"] = market_context
 
-        # hook 결과를 graph 시작 전에 미리 계산해서 state에 주입
         state["_product_identity_hook_result"] = self.adapter.product_identity_hook(state)
         state["_market_intelligence_hook_result"] = self.adapter.market_intelligence_hook(state)
         state["_copywriting_hook_result"] = self.adapter.copywriting_hook(state)
