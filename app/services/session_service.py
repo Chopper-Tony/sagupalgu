@@ -11,15 +11,14 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Optional
 
-from app.domain.session_status import resolve_next_action
+from app.domain.product_rules import needs_user_input, normalize_text
+from app.domain.session_status import assert_allowed_transition, resolve_next_action
 from app.repositories.session_repository import SessionRepository
+from app.services.optimization_service import OptimizationService
 from app.services.product_service import ProductService
 from app.services.publish_service import PublishService
-from app.services.seller_copilot_service import (
-    SellerCopilotService,
-    _needs_user_input,
-    _normalize_text,
-)
+from app.services.recovery_service import RecoveryService
+from app.services.seller_copilot_service import SellerCopilotService
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -78,6 +77,8 @@ class SessionService:
         self.product_service = ProductService()
         self.publish_service = PublishService()
         self.copilot_service = SellerCopilotService()
+        self.recovery_service = RecoveryService()
+        self.optimization_service = OptimizationService()
 
     # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
@@ -99,6 +100,7 @@ class SessionService:
 
     async def attach_images(self, session_id: str, image_urls: List[str]) -> Dict:
         session = self._get_or_raise(session_id)
+        assert_allowed_transition(session["status"], "images_uploaded")
         product_data = dict(session.get("product_data_jsonb") or {})
         product_data["image_paths"] = image_urls
         updated = self._update_or_raise(session_id, {
@@ -111,7 +113,7 @@ class SessionService:
 
     async def analyze_session(self, session_id: str) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "images_uploaded")
+        assert_allowed_transition(session["status"], "awaiting_product_confirmation")
 
         product_data = dict(session.get("product_data_jsonb") or {})
         image_paths = product_data.get("image_paths") or []
@@ -124,7 +126,7 @@ class SessionService:
             raise ValueError("상품 인식 결과가 없습니다")
 
         top = candidates[0]
-        needs_input = _needs_user_input(top)
+        needs_input = needs_user_input(top)
 
         product_data["candidates"] = candidates
         product_data["analysis_source"] = "vision"
@@ -151,7 +153,7 @@ class SessionService:
 
     async def confirm_product(self, session_id: str, candidate_index: int) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "awaiting_product_confirmation")
+        assert_allowed_transition(session["status"], "product_confirmed")
 
         product_data = dict(session.get("product_data_jsonb") or {})
         candidates = product_data.get("candidates") or []
@@ -177,17 +179,17 @@ class SessionService:
         brand: Optional[str] = None, category: Optional[str] = None,
     ) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "awaiting_product_confirmation")
+        assert_allowed_transition(session["status"], "product_confirmed")
 
-        normalized_model = _normalize_text(model)
+        normalized_model = normalize_text(model)
         if not normalized_model:
             raise ValueError("모델명은 필수입니다")
 
         product_data = dict(session.get("product_data_jsonb") or {})
         product_data["confirmed_product"] = {
-            "brand": _normalize_text(brand) or "Unknown",
+            "brand": normalize_text(brand) or "Unknown",
             "model": normalized_model,
-            "category": _normalize_text(category) or "unknown",
+            "category": normalize_text(category) or "unknown",
             "confidence": 1.0,
             "source": "user_input",
         }
@@ -208,7 +210,7 @@ class SessionService:
 
     async def generate_listing(self, session_id: str) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "product_confirmed")
+        assert_allowed_transition(session["status"], "draft_generated")
 
         result_payload = await self.copilot_service.run_listing_pipeline(
             session_id=session_id,
@@ -235,7 +237,7 @@ class SessionService:
 
     async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "draft_generated")
+        assert_allowed_transition(session["status"], "draft_generated")
 
         if not instruction or not instruction.strip():
             raise ValueError("재작성 지시사항이 필요합니다")
@@ -269,7 +271,7 @@ class SessionService:
 
     async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "draft_generated")
+        assert_allowed_transition(session["status"], "awaiting_publish_approval")
 
         if not platform_targets:
             raise ValueError("플랫폼을 선택해주세요")
@@ -299,7 +301,7 @@ class SessionService:
 
     async def publish_session(self, session_id: str) -> Dict:
         session = self._get_or_raise(session_id)
-        self._assert_status(session, "awaiting_publish_approval")
+        assert_allowed_transition(session["status"], "publishing")
 
         selected = session.get("selected_platforms_jsonb") or []
         packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
@@ -346,19 +348,15 @@ class SessionService:
         workflow_meta["publish_results"] = publish_results
 
         if any_failure:
-            from app.graph.seller_copilot_nodes import recovery_node
-            from app.graph.seller_copilot_state import create_initial_state
             product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
-            recovery_state = create_initial_state(
+            recovery_result = self.recovery_service.run_recovery(
                 session_id=session_id,
-                image_paths=product_data.get("image_paths") or [],
+                product_data=product_data,
+                publish_results=publish_results,
             )
-            recovery_state["publish_results"] = publish_results
-            recovery_state["confirmed_product"] = product_data.get("confirmed_product")
-            final_state = recovery_node(recovery_state)
-            workflow_meta["publish_diagnostics"] = final_state.get("publish_diagnostics") or []
+            workflow_meta["publish_diagnostics"] = recovery_result["publish_diagnostics"]
             workflow_meta["tool_calls"] = (
-                (workflow_meta.get("tool_calls") or []) + (final_state.get("tool_calls") or [])
+                (workflow_meta.get("tool_calls") or []) + recovery_result["tool_calls"]
             )
             final_status = "publishing_failed"
         else:
@@ -382,27 +380,21 @@ class SessionService:
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         workflow_meta["sale_status"] = sale_status
 
-        from app.graph.seller_copilot_nodes import post_sale_optimization_node
-        from app.graph.seller_copilot_state import create_initial_state
-
-        opt_state = create_initial_state(
+        opt_result = self.optimization_service.run_post_sale_optimization(
             session_id=session_id,
-            image_paths=product_data.get("image_paths") or [],
+            product_data=product_data,
+            listing_data=listing_data,
+            sale_status=sale_status,
+            followup_due_at=workflow_meta.get("followup_due_at"),
         )
-        opt_state["sale_status"] = sale_status
-        opt_state["canonical_listing"] = listing_data.get("canonical_listing")
-        opt_state["confirmed_product"] = product_data.get("confirmed_product")
-        opt_state["followup_due_at"] = workflow_meta.get("followup_due_at")
-
-        final_state = post_sale_optimization_node(opt_state)
-        optimization = final_state.get("optimization_suggestion")
+        optimization = opt_result["optimization_suggestion"]
         if optimization:
             listing_data["optimization_suggestion"] = optimization
 
         workflow_meta["tool_calls"] = (
-            (workflow_meta.get("tool_calls") or []) + (final_state.get("tool_calls") or [])
+            (workflow_meta.get("tool_calls") or []) + opt_result["tool_calls"]
         )
-        final_status = final_state.get("status") or (
+        final_status = opt_result["status"] or (
             "optimization_suggested" if optimization else "awaiting_sale_status_update"
         )
 
@@ -427,9 +419,3 @@ class SessionService:
             raise ValueError(f"세션 업데이트 실패: {session_id}")
         return result
 
-    def _assert_status(self, session: Dict, expected: str) -> None:
-        current = session.get("status")
-        if current != expected:
-            raise ValueError(
-                f"현재 상태 '{current}'에서는 이 작업을 수행할 수 없습니다 (필요 상태: '{expected}')"
-            )

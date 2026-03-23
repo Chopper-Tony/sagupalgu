@@ -3,32 +3,19 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from app.domain.product_rules import (
+    build_confirmed_product_from_candidate,
+    build_confirmed_product_from_user_input,
+    needs_user_input,
+    normalize_text,
+)
 from app.graph.seller_copilot_runner import SellerCopilotRunner
 from app.services.market.market_service import MarketService
 from app.services.product_service import ProductService
 
-
-def _normalize_text(value: str | None) -> str:
-    if not value:
-        return ""
-    value = str(value).strip()
-    if value.lower() in {"unknown", "none", "null", "n/a"}:
-        return ""
-    return value
-
-
-def _needs_user_input(candidate: dict[str, Any]) -> bool:
-    model = _normalize_text(candidate.get("model"))
-    brand = _normalize_text(candidate.get("brand"))
-    category = _normalize_text(candidate.get("category"))
-    confidence = float(candidate.get("confidence", 0.0) or 0.0)
-    if not model:
-        return True
-    if not brand and not category:
-        return True
-    if confidence < 0.6:
-        return True
-    return False
+# 하위 호환 alias — session_service.py import 경로 유지
+_normalize_text = normalize_text
+_needs_user_input = needs_user_input
 
 
 class SellerCopilotService:
@@ -51,36 +38,6 @@ class SellerCopilotService:
         self.runner = runner or SellerCopilotRunner()
 
     # ── 내부 빌더 ─────────────────────────────────────────────────────
-
-    def _build_confirmed_product_from_candidate(
-        self, candidate: dict[str, Any]
-    ) -> dict[str, Any]:
-        return {
-            "brand": candidate.get("brand") or "",
-            "model": candidate.get("model") or "",
-            "category": candidate.get("category") or "",
-            "confidence": float(candidate.get("confidence", 0.0) or 0.0),
-            "source": candidate.get("source", "vision"),
-            "storage": candidate.get("storage", "") or "",
-        }
-
-    def _build_confirmed_product_from_user_input(
-        self,
-        model: str,
-        brand: str | None = None,
-        category: str | None = None,
-    ) -> dict[str, Any]:
-        normalized_model = _normalize_text(model)
-        if not normalized_model:
-            raise ValueError("Model name is required")
-        return {
-            "brand": _normalize_text(brand) or "Unknown",
-            "model": normalized_model,
-            "category": _normalize_text(category) or "unknown",
-            "confidence": 1.0,
-            "source": "user_input",
-            "storage": "",
-        }
 
     def _build_confirmed_product_from_existing(
         self, existing_confirmed_product: dict[str, Any]
@@ -225,9 +182,7 @@ class SellerCopilotService:
 
         # 1) 이미 세션에 confirmed_product가 있으면 최우선 사용
         if existing_confirmed_product:
-            confirmed_product = self._build_confirmed_product_from_existing(
-                existing_confirmed_product
-            )
+            confirmed_product = self._build_confirmed_product_from_existing(existing_confirmed_product)
             product_data = self._build_product_payload(
                 product_data,
                 image_paths=image_paths,
@@ -239,7 +194,7 @@ class SellerCopilotService:
 
         # 2) 이번 요청에서 새로 user input이 들어오면 그걸 사용
         elif user_product_input:
-            confirmed_product = self._build_confirmed_product_from_user_input(
+            confirmed_product = build_confirmed_product_from_user_input(
                 model=user_product_input.get("model", ""),
                 brand=user_product_input.get("brand"),
                 category=user_product_input.get("category"),
@@ -266,7 +221,7 @@ class SellerCopilotService:
                 raise ValueError("Vision provider returned no candidates")
 
             top_candidate = candidates[0]
-            if _needs_user_input(top_candidate):
+            if needs_user_input(top_candidate):
                 product_data = self._build_product_payload(
                     product_data,
                     image_paths=image_paths,
@@ -288,7 +243,7 @@ class SellerCopilotService:
                     "workflow_meta_jsonb": workflow_meta,
                 }
 
-            confirmed_product = self._build_confirmed_product_from_candidate(top_candidate)
+            confirmed_product = build_confirmed_product_from_candidate(top_candidate)
             analysis_source = "vision"
             product_data = self._build_product_payload(
                 product_data,
