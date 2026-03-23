@@ -70,6 +70,63 @@ def _run_async(coro):
         return asyncio.run(coro)
 
 
+def _build_react_llm():
+    """ReAct 에이전트용 LLM 초기화 (bind_tools 지원 모델)"""
+    from app.core.config import settings
+    try:
+        if settings.gemini_api_key:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            return ChatGoogleGenerativeAI(
+                model=settings.gemini_listing_model,
+                google_api_key=settings.gemini_api_key,
+                temperature=0.0,
+            )
+    except Exception:
+        pass
+    try:
+        if settings.openai_api_key:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=settings.openai_listing_model,
+                api_key=settings.openai_api_key,
+                temperature=0.0,
+            )
+    except Exception:
+        pass
+    return None
+
+
+def _extract_market_context(text: str) -> dict:
+    """LLM 최종 응답에서 market_context JSON 파싱"""
+    import json, re
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text).strip()
+        text = re.sub(r"```$", "", text).strip()
+    try:
+        data = json.loads(text)
+        return {
+            "median_price": data.get("median_price"),
+            "price_band": data.get("price_band") or [],
+            "sample_count": int(data.get("sample_count") or 0),
+            "crawler_sources": data.get("crawler_sources") or [],
+        }
+    except Exception:
+        m = re.search(r"\{.*?\}", text, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(0))
+                return {
+                    "median_price": data.get("median_price"),
+                    "price_band": data.get("price_band") or [],
+                    "sample_count": int(data.get("sample_count") or 0),
+                    "crawler_sources": data.get("crawler_sources") or [],
+                }
+            except Exception:
+                pass
+    return {"median_price": None, "price_band": [], "sample_count": 0, "crawler_sources": []}
+
+
 # ══════════════════════════════════════════════════════════════════
 # 에이전트 1: 상품 식별 에이전트
 # 판단: user_product_input이 있으면 바로 확정
@@ -172,49 +229,107 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         state["status"] = "failed"
         return state
 
-    # 이미 주입된 market_context가 있으면 스킵 (SessionService 경로)
-    if state.get("market_context") and _safe_int(
-        (state["market_context"] or {}).get("sample_count"), 0
-    ) > 0:
+    # 이미 주입된 market_context가 있으면 스킵 (테스트/API 주입 경로)
+    existing_ctx = state.get("market_context") or {}
+    if existing_ctx and _safe_int(existing_ctx.get("sample_count"), 0) > 0:
         _log(state, "agent2:market_intelligence:using_precomputed_context")
         state["checkpoint"] = "B_market_complete"
         return state
 
-    # ── 도구 1 호출: 시세 수집 ──────────────────────────────────
-    from app.tools.agentic_tools import market_crawl_tool, rag_price_tool
+    # ── ReAct 에이전트: LLM이 툴을 자율 선택 ────────────────────
+    from app.tools.agentic_tools import lc_market_crawl_tool, lc_rag_price_tool
+    from langchain_core.messages import HumanMessage
 
-    _log(state, "agent2:selecting_tool:market_crawl_tool")
-    crawl_result = _run_async(market_crawl_tool(product))
-    _record_tool_call(state, crawl_result)
+    brand = product.get("brand", "")
+    model = product.get("model", "")
+    category = product.get("category", "")
 
-    crawl_output = crawl_result.get("output") or {}
-    sample_count = _safe_int(crawl_output.get("sample_count"), 0)
+    system_prompt = """당신은 중고거래 시세 분석 전문가입니다.
+주어진 상품의 현재 시세를 조사하고 가격 전략 수립에 필요한 정보를 수집합니다.
 
-    # ── 에이전트 판단: 표본 부족하면 RAG로 보완 ──────────────────
-    rag_output = {}
-    if sample_count < 3:
-        _log(state, f"agent2:sample_count={sample_count}<3 → selecting_tool:rag_price_tool")
-        rag_result = _run_async(rag_price_tool(product))
-        _record_tool_call(state, rag_result)
-        rag_output = rag_result.get("output") or {}
-    else:
-        _log(state, f"agent2:sample_count={sample_count} sufficient, skipping rag")
+반드시 따라야 할 규칙:
+1. lc_market_crawl_tool을 먼저 호출해 현재 매물 시세를 수집한다.
+2. 결과의 sample_count가 3 미만이면 lc_rag_price_tool을 추가로 호출해 보완한다.
+3. 모든 수집이 끝나면 최종 JSON을 반환한다.
 
-    # ── 결과 통합 ────────────────────────────────────────────────
+최종 응답 형식 (JSON만, 설명 없이):
+{"median_price": 숫자, "price_band": [최저, 최고], "sample_count": 숫자, "crawler_sources": ["플랫폼명"]}"""
+
+    user_prompt = f"""상품 정보:
+- 브랜드: {brand}
+- 모델: {model}
+- 카테고리: {category}
+
+위 상품의 중고 시세를 조사하고 최종 JSON을 반환하라."""
+
+    market_context_result = None
+
+    try:
+        llm = _build_react_llm()
+        if llm is None:
+            raise ValueError("LLM 초기화 실패 — API 키 확인 필요")
+
+        from langgraph.prebuilt import create_react_agent
+        agent = create_react_agent(
+            llm,
+            [lc_market_crawl_tool, lc_rag_price_tool],
+            prompt=system_prompt,
+        )
+
+        _log(state, "agent2:react_agent:invoking LLM with tools=[market_crawl, rag_price]")
+        result = _run_async(agent.ainvoke({
+            "messages": [HumanMessage(content=user_prompt)]
+        }))
+
+        # tool_calls 기록 (LLM이 실제로 호출한 툴 추적)
+        for msg in result.get("messages", []):
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    _log(state, f"agent2:llm_selected_tool:{tc.get('name', tc.get('type', '?'))}")
+                    _record_tool_call(state, {
+                        "tool_name": tc.get("name", ""),
+                        "input": tc.get("args", {}),
+                        "output": None,
+                        "success": True,
+                    })
+
+        # 최종 메시지에서 market_context 파싱
+        final_content = result["messages"][-1].content
+        _log(state, f"agent2:react_agent:final_response={final_content[:100]}")
+        market_context_result = _extract_market_context(final_content)
+
+    except Exception as e:
+        _record_error(state, "market_intelligence_node", f"react_agent failed: {e}")
+        _log(state, f"agent2:react_agent:failed error={e} → fallback to direct tool call")
+
+        # Fallback: 직접 툴 호출 (Python 로직)
+        from app.tools.agentic_tools import market_crawl_tool, rag_price_tool
+        crawl_result = _run_async(market_crawl_tool(product))
+        _record_tool_call(state, crawl_result)
+        crawl_output = crawl_result.get("output") or {}
+        sample_count = _safe_int(crawl_output.get("sample_count"), 0)
+
+        if sample_count < 3:
+            _log(state, f"agent2:fallback:sample_count={sample_count}<3 → rag_price_tool")
+            rag_result = _run_async(rag_price_tool(product))
+            _record_tool_call(state, rag_result)
+
+        market_context_result = {
+            "median_price": crawl_output.get("median_price"),
+            "price_band": crawl_output.get("price_band") or [],
+            "sample_count": sample_count,
+            "crawler_sources": crawl_output.get("crawler_sources") or [],
+        }
+
     state["market_context"] = MarketContext(
-        price_band=crawl_output.get("price_band") or [],
-        median_price=crawl_output.get("median_price"),
-        sample_count=sample_count,
-        crawler_sources=crawl_output.get("crawler_sources") or [],
+        price_band=market_context_result.get("price_band") or [],
+        median_price=market_context_result.get("median_price"),
+        sample_count=_safe_int(market_context_result.get("sample_count"), 0),
+        crawler_sources=market_context_result.get("crawler_sources") or [],
     )
-
-    if rag_output.get("rag_summary"):
-        meta = state.get("workflow_meta") or {}
-        meta["rag_summary"] = rag_output["rag_summary"]
-
     state["checkpoint"] = "B_market_complete"
     state["status"] = "market_analyzing"
-    _log(state, f"agent2:market_intelligence:done sample_count={sample_count}")
+    _log(state, f"agent2:market_intelligence:done sample_count={market_context_result.get('sample_count')}")
     return state
 
 
@@ -418,21 +533,29 @@ def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
 def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
     """
     게시 실패 후 복구 에이전트.
-    실패 원인을 진단하고, 자동 복구 가능한 경우 재시도 신호를 보낸다.
+    1. diagnose_publish_failure_tool — 원인 진단
+    2. auto_patch_tool — 자동 패치 생성 (Agent 4의 핵심)
+    3. discord_alert_tool — 알림 발송
     """
     _log(state, "agent4:recovery:start")
 
-    from app.tools.agentic_tools import diagnose_publish_failure_tool, discord_alert_tool
+    from app.tools.agentic_tools import (
+        diagnose_publish_failure_tool,
+        auto_patch_tool,
+        discord_alert_tool,
+    )
 
     publish_results = state.get("publish_results") or {}
+    canonical = state.get("canonical_listing") or {}
     diagnostics = []
+    patches = []
     any_auto_recoverable = False
 
     for platform, result in publish_results.items():
         if result.get("success"):
             continue
 
-        # ── 도구 선택: 장애 진단 ──────────────────────────────────
+        # ── 툴 1: 장애 진단 ──────────────────────────────────────
         _log(state, f"agent4:selecting_tool:diagnose_publish_failure platform={platform}")
         diag_call = diagnose_publish_failure_tool(
             platform=platform,
@@ -443,25 +566,39 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
         diag = diag_call.get("output") or {}
         diagnostics.append(diag)
 
-        if diag.get("auto_recoverable"):
+        # ── 툴 2: 자동 패치 제안 (Agent 4 핵심 툴) ───────────────
+        _log(state, f"agent4:selecting_tool:auto_patch_tool cause={diag.get('likely_cause')}")
+        patch_call = _run_async(auto_patch_tool(
+            platform=platform,
+            likely_cause=diag.get("likely_cause", "unknown"),
+            canonical_listing=canonical,
+            session_id=state.get("session_id", "unknown"),
+        ))
+        _record_tool_call(state, patch_call)
+        patch = patch_call.get("output") or {}
+        patches.append(patch)
+
+        if patch.get("auto_executable") or diag.get("auto_recoverable"):
             any_auto_recoverable = True
 
-        # ── 도구 선택: Discord 알림 (항상 호출) ─────────────────
+        # ── 툴 3: Discord 알림 ───────────────────────────────────
         _log(state, "agent4:selecting_tool:discord_alert_tool")
+        alert_msg = (
+            f"[{platform}] 게시 실패\n"
+            f"원인: {diag.get('likely_cause')}\n"
+            f"진단: {diag.get('patch_suggestion')}\n"
+            f"자동패치: {patch.get('type')} | 실행가능: {patch.get('auto_executable')}"
+        )
         alert_call = _run_async(discord_alert_tool(
-            message=(
-                f"[{platform}] 게시 실패\n"
-                f"원인: {diag.get('likely_cause')}\n"
-                f"제안: {diag.get('patch_suggestion')}\n"
-                f"자동복구: {diag.get('auto_recoverable')}"
-            ),
+            message=alert_msg,
             session_id=state.get("session_id", "unknown"),
             level="error",
         ))
         _record_tool_call(state, alert_call)
 
     state["publish_diagnostics"] = diagnostics
-    state["should_retry_publish"] = any_auto_recoverable  # 라우터가 읽는 신호
+    state["patch_suggestions"] = patches
+    state["should_retry_publish"] = any_auto_recoverable
 
     retry_count = _safe_int(state.get("publish_retry_count"), 0)
     if any_auto_recoverable and retry_count < 2:
@@ -529,6 +666,63 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
     else:
         state["status"] = "awaiting_sale_status_update"
         _log(state, "agent5:no_suggestion_generated")
+
+    return state
+
+
+def publish_node(state: SellerCopilotState) -> SellerCopilotState:
+    """
+    패키지를 실제 플랫폼에 게시한다.
+    성공/실패 결과를 state["publish_results"]에 기록.
+    실패가 있으면 recovery_node로 라우팅.
+    """
+    _log(state, "publish_node:start")
+
+    platform_packages = state.get("platform_packages") or {}
+    if not platform_packages:
+        _record_error(state, "publish_node", "platform_packages 없음")
+        state["status"] = "failed"
+        return state
+
+    from app.services.publish_service import PublishService
+    service = PublishService()
+    publish_results = {}
+
+    for platform, payload in platform_packages.items():
+        _log(state, f"publish_node:publishing platform={platform}")
+        try:
+            result = _run_async(service.publish(platform=platform, payload=payload))
+            publish_results[platform] = {
+                "success": result.success,
+                "external_url": result.external_url,
+                "external_listing_id": result.external_listing_id,
+                "error_code": result.error_code,
+                "error_message": result.error_message,
+                "evidence_path": result.evidence_path,
+            }
+            if result.success:
+                _log(state, f"publish_node:success platform={platform} url={result.external_url}")
+            else:
+                _log(state, f"publish_node:failed platform={platform} error={result.error_message}")
+        except Exception as e:
+            _record_error(state, "publish_node", f"{platform}: {e}")
+            publish_results[platform] = {
+                "success": False,
+                "error_code": "exception",
+                "error_message": str(e),
+            }
+
+    state["publish_results"] = publish_results
+    any_failed = any(not r.get("success") for r in publish_results.values())
+
+    if any_failed:
+        state["checkpoint"] = "D_publish_failed"
+        state["status"] = "publishing_failed"
+        _log(state, "publish_node:done some_failures=True → routing to recovery")
+    else:
+        state["checkpoint"] = "D_complete"
+        state["status"] = "published"
+        _log(state, "publish_node:done all_success=True")
 
     return state
 

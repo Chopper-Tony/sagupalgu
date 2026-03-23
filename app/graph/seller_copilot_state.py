@@ -14,6 +14,7 @@ CheckpointLiteral = Literal[
     "B_complete",
     "C_prepared",
     "C_complete",
+    "D_complete",
     "D_publish_failed",
     "D_recovering",
 ]
@@ -27,6 +28,7 @@ StatusLiteral = Literal[
     "draft_generated",
     "awaiting_publish_approval",
     "publishing",
+    "published",
     "completed",
     "publishing_failed",
     "failed",
@@ -162,6 +164,8 @@ class SellerCopilotState(TypedDict, total=False):
 
     # 게시 실패 진단 (검증·복구 에이전트)
     publish_diagnostics: List[PublishDiagnostics]
+    patch_suggestions: List[Dict[str, Any]]  # auto_patch_tool 결과 목록
+    should_retry_publish: bool               # recovery_node → route_after_recovery 신호
     publish_retry_count: int                 # 게시 자동 재시도 횟수
     publish_results: Dict[str, Any]
 
@@ -208,6 +212,8 @@ def create_initial_state(
         validation_retry_count=0,
         tool_calls=[],
         publish_diagnostics=[],
+        patch_suggestions=[],
+        should_retry_publish=False,
         publish_retry_count=0,
         publish_results={},
         sale_status=None,

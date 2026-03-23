@@ -40,6 +40,7 @@ class ListingService:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls_context: str = "",
     ) -> str:
         brand = confirmed_product.get("brand", "Unknown")
         model = confirmed_product.get("model", "상품")
@@ -54,7 +55,7 @@ class ListingService:
         goal = strategy.get("goal", "fast_sell")
         negotiation_policy = strategy.get("negotiation_policy", "")
 
-        return f"""
+        prompt = f"""
 You are an expert seller copilot for secondhand marketplace listings.
 
 Return ONLY valid JSON:
@@ -93,6 +94,11 @@ Strategy:
 Image paths:
 - {image_paths}
 """.strip()
+
+        if tool_calls_context:
+            prompt += f"\n\nAgent tool call history (for context):\n{tool_calls_context}"
+
+        return prompt
 
     def _extract_json_object(self, text: str) -> dict[str, Any]:
         text = text.strip()
@@ -175,6 +181,7 @@ Image paths:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls_context: str = "",
     ) -> dict[str, Any]:
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is not configured")
@@ -184,6 +191,7 @@ Image paths:
             market_context=market_context,
             strategy=strategy,
             image_paths=image_paths,
+            tool_calls_context=tool_calls_context,
         )
 
         headers = {
@@ -239,6 +247,7 @@ Image paths:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls_context: str = "",
     ) -> dict[str, Any]:
         if not getattr(settings, "gemini_api_key", None):
             raise ValueError("GEMINI_API_KEY is not configured")
@@ -252,6 +261,7 @@ Image paths:
             market_context=market_context,
             strategy=strategy,
             image_paths=image_paths,
+            tool_calls_context=tool_calls_context,
         )
 
         url = (
@@ -293,6 +303,7 @@ Image paths:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls_context: str = "",
     ) -> dict[str, Any]:
         if not getattr(settings, "upstage_api_key", None):
             raise ValueError("UPSTAGE_API_KEY is not configured")
@@ -306,6 +317,7 @@ Image paths:
             market_context=market_context,
             strategy=strategy,
             image_paths=image_paths,
+            tool_calls_context=tool_calls_context,
         )
 
         headers = {
@@ -346,6 +358,7 @@ Image paths:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls_context: str = "",
     ) -> dict[str, Any]:
         provider_order_map = {
             "openai": ["openai", "gemini", "solar"],
@@ -364,6 +377,7 @@ Image paths:
                         market_context=market_context,
                         strategy=strategy,
                         image_paths=image_paths,
+                        tool_calls_context=tool_calls_context,
                     )
 
                 if provider == "gemini":
@@ -372,6 +386,7 @@ Image paths:
                         market_context=market_context,
                         strategy=strategy,
                         image_paths=image_paths,
+                        tool_calls_context=tool_calls_context,
                     )
 
                 if provider == "solar":
@@ -380,6 +395,7 @@ Image paths:
                         market_context=market_context,
                         strategy=strategy,
                         image_paths=image_paths,
+                        tool_calls_context=tool_calls_context,
                     )
 
             except Exception:
@@ -397,12 +413,24 @@ Image paths:
         market_context: dict,
         strategy: dict,
         image_paths: list[str],
+        tool_calls: list = None,
     ) -> dict:
+        # Build tool_calls_context string from the list for prompt augmentation
+        tool_calls_context = ""
+        if tool_calls:
+            lines = []
+            for tc in tool_calls:
+                tool_name = tc.get("tool_name", "unknown")
+                success = tc.get("success", False)
+                lines.append(f"- {tool_name}: {'success' if success else 'failed'}")
+            tool_calls_context = "\n".join(lines)
+
         llm_result = await self._generate_copy(
             confirmed_product=confirmed_product,
             market_context=market_context,
             strategy=strategy,
             image_paths=image_paths,
+            tool_calls_context=tool_calls_context,
         )
 
         title = llm_result.get("title") or f"{confirmed_product.get('model', '상품')} 판매합니다"
