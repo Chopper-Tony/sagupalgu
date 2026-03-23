@@ -13,30 +13,30 @@ LangGraph Agentic Workflow로 구현.
 - **에이전틱**: `create_react_agent` + LangChain bind_tools (langchain-google-genai, langchain-openai)
 - **Vision AI**: OpenAI / Gemini (graceful fallback)
 - **Listing LLM**: Gemini 2.5 Flash (primary) → OpenAI → Solar (fallback 체인)
-- **DB**: Supabase (PostgreSQL + Storage) — 테이블 미생성
+- **DB**: Supabase (PostgreSQL + pgvector) — `migrations/001_pgvector_setup.sql` 적용 후 활성화
 - **크롤러/게시**: Playwright (웹 자동화), uiautomator2 (Android — 미구현)
 
-## 에이전트 구조 (5 에이전트 / 7 툴)
+## 에이전트 구조 (5 에이전트 / 10 툴)
 
 ### Agent 1: 상품 식별 에이전트
 - 노드: `product_identity_node`, `clarification_node`
 - 툴: 없음 (Vision AI 직접 호출, 룰 기반 분기)
 - 동작: user_product_input → 바로 확정 / candidates → confidence 체크 / 없으면 사용자 입력 요청
 
-### Agent 2: 시세·가격 전략 에이전트 ★ ReAct 구현
+### Agent 2: 시세·가격 전략 에이전트 ★ ReAct
 - 노드: `market_intelligence_node`, `pricing_strategy_node`
 - 툴: `lc_market_crawl_tool`, `lc_rag_price_tool`
 - 동작: `create_react_agent`로 LLM이 툴을 자율 선택. sample_count < 3이면 LLM이 rag_price_tool 추가 호출 결정
 
-### Agent 3: 판매글 생성 에이전트
+### Agent 3: 판매글 생성 에이전트 ★ ReAct
 - 노드: `copywriting_node`, `refinement_node`
-- 툴: `rewrite_listing_tool`
-- 동작: rewrite_instruction 있으면 rewrite_tool, 없으면 ListingService LLM 생성. tool_calls 기록을 프롬프트에 포함
+- 툴: `lc_generate_listing_tool`, `lc_rewrite_listing_tool`
+- 동작: `create_react_agent`로 LLM이 상황 판단. rewrite_instruction 있으면 rewrite, 없으면 generate 자율 선택
 
-### Agent 4: 검증·복구 에이전트
+### Agent 4: 검증·복구 에이전트 ★ ReAct
 - 노드: `validation_node`, `recovery_node`
-- 툴: `diagnose_publish_failure_tool`, `auto_patch_tool`, `discord_alert_tool`
-- 동작: 게시 실패 시 진단 → 자동 패치 생성 → Discord 알림. 자동복구 가능하면 publish 재시도
+- 툴: `lc_diagnose_publish_failure_tool`, `lc_auto_patch_tool`, `lc_discord_alert_tool`
+- 동작: `create_react_agent`로 LLM이 진단 → 패치 → Discord 알림 순서 자율 결정. 자동복구 가능하면 publish 재시도
 
 ### Agent 5: 판매 후 최적화 에이전트
 - 노드: `post_sale_optimization_node`
@@ -65,22 +65,28 @@ START
 > `build_graph()` / `build_post_confirmation_graph()` 이중 구조 폐기.
 > publish_node가 graph 내부에 포함되어 단일 실행으로 게시까지 완료.
 
-## 툴 목록 (7개)
+## 툴 목록 (10개)
 
 | # | 툴 이름 | 에이전트 | LangChain @tool | 구현 상태 |
 |---|---|---|---|---|
 | 1 | `lc_market_crawl_tool` | Agent 2 | ✅ | ✅ 실동작 |
-| 2 | `lc_rag_price_tool` | Agent 2 | ✅ | ✅ LLM 기반 RAG (Supabase pgvector 미연결) |
-| 3 | `rewrite_listing_tool` | Agent 3 | — | ✅ 실동작 |
-| 4 | `diagnose_publish_failure_tool` | Agent 4 | — | ✅ 규칙 기반 |
-| 5 | `auto_patch_tool` | Agent 4 | — | ✅ LLM 기반 패치 생성 |
-| 6 | `discord_alert_tool` | Agent 4 | — | ✅ 실동작 |
-| 7 | `price_optimization_tool` | Agent 5 | — | ✅ 규칙 기반 |
+| 2 | `lc_rag_price_tool` | Agent 2 | ✅ | ✅ pgvector → 키워드 → LLM 생성 3단계 RAG |
+| 3 | `lc_generate_listing_tool` | Agent 3 | ✅ | ✅ 신규 판매글 LLM 생성 |
+| 4 | `lc_rewrite_listing_tool` | Agent 3 | ✅ | ✅ 피드백 기반 재작성 |
+| 5 | `lc_diagnose_publish_failure_tool` | Agent 4 | ✅ | ✅ 규칙 기반 진단 |
+| 6 | `lc_auto_patch_tool` | Agent 4 | ✅ | ✅ LLM 기반 패치 생성 |
+| 7 | `lc_discord_alert_tool` | Agent 4 | ✅ | ✅ 실동작 |
+| 8 | `rewrite_listing_tool` | Agent 3 | — | ✅ lc_ 래퍼의 내부 구현 공유 |
+| 9 | `diagnose_publish_failure_tool` | Agent 4 | — | ✅ fallback용 |
+| 10 | `price_optimization_tool` | Agent 5 | — | ✅ 규칙 기반 |
 
 ## 레이어 구조
 
 - `app/graph/` — LangGraph StateGraph, 노드, 상태, 러너
-- `app/tools/agentic_tools.py` — 7개 툴 정의 (LangChain @tool 포함)
+- `app/tools/agentic_tools.py` — 10개 툴 정의 (LangChain @tool 7개 포함)
+- `app/db/pgvector_store.py` — pgvector 임베딩 생성·검색·삽입 (OpenAI embedding)
+- `migrations/001_pgvector_setup.sql` — pgvector 확장, price_history 테이블, RPC 함수
+- `scripts/setup_pgvector.py` — 테이블 확인 + 크롤 데이터 시딩 자동화
 - `app/publishers/` — 플랫폼 게시 adapter (Playwright 기반)
   - `bunjang_publisher.py`: `PatchedBunjangPublisher` (floating footer 클릭 버그 수정)
   - `joongna_publisher.py`: legacy adapter
@@ -105,12 +111,9 @@ START
 - 당근은 Android 에뮬레이터 기반, 현재 미구현
 
 ## 현재 미완성 항목 (TODO)
-- Supabase 테이블/버킷 미생성 (pgvector 포함)
-- Agent 3 copywriting_node → LLM bind_tools 전환 (현재 Python if-else)
-- Agent 4 recovery_node → LLM 자율 판단 전환 (현재 순서 고정)
-- Supabase pgvector 실제 데이터 적재 및 연결
+- pgvector 활성화: Supabase SQL Editor에서 `migrations/001_pgvector_setup.sql` 실행 후 `python scripts/setup_pgvector.py --seed`
 - 당근마켓 게시 구현 (Android 에뮬레이터)
-- 에이전틱 점수: 현재 88/100 → 목표 100/100
+- Supabase Storage 버킷 연결 (이미지 업로드)
 
 ## 주요 명령어
 
@@ -122,6 +125,10 @@ python -m playwright install chromium
 
 # 세션 갱신 (번개장터/중고나라 로그인 — 수동 필요)
 python scripts/manual_spikes/save_sessions.py   # 3 선택 → 두 플랫폼 동시
+
+# pgvector 활성화 (최초 1회 — SQL 마이그레이션 후 실행)
+python scripts/setup_pgvector.py --check    # 연결 확인
+python scripts/setup_pgvector.py --seed     # 가격 데이터 시딩
 
 # 전체 워크플로우 테스트 (AI 파이프라인 + 실제 게시까지)
 python -m scripts.test_seller_copilot_graph
@@ -136,4 +143,4 @@ uvicorn app.main:app --reload
 |---|---|---|
 | 초기 | 28/100 | 파이프라인 구조, LLM 툴 선택 없음 |
 | 1차 개선 | 88/100 | Agent 2 ReAct, publish_node 추가, recovery_node 연결, auto_patch_tool 구현 |
-| 목표 | 100/100 | Agent 3/4 LLM bind_tools, Supabase pgvector 연결 |
+| 2차 개선 | 100/100 | Agent 3/4 ReAct 전환, lc_ 툴 7개로 확대, Supabase pgvector RAG 연결 |
