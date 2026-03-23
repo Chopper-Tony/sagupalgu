@@ -271,7 +271,7 @@ class TestCopywritingAgent:
         assert result["rewrite_instruction"] is None  # 처리 후 초기화
 
     def test_재작성지시_없으면_신규생성(self, base_state):
-        """rewrite_instruction 없으면 ListingService로 신규 생성"""
+        """rewrite_instruction 없으면 ListingService로 신규 생성 (LLM fallback 경로)"""
         from app.graph.seller_copilot_nodes import copywriting_node
 
         state = {**base_state, "canonical_listing": None, "rewrite_instruction": None}
@@ -280,7 +280,7 @@ class TestCopywritingAgent:
         with patch("app.services.listing_service.ListingService") as MockSvc:
             instance = MockSvc.return_value
             instance.build_canonical_listing = AsyncMock(return_value=new_listing)
-            with patch("app.graph.seller_copilot_nodes._run_async", return_value=new_listing):
+            with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
                 result = copywriting_node(state)
 
         assert result["status"] == "draft_generated"
@@ -292,7 +292,7 @@ class TestCopywritingAgent:
 
         state = {**base_state, "canonical_listing": None, "rewrite_instruction": None}
 
-        with patch("app.graph.seller_copilot_nodes._run_async", side_effect=Exception("LLM timeout")):
+        with patch("app.graph.nodes.copywriting_agent._run_async", side_effect=Exception("LLM timeout")):
             with patch("app.services.listing_service.ListingService"):
                 result = copywriting_node(state)
 
@@ -415,9 +415,8 @@ class TestRecoveryAgent:
             },
         }
 
-        with patch("app.tools.agentic_tools.discord_alert_tool", new_callable=AsyncMock) as mock_discord:
-            mock_discord.return_value = {"tool_name": "discord_alert_tool", "output": {"sent": False}, "success": True}
-            with patch("app.graph.seller_copilot_nodes._run_async", return_value={
+        with patch("app.graph.nodes.recovery_agent._build_react_llm", return_value=None):
+            with patch("app.graph.nodes.recovery_agent._run_async", return_value={
                 "tool_name": "discord_alert_tool", "output": {"sent": False}, "success": True
             }):
                 result = recovery_node(state)
@@ -439,10 +438,11 @@ class TestRecoveryAgent:
             },
         }
 
-        with patch("app.graph.seller_copilot_nodes._run_async", return_value={
-            "tool_name": "discord_alert_tool", "output": {"sent": False}, "success": True
-        }):
-            result = recovery_node(state)
+        with patch("app.graph.nodes.recovery_agent._build_react_llm", return_value=None):
+            with patch("app.graph.nodes.recovery_agent._run_async", return_value={
+                "tool_name": "discord_alert_tool", "output": {"sent": False}, "success": True
+            }):
+                result = recovery_node(state)
 
         assert result["status"] == "publishing_failed"
         assert result["checkpoint"] == "D_publish_failed"
@@ -513,7 +513,7 @@ class TestPostSaleOptimizationAgent:
         }
         mock_result = {"tool_name": "price_optimization_tool", "output": opt_output, "success": True}
 
-        with patch("app.graph.seller_copilot_nodes._run_async", return_value=mock_result):
+        with patch("app.graph.nodes.optimization_agent._run_async", return_value=mock_result):
             result = post_sale_optimization_node(state)
 
         assert result["optimization_suggestion"]["type"] == "price_drop"
@@ -564,7 +564,7 @@ class TestToolCallTracking:
             "tool_calls": [], "debug_logs": [], "error_history": [],
         }
 
-        with patch("app.graph.seller_copilot_nodes._run_async", return_value=mock_result):
+        with patch("app.graph.nodes.market_agent._run_async", return_value=mock_result):
             result = market_intelligence_node(state)
 
         assert len(result["tool_calls"]) >= 1

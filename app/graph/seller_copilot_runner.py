@@ -273,6 +273,7 @@ class SellerCopilotRunner:
         user_product_input: Optional[Dict[str, Any]] = None,
         product_candidates: Optional[List[Dict[str, Any]]] = None,
         market_context: Optional[Dict[str, Any]] = None,
+        rewrite_instruction: Optional[str] = None,
     ) -> SellerCopilotState:
         state = create_initial_state(
             session_id=session_id,
@@ -286,6 +287,9 @@ class SellerCopilotRunner:
 
         if market_context:
             state["market_context"] = market_context
+
+        if rewrite_instruction:
+            state["rewrite_instruction"] = rewrite_instruction
 
         state["_product_identity_hook_result"] = self.adapter.product_identity_hook(state)
         state["_market_intelligence_hook_result"] = self.adapter.market_intelligence_hook(state)
@@ -302,6 +306,7 @@ class SellerCopilotRunner:
         user_product_input: Optional[Dict[str, Any]] = None,
         product_candidates: Optional[List[Dict[str, Any]]] = None,
         market_context: Optional[Dict[str, Any]] = None,
+        rewrite_instruction: Optional[str] = None,
     ) -> SellerCopilotState:
         initial_state = self.build_initial_state(
             session_id=session_id,
@@ -310,6 +315,7 @@ class SellerCopilotRunner:
             user_product_input=user_product_input,
             product_candidates=product_candidates,
             market_context=market_context,
+            rewrite_instruction=rewrite_instruction,
         )
 
         final_state = seller_copilot_graph.invoke(initial_state)

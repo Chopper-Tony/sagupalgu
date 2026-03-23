@@ -16,30 +16,11 @@ from app.domain.session_status import resolve_next_action
 from app.repositories.session_repository import SessionRepository
 from app.services.product_service import ProductService
 from app.services.publish_service import PublishService
-from app.services.seller_copilot_service import SellerCopilotService
-
-
-def _normalize_text(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    value = str(value).strip()
-    if value.lower() in {"unknown", "none", "null", "n/a"}:
-        return ""
-    return value
-
-
-def _needs_user_input(candidate: Dict[str, Any]) -> bool:
-    model = _normalize_text(candidate.get("model"))
-    brand = _normalize_text(candidate.get("brand"))
-    category = _normalize_text(candidate.get("category"))
-    confidence = float(candidate.get("confidence", 0.0) or 0.0)
-    if not model:
-        return True
-    if not brand and not category:
-        return True
-    if confidence < 0.6:
-        return True
-    return False
+from app.services.seller_copilot_service import (
+    SellerCopilotService,
+    _needs_user_input,
+    _normalize_text,
+)
 
 
 class SessionService:
