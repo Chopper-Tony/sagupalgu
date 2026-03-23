@@ -245,16 +245,26 @@ class TestMarketIntelligenceAgent:
 class TestCopywritingAgent:
 
     def test_재작성지시_있으면_rewrite_tool_호출(self, base_state):
-        """rewrite_instruction이 있으면 rewrite_listing_tool을 선택한다"""
+        """rewrite_instruction이 있으면 LLM이 lc_rewrite_listing_tool을 자율 선택한다 (ReAct)"""
+        import json
         from app.graph.seller_copilot_nodes import copywriting_node
 
         state = {**base_state, "rewrite_instruction": "더 신뢰감 있게 작성해주세요"}
-
         rewritten = {**base_state["canonical_listing"], "title": "Apple iPhone 15 Pro 256GB 믿을 수 있는 판매자"}
-        mock_result = {"tool_name": "rewrite_listing_tool", "output": rewritten, "success": True}
 
-        with patch("app.tools.agentic_tools.rewrite_listing_tool", new_callable=AsyncMock) as mock_rewrite:
-            with patch("app.graph.seller_copilot_nodes._run_async", return_value=mock_result):
+        # ReAct agent가 반환하는 messages 구조: LLM tool_call → ToolMessage(JSON 결과)
+        llm_msg = MagicMock()
+        llm_msg.tool_calls = [{"name": "lc_rewrite_listing_tool", "args": {"rewrite_instruction": "더 신뢰감 있게"}}]
+        llm_msg.content = ""
+
+        tool_msg = MagicMock()
+        tool_msg.tool_calls = []
+        tool_msg.content = json.dumps(rewritten, ensure_ascii=False)
+
+        mock_agent_result = {"messages": [llm_msg, tool_msg]}
+
+        with patch("app.graph.seller_copilot_nodes._build_react_llm", return_value=MagicMock()):
+            with patch("app.graph.seller_copilot_nodes._run_async", return_value=mock_agent_result):
                 result = copywriting_node(state)
 
         assert result["canonical_listing"]["title"] == rewritten["title"]
