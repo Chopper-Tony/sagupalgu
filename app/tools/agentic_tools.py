@@ -150,8 +150,14 @@ async def _rag_price_impl(
 ) -> Dict[str, Any]:
     """
     RAG 가격 조회 실제 구현.
-    Retrieval: 크롤된 매물 데이터 또는 Supabase 벡터 검색
-    Augmented Generation: LLM이 데이터를 종합해 가격 추정
+
+    Retrieval 우선순위:
+      1. 전달받은 크롤 매물 (recent_listings)
+      2. Supabase pgvector 코사인 유사도 검색 (search_price_history RPC)
+      3. Supabase 키워드(ILIKE) 검색 (pgvector RPC 실패 시)
+
+    Augmented Generation:
+      LLM(Gemini → OpenAI)이 retrieved_docs를 분석해 가격 추정 생성
     """
     tool_input = {"product": confirmed_product}
     recent_listings = recent_listings or []
@@ -164,40 +170,59 @@ async def _rag_price_impl(
         model = confirmed_product.get("model", "")
 
         # ── Retrieval ──────────────────────────────────────────────
-        # 1순위: 전달받은 크롤 매물 사용
-        # 2순위: Supabase 벡터 검색 (테이블 생성 후 활성화)
-        retrieved_docs = recent_listings
+        retrieved_docs: List[Dict] = list(recent_listings)
+        retrieval_source = "crawl" if retrieved_docs else "none"
 
         if not retrieved_docs:
-            # Supabase pgvector 검색 시도 (테이블 미생성 시 fallback)
+            # 1순위: pgvector 코사인 유사도 검색
             try:
-                from app.db.supabase_client import get_supabase_client
-                supabase = get_supabase_client()
-                rows = supabase.table("price_history").select("*").ilike(
-                    "model", f"%{model}%"
-                ).limit(10).execute()
-                retrieved_docs = rows.data or []
-            except Exception:
-                retrieved_docs = []
+                from app.db.pgvector_store import vector_search_price_history, is_table_ready
+
+                if await is_table_ready() and settings.openai_api_key:
+                    rows = await vector_search_price_history(
+                        brand=brand,
+                        model=model,
+                        api_key=settings.openai_api_key,
+                        match_count=10,
+                        match_threshold=0.4,
+                    )
+                    if rows:
+                        retrieved_docs = rows
+                        retrieval_source = "pgvector"
+                        logger.info(f"[rag_price] pgvector: {len(rows)}건 검색됨")
+            except Exception as e:
+                logger.warning(f"[rag_price] pgvector search failed: {e}")
+
+        if not retrieved_docs:
+            # 2순위: 키워드 기반 검색 (fallback)
+            try:
+                from app.db.pgvector_store import keyword_search_price_history
+                rows = await keyword_search_price_history(model=model, brand=brand, limit=10)
+                if rows:
+                    retrieved_docs = rows
+                    retrieval_source = "keyword"
+                    logger.info(f"[rag_price] keyword: {len(rows)}건 검색됨")
+            except Exception as e:
+                logger.warning(f"[rag_price] keyword search failed: {e}")
 
         # ── Augmented Generation ───────────────────────────────────
-        # LLM이 retrieved_docs를 분석해 가격 추정 생성
         doc_summary = "\n".join([
-            f"- {d.get('title', d.get('model', '?'))}: {d.get('price', '?')}원"
+            f"- {d.get('title', d.get('model', '?'))}: {d.get('price', '?')}원 ({d.get('platform', '?')})"
             for d in retrieved_docs[:8]
         ]) or "수집된 과거 거래 데이터 없음"
 
+        confidence_hint = "high" if len(retrieved_docs) >= 5 else ("medium" if retrieved_docs else "low")
+
         prompt = f"""다음 중고 거래 데이터를 바탕으로 {brand} {model}의 적정 가격을 추정하라.
 
-참고 데이터:
+참고 데이터 ({retrieval_source}, {len(retrieved_docs)}건):
 {doc_summary}
 
 반드시 JSON만 반환:
-{{"estimated_price_band": [최저가, 최고가], "rag_summary": "한 줄 요약", "confidence": "high|medium|low"}}
+{{"estimated_price_band": [최저가, 최고가], "rag_summary": "한 줄 요약", "confidence": "{confidence_hint}"}}
 
 데이터가 없으면 일반 지식 기반으로 추정하고 confidence를 low로 설정."""
 
-        # LLM 호출 (gemini 우선, openai fallback)
         rag_result = None
 
         if settings.gemini_api_key:
@@ -213,8 +238,7 @@ async def _rag_price_impl(
                         "generationConfig": {"temperature": 0.1},
                     })
                     resp.raise_for_status()
-                    data = resp.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                 rag_result = _extract_json(text)
             except Exception as e:
                 logger.warning(f"[rag_price] gemini failed: {e}")
@@ -244,6 +268,7 @@ async def _rag_price_impl(
         }
         output["rag_available"] = bool(rag_result)
         output["source_count"] = len(retrieved_docs)
+        output["retrieval_source"] = retrieval_source
 
         return _make_tool_call("rag_price_tool", tool_input, output, success=True)
 
@@ -256,16 +281,139 @@ async def _rag_price_impl(
         )
 
 
-# ── Tool 3: 판매글 재작성 ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# LangChain Tool 버전 — Agent 3 (판매글 생성) create_react_agent에 bind됨
+# ══════════════════════════════════════════════════════════════════
 
-async def rewrite_listing_tool(
+@tool
+async def lc_generate_listing_tool(
+    brand: str,
+    model: str,
+    category: str,
+    recommended_price: int,
+    image_paths_json: str = "[]",
+    platforms_json: str = '["bunjang","joongna"]',
+) -> str:
+    """
+    새 중고거래 판매글(제목, 설명, 태그, 가격)을 LLM으로 생성합니다.
+    rewrite_instruction이 없을 때(신규 생성) 반드시 이 툴을 호출하세요.
+    반환: JSON {"title": str, "description": str, "tags": [...], "price": int, "images": [...]}
+    """
+    try:
+        import json as _json
+        from app.services.listing_service import ListingService
+
+        image_paths = _json.loads(image_paths_json) if image_paths_json else []
+        platforms = _json.loads(platforms_json) if platforms_json else ["bunjang", "joongna"]
+
+        confirmed_product = {
+            "brand": brand, "model": model, "category": category,
+            "confidence": 1.0, "source": "user_input", "storage": "",
+        }
+        market_context = {
+            "median_price": recommended_price,
+            "price_band": [],
+            "sample_count": 1,
+            "crawler_sources": [],
+        }
+        strategy = {"goal": "fast_sell", "recommended_price": recommended_price}
+
+        svc = ListingService()
+        result = await svc.build_canonical_listing(
+            confirmed_product=confirmed_product,
+            market_context=market_context,
+            strategy=strategy,
+            image_paths=image_paths,
+        )
+        if isinstance(result, dict):
+            if not result.get("images"):
+                result["images"] = image_paths
+            return _json.dumps(result, ensure_ascii=False)
+        return str(result)
+
+    except Exception as e:
+        import json as _json
+        return _json.dumps({
+            "title": f"{brand} {model} 판매합니다",
+            "description": f"{brand} {model} 판매합니다. 상태 양호합니다. 문의 환영합니다.",
+            "tags": [t for t in [model, brand, category] if t][:5],
+            "price": recommended_price,
+            "images": [],
+            "error": str(e),
+        }, ensure_ascii=False)
+
+
+@tool
+async def lc_rewrite_listing_tool(
+    rewrite_instruction: str,
+    current_title: str,
+    current_description: str,
+    current_price: int,
+    brand: str,
+    model: str,
+    category: str,
+) -> str:
+    """
+    사용자의 피드백(rewrite_instruction)을 반영해 기존 판매글을 수정합니다.
+    rewrite_instruction이 있을 때 반드시 이 툴을 호출하세요.
+    반환: JSON {"title": str, "description": str, "tags": [...], "price": int}
+    """
+    try:
+        import json as _json
+        from app.services.listing_service import ListingService
+
+        canonical_listing = {
+            "title": current_title,
+            "description": current_description,
+            "price": current_price,
+            "images": [],
+            "tags": [model, brand, category],
+        }
+        confirmed_product = {
+            "brand": brand, "model": model, "category": category,
+            "confidence": 1.0, "source": "user_input", "storage": "",
+        }
+        market_context = {
+            "median_price": current_price,
+            "price_band": [],
+            "sample_count": 1,
+            "crawler_sources": [],
+        }
+        strategy = {"goal": "fast_sell", "recommended_price": current_price}
+
+        result = await _rewrite_listing_impl(
+            canonical_listing=canonical_listing,
+            rewrite_instruction=rewrite_instruction,
+            confirmed_product=confirmed_product,
+            market_context=market_context,
+            strategy=strategy,
+        )
+        output = result.get("output") or canonical_listing
+        if isinstance(output, dict):
+            return _json.dumps(output, ensure_ascii=False)
+        return str(output)
+
+    except Exception as e:
+        import json as _json
+        return _json.dumps({
+            "title": current_title,
+            "description": current_description,
+            "price": current_price,
+            "tags": [model, brand, category],
+            "error": str(e),
+        }, ensure_ascii=False)
+
+
+# ── Tool 3: 판매글 재작성 (내부 구현) ────────────────────────────
+
+async def _rewrite_listing_impl(
     canonical_listing: Dict[str, Any],
     rewrite_instruction: str,
     confirmed_product: Dict[str, Any],
     market_context: Dict[str, Any],
     strategy: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """사용자 피드백 기반 판매글 재작성. 에이전트 3이 rewrite_instruction이 있을 때 호출."""
+    """rewrite_listing_tool 내부 구현 (lc_rewrite_listing_tool과 공유)"""
     tool_input = {"instruction": rewrite_instruction, "current_title": canonical_listing.get("title")}
     try:
         from app.services.listing_service import ListingService
@@ -292,6 +440,23 @@ async def rewrite_listing_tool(
     except Exception as e:
         logger.error(f"[rewrite_listing_tool] failed: {e}")
         return _make_tool_call("rewrite_listing_tool", tool_input, canonical_listing, success=False, error=str(e))
+
+
+async def rewrite_listing_tool(
+    canonical_listing: Dict[str, Any],
+    rewrite_instruction: str,
+    confirmed_product: Dict[str, Any],
+    market_context: Dict[str, Any],
+    strategy: Dict[str, Any],
+) -> Dict[str, Any]:
+    """사용자 피드백 기반 판매글 재작성. 에이전트 3이 rewrite_instruction이 있을 때 호출."""
+    return await _rewrite_listing_impl(
+        canonical_listing=canonical_listing,
+        rewrite_instruction=rewrite_instruction,
+        confirmed_product=confirmed_product,
+        market_context=market_context,
+        strategy=strategy,
+    )
 
 
 # ── Tool 4: Discord 알림 ──────────────────────────────────────────
@@ -493,6 +658,76 @@ async def price_optimization_tool(
 
     except Exception as e:
         return _make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=False, error=str(e))
+
+
+# ══════════════════════════════════════════════════════════════════
+# LangChain Tool 버전 — Agent 4 (복구) create_react_agent에 bind됨
+# ══════════════════════════════════════════════════════════════════
+
+@tool
+def lc_diagnose_publish_failure_tool(
+    platform: str,
+    error_code: str,
+    error_message: str,
+) -> str:
+    """
+    게시 실패 원인을 분석하고 복구 가능 여부를 판단합니다.
+    실패한 각 플랫폼에 대해 반드시 가장 먼저 호출하세요.
+    반환: JSON {"likely_cause": str, "patch_suggestion": str, "auto_recoverable": bool}
+    """
+    result = diagnose_publish_failure_tool(
+        platform=platform,
+        error_code=error_code,
+        error_message=error_message,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
+
+
+@tool
+async def lc_auto_patch_tool(
+    platform: str,
+    likely_cause: str,
+    session_id: str,
+    current_title: str = "",
+    current_description: str = "",
+) -> str:
+    """
+    게시 실패 원인에 따라 자동 패치 방법을 생성합니다.
+    lc_diagnose_publish_failure_tool 호출 후 반드시 호출하세요.
+    likely_cause 값: login_expired | network | content_policy | unknown
+    반환: JSON {"type": str, "action": str, "auto_executable": bool, "message": str}
+    """
+    canonical_listing = {"title": current_title, "description": current_description}
+    result = await auto_patch_tool(
+        platform=platform,
+        likely_cause=likely_cause,
+        canonical_listing=canonical_listing,
+        session_id=session_id,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
+
+
+@tool
+async def lc_discord_alert_tool(
+    message: str,
+    session_id: str,
+    level: str = "error",
+) -> str:
+    """
+    Discord로 게시 실패 알림을 발송합니다.
+    진단과 패치 생성 후 반드시 호출하세요.
+    level: error | warning | info
+    반환: JSON {"sent": bool}
+    """
+    result = await discord_alert_tool(
+        message=message,
+        session_id=session_id,
+        level=level,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
 
 
 # ── 하위 호환: 이전 코드에서 직접 호출하는 함수 ──────────────────

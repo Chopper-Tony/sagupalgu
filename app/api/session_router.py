@@ -24,6 +24,82 @@ session_repository = SessionRepository()
 session_service = SessionService(session_repository=session_repository)
 
 
+def _resolve_next_action(status: str, needs_user_input: bool) -> str | None:
+    if status == "session_created":
+        return "upload_images"
+    if status == "images_uploaded":
+        return "analyze"
+    if status == "awaiting_product_confirmation":
+        return "provide_product_info" if needs_user_input else "confirm_product"
+    if status == "product_confirmed":
+        return "generate_listing"
+    if status == "draft_generated":
+        return "prepare_publish"
+    if status == "awaiting_publish_approval":
+        return "publish"
+    if status == "publishing":
+        return "poll_status"
+    if status == "completed":
+        return "done"
+    if status in {"failed", "publishing_failed"}:
+        return "retry_or_edit"
+    return None
+
+
+def _build_session_ui_response(session: dict) -> dict:
+    product_data = session.get("product_data_jsonb", {}) or {}
+    listing_data = session.get("listing_data_jsonb", {}) or {}
+    workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
+
+    status = session.get("status", "")
+    needs_user_input = bool(product_data.get("needs_user_input", False))
+
+    return {
+        "session_id": session["session_id"],
+        "status": status,
+        "checkpoint": workflow_meta.get("checkpoint"),
+        "next_action": _resolve_next_action(status, needs_user_input),
+        "needs_user_input": needs_user_input,
+        "user_input_prompt": product_data.get("user_input_prompt"),
+        "selected_platforms": session.get("selected_platforms_jsonb", []) or [],
+        "product": {
+            "image_paths": product_data.get("image_paths", []) or [],
+            "image_count": product_data.get("image_count", 0) or 0,
+            "analysis_source": product_data.get("analysis_source"),
+            "candidates": product_data.get("candidates", []) or [],
+            "confirmed_product": product_data.get("confirmed_product"),
+        },
+        "listing": {
+            "market_context": listing_data.get("market_context"),
+            "strategy": listing_data.get("strategy"),
+            "canonical_listing": listing_data.get("canonical_listing"),
+            "platform_packages": listing_data.get("platform_packages", {}) or {},
+        },
+        "publish": {
+            "results": workflow_meta.get("publish_results", {}) or {},
+        },
+        "debug": {
+            "graph_debug_logs": workflow_meta.get("graph_debug_logs", []) or [],
+            "validation_result": workflow_meta.get("validation_result"),
+            "last_error": workflow_meta.get("last_error"),
+        },
+    }
+
+
+def _get_ui_session(session_id: str) -> dict:
+    session = session_service.get_session(session_id)
+    raw = session_repository.get_by_id(session_id)
+
+    if not raw:
+        raise ValueError(f"Session not found: {session_id}")
+
+    merged = {
+        **session,
+        "selected_platforms_jsonb": raw.get("selected_platforms_jsonb", []) or [],
+    }
+    return _build_session_ui_response(merged)
+
+
 @router.post("", response_model=CreateSessionResponse)
 async def create_session():
     try:

@@ -383,48 +383,156 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
     rewrite_instruction = state.get("rewrite_instruction")
     existing_listing = state.get("canonical_listing")
 
-    # ── 에이전트 판단: 재작성 요청이 있는가? ─────────────────────
-    if rewrite_instruction and existing_listing:
-        _log(state, f"agent3:selecting_tool:rewrite_listing_tool instruction={rewrite_instruction[:30]}")
-        from app.tools.agentic_tools import rewrite_listing_tool
+    from app.tools.agentic_tools import lc_generate_listing_tool, lc_rewrite_listing_tool
+    from langchain_core.messages import HumanMessage
+    import json
 
-        result = _run_async(rewrite_listing_tool(
-            canonical_listing=existing_listing,
-            rewrite_instruction=rewrite_instruction,
-            confirmed_product=product,
-            market_context=market_context,
-            strategy=strategy,
-        ))
-        _record_tool_call(state, result)
+    brand = product.get("brand", "")
+    model = product.get("model", "")
+    category = product.get("category", "")
+    recommended_price = _safe_int(strategy.get("recommended_price"), 0)
+    image_paths = state.get("image_paths") or []
+    selected_platforms = state.get("selected_platforms") or ["bunjang", "joongna"]
 
-        if result.get("success") and result.get("output"):
-            state["canonical_listing"] = result["output"]
-            state["rewrite_instruction"] = None  # 처리 완료 후 초기화
-            _log(state, "agent3:rewrite:success")
-        else:
-            _log(state, f"agent3:rewrite:failed error={result.get('error')}")
-            # 실패해도 기존 listing 유지
+    # 기존 listing 요약 (재작성 시 LLM 컨텍스트로 제공)
+    existing_summary = ""
+    if existing_listing:
+        existing_summary = (
+            f"\n현재 판매글:\n"
+            f"- 제목: {existing_listing.get('title', '')}\n"
+            f"- 설명: {(existing_listing.get('description') or '')[:120]}...\n"
+            f"- 가격: {existing_listing.get('price', 0)}원"
+        )
+
+    # LLM에게 상황을 명확히 알려 툴 선택 유도
+    if rewrite_instruction:
+        task_directive = (
+            f"\n[작업] 사용자 수정 요청: \"{rewrite_instruction}\"\n"
+            f"→ lc_rewrite_listing_tool을 호출해 기존 판매글을 수정하라."
+        )
     else:
-        # ── 신규 생성: ListingService 직접 호출 ──────────────────
-        _log(state, "agent3:selecting_tool:listing_service (new generation)")
+        task_directive = (
+            "\n[작업] 수정 요청 없음 — 신규 판매글 생성.\n"
+            "→ lc_generate_listing_tool을 호출해 새 판매글을 생성하라."
+        )
+
+    # 이전 툴 호출 기록 (카피라이팅 판단에 활용)
+    prior_tool_calls = "\n".join([
+        f"- {tc.get('tool_name')}: {str(tc.get('input', {}))[:60]}"
+        for tc in (state.get("tool_calls") or [])[-3:]
+    ])
+
+    system_prompt = (
+        "당신은 중고거래 카피라이팅 전문 에이전트입니다.\n"
+        "주어진 상품 정보와 시장 데이터를 활용해 매력적인 판매글을 작성합니다.\n\n"
+        "규칙:\n"
+        "1. rewrite_instruction이 있으면 반드시 lc_rewrite_listing_tool을 호출한다.\n"
+        "2. rewrite_instruction이 없으면 반드시 lc_generate_listing_tool을 호출한다.\n"
+        "3. 툴 호출 결과(JSON)를 그대로 최종 응답으로 출력한다."
+    )
+
+    user_prompt = (
+        f"상품 정보:\n"
+        f"- 브랜드: {brand}\n"
+        f"- 모델: {model}\n"
+        f"- 카테고리: {category}\n"
+        f"- 추천 가격: {recommended_price}원\n"
+        f"- 이미지 경로: {json.dumps(image_paths, ensure_ascii=False)}\n"
+        f"- 플랫폼: {json.dumps(selected_platforms, ensure_ascii=False)}\n"
+        f"{existing_summary}"
+        f"{task_directive}\n"
+        + (f"\n이전 툴 호출 기록:\n{prior_tool_calls}" if prior_tool_calls else "")
+    )
+
+    new_listing = None
+
+    try:
+        llm = _build_react_llm()
+        if llm is None:
+            raise ValueError("LLM 초기화 실패 — API 키 확인 필요")
+
+        from langgraph.prebuilt import create_react_agent
+        agent = create_react_agent(
+            llm,
+            [lc_generate_listing_tool, lc_rewrite_listing_tool],
+            prompt=system_prompt,
+        )
+
+        _log(state, "agent3:react_agent:invoking LLM with tools=[generate_listing, rewrite_listing]")
+        result = _run_async(agent.ainvoke({
+            "messages": [HumanMessage(content=user_prompt)]
+        }))
+
+        # LLM이 선택한 툴 기록
+        for msg in result.get("messages", []):
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    _log(state, f"agent3:llm_selected_tool:{tc.get('name', '?')}")
+                    _record_tool_call(state, {
+                        "tool_name": tc.get("name", ""),
+                        "input": tc.get("args", {}),
+                        "output": None,
+                        "success": True,
+                    })
+
+        # ToolMessage 결과에서 listing JSON 추출
+        for msg in reversed(result.get("messages", [])):
+            content = getattr(msg, "content", "") or ""
+            if not content:
+                continue
+            try:
+                parsed = json.loads(content) if isinstance(content, str) else content
+                if isinstance(parsed, dict) and "title" in parsed:
+                    new_listing = parsed
+                    _log(state, f"agent3:react_agent:listing_extracted title={parsed.get('title', '')[:40]}")
+                    break
+            except Exception:
+                pass
+
+        # ToolMessage에서 못 찾으면 최종 메시지에서 JSON 추출 시도
+        if not new_listing:
+            import re
+            final_content = str(result["messages"][-1].content or "")
+            _log(state, f"agent3:react_agent:final_response={final_content[:100]}")
+            m = re.search(r'\{[^{}]*"title"[^{}]*\}', final_content, re.DOTALL)
+            if m:
+                try:
+                    new_listing = json.loads(m.group(0))
+                except Exception:
+                    pass
+
+    except Exception as e:
+        _record_error(state, "copywriting_node", f"react_agent failed: {e}")
+        _log(state, f"agent3:react_agent:failed error={e} → fallback to direct service call")
+
+        # Fallback: ListingService 직접 호출
         try:
             from app.services.listing_service import ListingService
-
             svc = ListingService()
-            image_paths = state.get("image_paths") or []
-            result = _run_async(svc.build_canonical_listing(
+            new_listing = _run_async(svc.build_canonical_listing(
                 confirmed_product=product,
                 market_context=market_context,
                 strategy=strategy,
                 image_paths=image_paths,
             ))
-            state["canonical_listing"] = result
-            _log(state, "agent3:new_listing:success")
-        except Exception as e:
-            _record_error(state, "copywriting_node", str(e))
-            # fallback: 템플릿 기반 생성
-            _log(state, f"agent3:llm_failed fallback to template error={e}")
-            state["canonical_listing"] = _build_template_listing(product, strategy, market_context, state)
+            _log(state, "agent3:fallback:direct_service_call:success")
+        except Exception as e2:
+            _record_error(state, "copywriting_node", f"fallback failed: {e2}")
+            _log(state, f"agent3:fallback:failed error={e2} → template")
+            new_listing = _build_template_listing(product, strategy, market_context, state)
+
+    if new_listing:
+        # CanonicalListing 필수 필드 보정
+        if not new_listing.get("images"):
+            new_listing["images"] = image_paths
+        if "product" not in new_listing:
+            new_listing["product"] = product
+        if "strategy" not in new_listing:
+            new_listing["strategy"] = strategy.get("goal", "fast_sell")
+        state["canonical_listing"] = new_listing
+        state["rewrite_instruction"] = None
+    elif not state.get("canonical_listing"):
+        state["canonical_listing"] = _build_template_listing(product, strategy, market_context, state)
 
     state["checkpoint"] = "B_draft_complete"
     state["status"] = "draft_generated"
@@ -532,71 +640,173 @@ def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
 
 def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
     """
-    게시 실패 후 복구 에이전트.
-    1. diagnose_publish_failure_tool — 원인 진단
-    2. auto_patch_tool — 자동 패치 생성 (Agent 4의 핵심)
-    3. discord_alert_tool — 알림 발송
+    게시 실패 후 복구 에이전트 (ReAct).
+    LLM이 실패 상황을 분석해 자율적으로 툴 호출 순서와 조합을 결정한다:
+    - lc_diagnose_publish_failure_tool: 원인 진단
+    - lc_auto_patch_tool: 자동 패치 생성
+    - lc_discord_alert_tool: Discord 알림 발송
     """
     _log(state, "agent4:recovery:start")
 
     from app.tools.agentic_tools import (
-        diagnose_publish_failure_tool,
-        auto_patch_tool,
-        discord_alert_tool,
+        lc_diagnose_publish_failure_tool,
+        lc_auto_patch_tool,
+        lc_discord_alert_tool,
     )
+    from langchain_core.messages import HumanMessage
+    import json
 
     publish_results = state.get("publish_results") or {}
     canonical = state.get("canonical_listing") or {}
-    diagnostics = []
+    session_id = state.get("session_id", "unknown")
+
+    # 실패 플랫폼 정리
+    failures = [
+        {
+            "platform": p,
+            "error_code": r.get("error_code", "unknown"),
+            "error_message": r.get("error_message", ""),
+        }
+        for p, r in publish_results.items()
+        if not r.get("success")
+    ]
+
+    if not failures:
+        state["should_retry_publish"] = False
+        state["checkpoint"] = "D_complete"
+        return state
+
+    system_prompt = (
+        "당신은 중고거래 플랫폼 게시 실패 복구 전문 에이전트입니다.\n"
+        "실패한 각 플랫폼에 대해 다음 순서로 반드시 툴을 호출하세요:\n\n"
+        "1. lc_diagnose_publish_failure_tool → 실패 원인 진단\n"
+        "2. lc_auto_patch_tool → 진단 결과 기반 패치 생성\n"
+        "3. lc_discord_alert_tool → 관리자에게 알림 발송\n\n"
+        "모든 플랫폼 처리 후 최종 JSON을 반환하라:\n"
+        '{"auto_recoverable": true/false, "should_retry": true/false, '
+        '"summary": "한 줄 요약"}'
+    )
+
+    failures_desc = "\n".join([
+        f"- 플랫폼: {f['platform']} | 에러코드: {f['error_code']} | 메시지: {f['error_message'][:80]}"
+        for f in failures
+    ])
+    current_title = canonical.get("title", "")
+    current_description = (canonical.get("description") or "")[:100]
+
+    user_prompt = (
+        f"게시 실패 목록:\n{failures_desc}\n\n"
+        f"현재 판매글 제목: {current_title}\n"
+        f"현재 판매글 설명(앞 100자): {current_description}\n"
+        f"session_id: {session_id}\n\n"
+        "위 실패 플랫폼 각각에 대해 진단 → 패치 → 알림 순으로 처리하고 "
+        "최종 복구 가능 여부를 JSON으로 반환하라."
+    )
+
     patches = []
     any_auto_recoverable = False
 
-    for platform, result in publish_results.items():
-        if result.get("success"):
-            continue
+    try:
+        llm = _build_react_llm()
+        if llm is None:
+            raise ValueError("LLM 초기화 실패")
 
-        # ── 툴 1: 장애 진단 ──────────────────────────────────────
-        _log(state, f"agent4:selecting_tool:diagnose_publish_failure platform={platform}")
-        diag_call = diagnose_publish_failure_tool(
-            platform=platform,
-            error_code=result.get("error_code", "unknown"),
-            error_message=result.get("error_message", ""),
+        from langgraph.prebuilt import create_react_agent
+        agent = create_react_agent(
+            llm,
+            [lc_diagnose_publish_failure_tool, lc_auto_patch_tool, lc_discord_alert_tool],
+            prompt=system_prompt,
         )
-        _record_tool_call(state, diag_call)
-        diag = diag_call.get("output") or {}
-        diagnostics.append(diag)
 
-        # ── 툴 2: 자동 패치 제안 (Agent 4 핵심 툴) ───────────────
-        _log(state, f"agent4:selecting_tool:auto_patch_tool cause={diag.get('likely_cause')}")
-        patch_call = _run_async(auto_patch_tool(
-            platform=platform,
-            likely_cause=diag.get("likely_cause", "unknown"),
-            canonical_listing=canonical,
-            session_id=state.get("session_id", "unknown"),
-        ))
-        _record_tool_call(state, patch_call)
-        patch = patch_call.get("output") or {}
-        patches.append(patch)
+        _log(state, "agent4:react_agent:invoking LLM with tools=[diagnose, auto_patch, discord_alert]")
+        result = _run_async(agent.ainvoke({
+            "messages": [HumanMessage(content=user_prompt)]
+        }))
 
-        if patch.get("auto_executable") or diag.get("auto_recoverable"):
-            any_auto_recoverable = True
+        # LLM이 선택한 툴 기록 + ToolMessage에서 패치 정보 추출
+        for msg in result.get("messages", []):
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    _log(state, f"agent4:llm_selected_tool:{tc.get('name', '?')}")
+                    _record_tool_call(state, {
+                        "tool_name": tc.get("name", ""),
+                        "input": tc.get("args", {}),
+                        "output": None,
+                        "success": True,
+                    })
 
-        # ── 툴 3: Discord 알림 ───────────────────────────────────
-        _log(state, "agent4:selecting_tool:discord_alert_tool")
-        alert_msg = (
-            f"[{platform}] 게시 실패\n"
-            f"원인: {diag.get('likely_cause')}\n"
-            f"진단: {diag.get('patch_suggestion')}\n"
-            f"자동패치: {patch.get('type')} | 실행가능: {patch.get('auto_executable')}"
+            # ToolMessage 결과에서 패치/복구 정보 파싱
+            content = getattr(msg, "content", "") or ""
+            if content:
+                try:
+                    parsed = json.loads(content) if isinstance(content, str) else content
+                    if isinstance(parsed, dict):
+                        if "auto_executable" in parsed:
+                            patches.append(parsed)
+                            if parsed.get("auto_executable"):
+                                any_auto_recoverable = True
+                        elif "auto_recoverable" in parsed:
+                            if parsed.get("auto_recoverable") or parsed.get("should_retry"):
+                                any_auto_recoverable = True
+                except Exception:
+                    pass
+
+        # 최종 메시지에서 복구 여부 재확인
+        import re
+        final_content = str(result["messages"][-1].content or "")
+        _log(state, f"agent4:react_agent:final_response={final_content[:100]}")
+        try:
+            m = re.search(r'\{[^{}]*"auto_recoverable"[^{}]*\}', final_content, re.DOTALL)
+            if m:
+                final_json = json.loads(m.group(0))
+                if final_json.get("auto_recoverable") or final_json.get("should_retry"):
+                    any_auto_recoverable = True
+        except Exception:
+            pass
+
+    except Exception as e:
+        _record_error(state, "recovery_node", f"react_agent failed: {e}")
+        _log(state, f"agent4:react_agent:failed error={e} → fallback to direct tool calls")
+
+        # Fallback: 기존 순서 고정 방식
+        from app.tools.agentic_tools import (
+            diagnose_publish_failure_tool,
+            auto_patch_tool,
+            discord_alert_tool,
         )
-        alert_call = _run_async(discord_alert_tool(
-            message=alert_msg,
-            session_id=state.get("session_id", "unknown"),
-            level="error",
-        ))
-        _record_tool_call(state, alert_call)
+        for f in failures:
+            platform = f["platform"]
+            diag_call = diagnose_publish_failure_tool(
+                platform=platform,
+                error_code=f["error_code"],
+                error_message=f["error_message"],
+            )
+            _record_tool_call(state, diag_call)
+            diag = diag_call.get("output") or {}
 
-    state["publish_diagnostics"] = diagnostics
+            patch_call = _run_async(auto_patch_tool(
+                platform=platform,
+                likely_cause=diag.get("likely_cause", "unknown"),
+                canonical_listing=canonical,
+                session_id=session_id,
+            ))
+            _record_tool_call(state, patch_call)
+            patch = patch_call.get("output") or {}
+            patches.append(patch)
+
+            if patch.get("auto_executable") or diag.get("auto_recoverable"):
+                any_auto_recoverable = True
+
+            alert_msg = (
+                f"[{platform}] 게시 실패 | 원인: {diag.get('likely_cause')} | "
+                f"패치: {patch.get('type')} | 자동실행: {patch.get('auto_executable')}"
+            )
+            _run_async(discord_alert_tool(
+                message=alert_msg,
+                session_id=session_id,
+                level="error",
+            ))
+
     state["patch_suggestions"] = patches
     state["should_retry_publish"] = any_auto_recoverable
 
@@ -604,7 +814,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
     if any_auto_recoverable and retry_count < 2:
         state["publish_retry_count"] = retry_count + 1
         state["checkpoint"] = "D_recovering"
-        _log(state, f"agent4:recovery:auto_recoverable retry={retry_count+1}")
+        _log(state, f"agent4:recovery:auto_recoverable retry={retry_count + 1}")
     else:
         state["checkpoint"] = "D_publish_failed"
         state["status"] = "publishing_failed"
