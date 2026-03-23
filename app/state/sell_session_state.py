@@ -1,18 +1,6 @@
-from typing import TypedDict, Literal, Any
+from typing import TypedDict, Any
 
-StateStatus = Literal[
-    "session_created",
-    "images_uploaded",
-    "awaiting_product_confirmation",
-    "product_confirmed",
-    "market_analyzing",
-    "draft_generated",
-    "awaiting_publish_approval",
-    "publishing",
-    "completed",
-    "publishing_failed",
-    "failed",
-]
+from app.domain.session_status import SessionStatus as StateStatus  # re-export alias
 
 
 class SellSessionState(TypedDict, total=False):
