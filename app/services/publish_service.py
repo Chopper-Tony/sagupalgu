@@ -67,6 +67,29 @@ class PublishService:
 
         raise ValueError(f"Unsupported platform: {platform}")
 
+    def build_platform_packages(
+        self,
+        canonical_listing: dict,
+        platform_targets: list[str],
+    ) -> dict:
+        """플랫폼별 가격 차등 패키지 생성. prepare_publish 단계에서 호출."""
+        base_price = int(canonical_listing.get("price", 0))
+        packages: dict = {}
+        for platform in platform_targets:
+            if platform == "bunjang":
+                price = base_price + 10000
+            elif platform == "daangn":
+                price = max(base_price - 4000, 0)
+            else:
+                price = base_price
+            packages[platform] = {
+                "title": canonical_listing.get("title", ""),
+                "body": canonical_listing.get("description", ""),
+                "price": price,
+                "images": canonical_listing.get("images", []),
+            }
+        return packages
+
     async def publish(self, platform: str, payload: dict) -> PublishResult:
 
         publisher = self.get_publisher(platform)

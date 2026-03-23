@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import nest_asyncio
-nest_asyncio.apply()
-
-import asyncio
 from copy import deepcopy
 from typing import Any
 
@@ -12,19 +8,36 @@ from app.services.market.market_service import MarketService
 from app.services.product_service import ProductService
 
 
+def _normalize_text(value: str | None) -> str:
+    if not value:
+        return ""
+    value = str(value).strip()
+    if value.lower() in {"unknown", "none", "null", "n/a"}:
+        return ""
+    return value
+
+
+def _needs_user_input(candidate: dict[str, Any]) -> bool:
+    model = _normalize_text(candidate.get("model"))
+    brand = _normalize_text(candidate.get("brand"))
+    category = _normalize_text(candidate.get("category"))
+    confidence = float(candidate.get("confidence", 0.0) or 0.0)
+    if not model:
+        return True
+    if not brand and not category:
+        return True
+    if confidence < 0.6:
+        return True
+    return False
+
+
 class SellerCopilotService:
     """
     SessionService와 LangGraph 사이의 응용 서비스.
 
-    현재 코드베이스 기준에서는 Product/Market 단계는 기존 서비스로 확정하고,
-    LangGraph에는 확정된 입력(product_candidates or user_product_input, market_context)
-    을 넣어 B/C 구간(가격 전략, 카피라이팅, 검증, 패키지 생성)을 안정적으로 실행한다.
-
-    이유:
-    - 현재 SellerCopilotRunner는 hook 결과를 graph 실행 전에 eager precompute 한다.
-    - 그래서 confirmed_product가 생기기 전에는 market/copy hook가 제대로 동작할 수 없다.
-    - 지금 단계에서는 '작동하는 production path'를 먼저 만들고,
-      다음 단계에서 hook lazy execution으로 고도화하는 편이 맞다.
+    Product/Market 분석은 각 서비스로 처리하고,
+    확정된 입력(confirmed_product, market_context)을 LangGraph에 넘겨
+    가격 전략 → 카피라이팅 → 검증 → 패키지 생성 구간을 실행한다.
     """
 
     def __init__(
@@ -37,37 +50,7 @@ class SellerCopilotService:
         self.market_service = market_service or MarketService()
         self.runner = runner or SellerCopilotRunner()
 
-    def _normalize_text(self, value: str | None) -> str:
-        if not value:
-            return ""
-
-        value = str(value).strip()
-        if value.lower() in {"unknown", "none", "null", "n/a"}:
-            return ""
-
-        return value
-
-    def _needs_user_input(self, candidate: dict[str, Any]) -> bool:
-        brand = self._normalize_text(candidate.get("brand"))
-        model = self._normalize_text(candidate.get("model"))
-        category = self._normalize_text(candidate.get("category"))
-        confidence = float(candidate.get("confidence", 0.0) or 0.0)
-
-        if not model:
-            return True
-        if not brand and not category:
-            return True
-        if confidence < 0.6:
-            return True
-
-        return False
-
-    def _build_clarification_prompt(self) -> str:
-        return (
-            "사진만으로 모델명을 정확히 식별하지 못했습니다. "
-            "모델명을 직접 입력해 주세요. "
-            "모델명이 잘 보이도록 다시 촬영한 사진을 올려도 됩니다."
-        )
+    # ── 내부 빌더 ─────────────────────────────────────────────────────
 
     def _build_confirmed_product_from_candidate(
         self, candidate: dict[str, Any]
@@ -87,17 +70,13 @@ class SellerCopilotService:
         brand: str | None = None,
         category: str | None = None,
     ) -> dict[str, Any]:
-        normalized_model = self._normalize_text(model)
-        normalized_brand = self._normalize_text(brand)
-        normalized_category = self._normalize_text(category)
-
+        normalized_model = _normalize_text(model)
         if not normalized_model:
             raise ValueError("Model name is required")
-
         return {
-            "brand": normalized_brand or "Unknown",
+            "brand": _normalize_text(brand) or "Unknown",
             "model": normalized_model,
-            "category": normalized_category or "unknown",
+            "category": _normalize_text(category) or "unknown",
             "confidence": 1.0,
             "source": "user_input",
             "storage": "",
@@ -134,15 +113,17 @@ class SellerCopilotService:
 
         if candidates is not None:
             product_data["candidates"] = candidates
-
         if confirmed_product is not None:
             product_data["confirmed_product"] = confirmed_product
 
         product_data["needs_user_input"] = needs_user_input
-
         if needs_user_input:
             product_data["user_input_type"] = "model_name"
-            product_data["user_input_prompt"] = self._build_clarification_prompt()
+            product_data["user_input_prompt"] = (
+                "사진만으로 모델명을 정확히 식별하지 못했습니다. "
+                "모델명을 직접 입력해 주세요. "
+                "모델명이 잘 보이도록 다시 촬영한 사진을 올려도 됩니다."
+            )
         else:
             product_data.pop("user_input_type", None)
             product_data.pop("user_input_prompt", None)
@@ -155,16 +136,9 @@ class SellerCopilotService:
         final_state: dict[str, Any],
     ) -> dict[str, Any]:
         listing_data = deepcopy(existing_listing_data)
-
-        if final_state.get("market_context") is not None:
-            listing_data["market_context"] = final_state.get("market_context")
-        if final_state.get("strategy") is not None:
-            listing_data["strategy"] = final_state.get("strategy")
-        if final_state.get("canonical_listing") is not None:
-            listing_data["canonical_listing"] = final_state.get("canonical_listing")
-        if final_state.get("platform_packages") is not None:
-            listing_data["platform_packages"] = final_state.get("platform_packages")
-
+        for key in ("market_context", "strategy", "canonical_listing", "platform_packages"):
+            if final_state.get(key) is not None:
+                listing_data[key] = final_state[key]
         return listing_data
 
     def _build_workflow_payload(
@@ -176,8 +150,7 @@ class SellerCopilotService:
     ) -> dict[str, Any]:
         workflow_meta = deepcopy(existing_workflow_meta)
         workflow_meta["schema_version"] = final_state.get(
-            "schema_version",
-            workflow_meta.get("schema_version", 1),
+            "schema_version", workflow_meta.get("schema_version", 1)
         )
         workflow_meta["checkpoint"] = final_state.get("checkpoint")
         workflow_meta["integration_phase"] = integration_phase
@@ -185,10 +158,9 @@ class SellerCopilotService:
         workflow_meta["graph_debug_logs"] = final_state.get("debug_logs", [])
         workflow_meta["validation_result"] = final_state.get("validation_result")
         workflow_meta["last_error"] = final_state.get("last_error")
-
         return workflow_meta
 
-    def _run_graph_for_confirmed_product(
+    def _run_graph(
         self,
         *,
         session_id: str,
@@ -196,6 +168,7 @@ class SellerCopilotService:
         selected_platforms: list[str],
         confirmed_product: dict[str, Any],
         market_context: dict[str, Any],
+        rewrite_instruction: str | None = None,
     ) -> dict[str, Any]:
         if confirmed_product.get("source") == "user_input":
             return self.runner.run(
@@ -209,6 +182,7 @@ class SellerCopilotService:
                     "storage": confirmed_product.get("storage", ""),
                 },
                 market_context=market_context,
+                rewrite_instruction=rewrite_instruction,
             )
 
         return self.runner.run(
@@ -217,15 +191,19 @@ class SellerCopilotService:
             selected_platforms=selected_platforms,
             product_candidates=[confirmed_product],
             market_context=market_context,
+            rewrite_instruction=rewrite_instruction,
         )
 
-    def run_product_analysis_and_listing_pipeline(
+    # ── 공개 API ──────────────────────────────────────────────────────
+
+    async def run_product_analysis_and_listing_pipeline(
         self,
         *,
         session_id: str,
         session_record: dict[str, Any],
         selected_platforms: list[str] | None = None,
         user_product_input: dict[str, Any] | None = None,
+        rewrite_instruction: str | None = None,
     ) -> dict[str, Any]:
         product_data = deepcopy(session_record.get("product_data_jsonb") or {})
         listing_data = deepcopy(session_record.get("listing_data_jsonb") or {})
@@ -250,7 +228,6 @@ class SellerCopilotService:
             confirmed_product = self._build_confirmed_product_from_existing(
                 existing_confirmed_product
             )
-
             product_data = self._build_product_payload(
                 product_data,
                 image_paths=image_paths,
@@ -268,7 +245,6 @@ class SellerCopilotService:
                 category=user_product_input.get("category"),
             )
             analysis_source = "user_input"
-
             product_data = self._build_product_payload(
                 product_data,
                 image_paths=image_paths,
@@ -281,11 +257,7 @@ class SellerCopilotService:
         # 3) confirmed_product가 없을 때만 vision 재분석
         else:
             try:
-                import nest_asyncio
-                nest_asyncio.apply()
-                vision_result = asyncio.run(
-                    self.product_service.identify_product(image_paths)
-                )
+                vision_result = await self.product_service.identify_product(image_paths)
             except Exception as exc:
                 raise ValueError(f"Vision analysis failed: {exc}") from exc
 
@@ -294,7 +266,7 @@ class SellerCopilotService:
                 raise ValueError("Vision provider returned no candidates")
 
             top_candidate = candidates[0]
-            if self._needs_user_input(top_candidate):
+            if _needs_user_input(top_candidate):
                 product_data = self._build_product_payload(
                     product_data,
                     image_paths=image_paths,
@@ -316,11 +288,8 @@ class SellerCopilotService:
                     "workflow_meta_jsonb": workflow_meta,
                 }
 
-            confirmed_product = self._build_confirmed_product_from_candidate(
-                top_candidate
-            )
+            confirmed_product = self._build_confirmed_product_from_candidate(top_candidate)
             analysis_source = "vision"
-
             product_data = self._build_product_payload(
                 product_data,
                 image_paths=image_paths,
@@ -331,18 +300,17 @@ class SellerCopilotService:
             )
 
         try:
-            market_context = asyncio.run(
-                self.market_service.analyze_market(confirmed_product)
-            )
+            market_context = await self.market_service.analyze_market(confirmed_product)
         except Exception as exc:
             raise ValueError(f"Market analysis failed: {exc}") from exc
 
-        final_state = self._run_graph_for_confirmed_product(
+        final_state = self._run_graph(
             session_id=session_id,
             image_paths=image_paths,
             selected_platforms=target_platforms,
             confirmed_product=confirmed_product,
             market_context=market_context,
+            rewrite_instruction=rewrite_instruction,
         )
 
         if final_state.get("confirmed_product"):
@@ -355,9 +323,7 @@ class SellerCopilotService:
 
         listing_data = self._build_listing_payload(listing_data, final_state)
         workflow_meta = self._build_workflow_payload(
-            workflow_meta,
-            final_state,
-            integration_phase="seller_copilot_service",
+            workflow_meta, final_state, integration_phase="seller_copilot_service"
         )
 
         return {
@@ -368,18 +334,23 @@ class SellerCopilotService:
             "listing_data_jsonb": listing_data,
             "workflow_meta_jsonb": workflow_meta,
         }
-    
 
-    async def run_listing_pipeline(self, session_id: str, session_record: dict) -> dict:
-        return self.run_product_analysis_and_listing_pipeline(
+    async def run_listing_pipeline(
+        self, session_id: str, session_record: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self.run_product_analysis_and_listing_pipeline(
             session_id=session_id,
             session_record=session_record,
         )
 
     async def run_rewrite_pipeline(
-        self, session_id: str, session_record: dict, rewrite_instruction: str
-    ) -> dict:
-        return self.run_product_analysis_and_listing_pipeline(
+        self,
+        session_id: str,
+        session_record: dict[str, Any],
+        rewrite_instruction: str,
+    ) -> dict[str, Any]:
+        return await self.run_product_analysis_and_listing_pipeline(
             session_id=session_id,
             session_record=session_record,
+            rewrite_instruction=rewrite_instruction,
         )
