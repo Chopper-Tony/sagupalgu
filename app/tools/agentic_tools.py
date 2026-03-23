@@ -150,8 +150,14 @@ async def _rag_price_impl(
 ) -> Dict[str, Any]:
     """
     RAG 가격 조회 실제 구현.
-    Retrieval: 크롤된 매물 데이터 또는 Supabase 벡터 검색
-    Augmented Generation: LLM이 데이터를 종합해 가격 추정
+
+    Retrieval 우선순위:
+      1. 전달받은 크롤 매물 (recent_listings)
+      2. Supabase pgvector 코사인 유사도 검색 (search_price_history RPC)
+      3. Supabase 키워드(ILIKE) 검색 (pgvector RPC 실패 시)
+
+    Augmented Generation:
+      LLM(Gemini → OpenAI)이 retrieved_docs를 분석해 가격 추정 생성
     """
     tool_input = {"product": confirmed_product}
     recent_listings = recent_listings or []
@@ -164,40 +170,59 @@ async def _rag_price_impl(
         model = confirmed_product.get("model", "")
 
         # ── Retrieval ──────────────────────────────────────────────
-        # 1순위: 전달받은 크롤 매물 사용
-        # 2순위: Supabase 벡터 검색 (테이블 생성 후 활성화)
-        retrieved_docs = recent_listings
+        retrieved_docs: List[Dict] = list(recent_listings)
+        retrieval_source = "crawl" if retrieved_docs else "none"
 
         if not retrieved_docs:
-            # Supabase pgvector 검색 시도 (테이블 미생성 시 fallback)
+            # 1순위: pgvector 코사인 유사도 검색
             try:
-                from app.db.supabase_client import get_supabase_client
-                supabase = get_supabase_client()
-                rows = supabase.table("price_history").select("*").ilike(
-                    "model", f"%{model}%"
-                ).limit(10).execute()
-                retrieved_docs = rows.data or []
-            except Exception:
-                retrieved_docs = []
+                from app.db.pgvector_store import vector_search_price_history, is_table_ready
+
+                if await is_table_ready() and settings.openai_api_key:
+                    rows = await vector_search_price_history(
+                        brand=brand,
+                        model=model,
+                        api_key=settings.openai_api_key,
+                        match_count=10,
+                        match_threshold=0.4,
+                    )
+                    if rows:
+                        retrieved_docs = rows
+                        retrieval_source = "pgvector"
+                        logger.info(f"[rag_price] pgvector: {len(rows)}건 검색됨")
+            except Exception as e:
+                logger.warning(f"[rag_price] pgvector search failed: {e}")
+
+        if not retrieved_docs:
+            # 2순위: 키워드 기반 검색 (fallback)
+            try:
+                from app.db.pgvector_store import keyword_search_price_history
+                rows = await keyword_search_price_history(model=model, brand=brand, limit=10)
+                if rows:
+                    retrieved_docs = rows
+                    retrieval_source = "keyword"
+                    logger.info(f"[rag_price] keyword: {len(rows)}건 검색됨")
+            except Exception as e:
+                logger.warning(f"[rag_price] keyword search failed: {e}")
 
         # ── Augmented Generation ───────────────────────────────────
-        # LLM이 retrieved_docs를 분석해 가격 추정 생성
         doc_summary = "\n".join([
-            f"- {d.get('title', d.get('model', '?'))}: {d.get('price', '?')}원"
+            f"- {d.get('title', d.get('model', '?'))}: {d.get('price', '?')}원 ({d.get('platform', '?')})"
             for d in retrieved_docs[:8]
         ]) or "수집된 과거 거래 데이터 없음"
 
+        confidence_hint = "high" if len(retrieved_docs) >= 5 else ("medium" if retrieved_docs else "low")
+
         prompt = f"""다음 중고 거래 데이터를 바탕으로 {brand} {model}의 적정 가격을 추정하라.
 
-참고 데이터:
+참고 데이터 ({retrieval_source}, {len(retrieved_docs)}건):
 {doc_summary}
 
 반드시 JSON만 반환:
-{{"estimated_price_band": [최저가, 최고가], "rag_summary": "한 줄 요약", "confidence": "high|medium|low"}}
+{{"estimated_price_band": [최저가, 최고가], "rag_summary": "한 줄 요약", "confidence": "{confidence_hint}"}}
 
 데이터가 없으면 일반 지식 기반으로 추정하고 confidence를 low로 설정."""
 
-        # LLM 호출 (gemini 우선, openai fallback)
         rag_result = None
 
         if settings.gemini_api_key:
@@ -213,8 +238,7 @@ async def _rag_price_impl(
                         "generationConfig": {"temperature": 0.1},
                     })
                     resp.raise_for_status()
-                    data = resp.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                 rag_result = _extract_json(text)
             except Exception as e:
                 logger.warning(f"[rag_price] gemini failed: {e}")
@@ -244,6 +268,7 @@ async def _rag_price_impl(
         }
         output["rag_available"] = bool(rag_result)
         output["source_count"] = len(retrieved_docs)
+        output["retrieval_source"] = retrieval_source
 
         return _make_tool_call("rag_price_tool", tool_input, output, success=True)
 
