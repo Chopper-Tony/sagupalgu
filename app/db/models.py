@@ -2,20 +2,7 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from typing import Any, Literal
 
-
-SessionStatus = Literal[
-    "session_created",
-    "images_uploaded",
-    "awaiting_product_confirmation",
-    "product_confirmed",
-    "market_analyzing",
-    "draft_generated",
-    "awaiting_publish_approval",
-    "publishing",
-    "completed",
-    "publishing_failed",
-    "failed",
-]
+from app.domain.session_status import SessionStatus  # noqa: F401 — re-export
 
 PlatformName = Literal["joongna", "bunjang", "daangn", "sagupalgu_market"]
 AuthType = Literal["id_password", "session_file", "emulator_session"]
