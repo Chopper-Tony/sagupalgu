@@ -80,7 +80,21 @@ START
 
 - `app/domain/session_status.py` — SessionStatus SSOT, ALLOWED_TRANSITIONS, resolve_next_action, is_terminal_status
 - `app/graph/` — LangGraph StateGraph, 노드, 상태, 러너
-- `app/tools/agentic_tools.py` — 10개 툴 정의 (LangChain @tool 7개 포함)
+- `app/tools/` — 에이전트별 툴 모듈 (agentic_tools.py는 re-export shim)
+  - `market_tools.py` — Agent 2 (lc_market_crawl_tool, lc_rag_price_tool)
+  - `listing_tools.py` — Agent 3 (lc_generate_listing_tool, lc_rewrite_listing_tool)
+  - `recovery_tools.py` — Agent 4 (lc_diagnose/auto_patch/discord_alert)
+  - `optimization_tools.py` — Agent 5 (price_optimization_tool)
+  - `_common.py` — 공통 헬퍼 (_make_tool_call, _extract_json)
+- `app/graph/nodes/` — 에이전트별 노드 모듈 (seller_copilot_nodes.py는 re-export shim)
+  - `helpers.py` — _run_async, _build_react_llm, 공통 state 헬퍼
+  - `product_agent.py` — Agent 1
+  - `market_agent.py` — Agent 2
+  - `copywriting_agent.py` — Agent 3
+  - `validation_agent.py` — Agent 4 검증
+  - `recovery_agent.py` — Agent 4 복구
+  - `packaging_agent.py` — 패키지 빌더 + 게시
+  - `optimization_agent.py` — Agent 5
 - `app/db/pgvector_store.py` — pgvector 임베딩 생성·검색·삽입 (OpenAI embedding)
 - `migrations/001_pgvector_setup.sql` — pgvector 확장, price_history 테이블, RPC 함수
 - `scripts/setup_pgvector.py` — 테이블 확인 + 크롤 데이터 시딩 자동화
@@ -150,7 +164,7 @@ python -m pytest tests/
 |---|---|---|
 | M1: 위생·테스트 기반 | ✅ 완료 | pytest.ini 고정, 33/33 테스트 green, 수동 스크립트 `scripts/manual/` 격리, screenshots git 제거 |
 | M2: 프로덕션 경로 단일화 | ✅ 완료 | `app/domain/session_status.py` SSOT 생성, _resolve_next_action 중복 제거, 그래프에서 publish/recovery/post_sale 노드 제거, graph.invoke(_start_node) 깨진 패턴 제거 |
-| M3: God File 분해 | 🚧 진행 중 | `agentic_tools.py`(742줄) → 에이전트별 모듈 분리, `seller_copilot_nodes.py`(978줄) → 노드별 모듈 분리 |
+| M3: God File 분해 | ✅ 완료 | `tools/` → `_common/market/listing/recovery/optimization_tools.py` 5개 모듈, `graph/nodes/` 패키지 → `helpers/product/market/copywriting/validation/recovery/packaging/optimization_agent.py` 8개 모듈, 원본 파일은 re-export shim으로 전환 |
 | M4: API 계약 정리 | 대기 | Pydantic 스키마 정규화, 에러 응답 통일 |
 | M5: 배포 준비 | 대기 | Dockerfile, CI, 환경변수 정리 |
 
