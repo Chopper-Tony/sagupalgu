@@ -635,6 +635,76 @@ async def price_optimization_tool(
         return _make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=False, error=str(e))
 
 
+# ══════════════════════════════════════════════════════════════════
+# LangChain Tool 버전 — Agent 4 (복구) create_react_agent에 bind됨
+# ══════════════════════════════════════════════════════════════════
+
+@tool
+def lc_diagnose_publish_failure_tool(
+    platform: str,
+    error_code: str,
+    error_message: str,
+) -> str:
+    """
+    게시 실패 원인을 분석하고 복구 가능 여부를 판단합니다.
+    실패한 각 플랫폼에 대해 반드시 가장 먼저 호출하세요.
+    반환: JSON {"likely_cause": str, "patch_suggestion": str, "auto_recoverable": bool}
+    """
+    result = diagnose_publish_failure_tool(
+        platform=platform,
+        error_code=error_code,
+        error_message=error_message,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
+
+
+@tool
+async def lc_auto_patch_tool(
+    platform: str,
+    likely_cause: str,
+    session_id: str,
+    current_title: str = "",
+    current_description: str = "",
+) -> str:
+    """
+    게시 실패 원인에 따라 자동 패치 방법을 생성합니다.
+    lc_diagnose_publish_failure_tool 호출 후 반드시 호출하세요.
+    likely_cause 값: login_expired | network | content_policy | unknown
+    반환: JSON {"type": str, "action": str, "auto_executable": bool, "message": str}
+    """
+    canonical_listing = {"title": current_title, "description": current_description}
+    result = await auto_patch_tool(
+        platform=platform,
+        likely_cause=likely_cause,
+        canonical_listing=canonical_listing,
+        session_id=session_id,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
+
+
+@tool
+async def lc_discord_alert_tool(
+    message: str,
+    session_id: str,
+    level: str = "error",
+) -> str:
+    """
+    Discord로 게시 실패 알림을 발송합니다.
+    진단과 패치 생성 후 반드시 호출하세요.
+    level: error | warning | info
+    반환: JSON {"sent": bool}
+    """
+    result = await discord_alert_tool(
+        message=message,
+        session_id=session_id,
+        level=level,
+    )
+    output = result.get("output", {})
+    return json.dumps(output, ensure_ascii=False)
+
+
 # ── 하위 호환: 이전 코드에서 직접 호출하는 함수 ──────────────────
 
 async def market_crawl_tool(confirmed_product: Dict[str, Any]) -> Dict[str, Any]:
