@@ -165,7 +165,7 @@ python -m pytest tests/
 | M1: 위생·테스트 기반 | ✅ 완료 | pytest.ini 고정, 33/33 테스트 green, 수동 스크립트 `scripts/manual/` 격리, screenshots git 제거 |
 | M2: 프로덕션 경로 단일화 | ✅ 완료 | `app/domain/session_status.py` SSOT 생성, _resolve_next_action 중복 제거, 그래프에서 publish/recovery/post_sale 노드 제거, graph.invoke(_start_node) 깨진 패턴 제거 |
 | M3: God File 분해 | ✅ 완료 | `tools/` → `_common/market/listing/recovery/optimization_tools.py` 5개 모듈, `graph/nodes/` 패키지 → `helpers/product/market/copywriting/validation/recovery/packaging/optimization_agent.py` 8개 모듈, 원본 파일은 re-export shim으로 전환 |
-| M4: API 계약 정리 | 대기 | Pydantic 스키마 정규화, 에러 응답 통일 |
+| M4: API 계약 정리 | ✅ 완료 | `ProductInfo/ListingInfo/PublishInfo` 중첩 스키마, `ErrorResponse` 통일, `RewriteListingRequest/SaleStatusRequest` 추가, `_build_session_ui_response` 데드 코드 제거, `_api_error` 헬퍼 적용 |
 | M5: 배포 준비 | 대기 | Dockerfile, CI, 환경변수 정리 |
 
 ## 에이전틱 점수 이력
