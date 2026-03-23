@@ -3,14 +3,16 @@ SessionService — 에이전틱 버전.
 
 변경 사항:
 1. 전체 async 전환 (asyncio.run() 제거)
-2. publish 실패 시 recovery_node 호출
-3. sale-status 입력 시 post_sale_optimization_node 호출
+2. publish 실패 시 recovery_node 직접 호출
+3. sale-status 입력 시 post_sale_optimization_node 직접 호출
 4. rewrite-listing 지원
+5. (M2) _resolve_next_action → app.domain.session_status.resolve_next_action 단일화
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from app.domain.session_status import resolve_next_action
 from app.repositories.session_repository import SessionRepository
 from app.services.product_service import ProductService
 from app.services.publish_service import PublishService
@@ -351,18 +353,15 @@ class SessionService:
         workflow_meta["publish_results"] = publish_results
 
         if any_failure:
-            # ── 에이전트 4 복구 노드 호출 ──────────────────────────
+            # ── 에이전트 4 복구 노드 직접 호출 ────────────────────
+            from app.graph.seller_copilot_nodes import recovery_node
             updated_session = self.repo.get_by_id(session_id)
             recovery_state = self._build_recovery_state(
                 session_id=session_id,
                 session=updated_session,
                 publish_results=publish_results,
             )
-            from app.graph.seller_copilot_graph import seller_copilot_graph
-            final_state = seller_copilot_graph.invoke(
-                {**recovery_state, "_start_node": "recovery_node"},
-                config={"recursion_limit": 10},
-            )
+            final_state = recovery_node(recovery_state)
             workflow_meta["publish_diagnostics"] = final_state.get("publish_diagnostics") or []
             workflow_meta["tool_calls"] = (
                 (workflow_meta.get("tool_calls") or [])
@@ -393,9 +392,9 @@ class SessionService:
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         workflow_meta["sale_status"] = sale_status
 
-        # 에이전트 5: 판매 후 최적화 graph 실행
+        # 에이전트 5: 판매 후 최적화 노드 직접 호출
+        from app.graph.seller_copilot_nodes import post_sale_optimization_node
         from app.graph.seller_copilot_state import create_initial_state
-        from app.graph.seller_copilot_graph import seller_copilot_graph
 
         listing_data = session.get("listing_data_jsonb") or {}
         product_data = session.get("product_data_jsonb") or {}
@@ -409,10 +408,7 @@ class SessionService:
         opt_state["confirmed_product"] = product_data.get("confirmed_product")
         opt_state["followup_due_at"] = workflow_meta.get("followup_due_at")
 
-        final_state = seller_copilot_graph.invoke(
-            {**opt_state, "_start_node": "post_sale_optimization_node"},
-            config={"recursion_limit": 5},
-        )
+        final_state = post_sale_optimization_node(opt_state)
 
         optimization = final_state.get("optimization_suggestion")
         if optimization:
@@ -480,7 +476,7 @@ class SessionService:
             "session_id": session.get("id") or session.get("session_id"),
             "status": status,
             "checkpoint": workflow_meta.get("checkpoint"),
-            "next_action": _resolve_next_action(status, needs_input),
+            "next_action": resolve_next_action(status, needs_input),
             "needs_user_input": needs_input,
             "user_input_prompt": product_data.get("user_input_prompt"),
             "selected_platforms": session.get("selected_platforms_jsonb") or [],
@@ -509,23 +505,6 @@ class SessionService:
                 "last_error": workflow_meta.get("last_error"),
             },
         }
-
-
-def _resolve_next_action(status: str, needs_user_input: bool) -> Optional[str]:
-    mapping = {
-        "session_created": "upload_images",
-        "images_uploaded": "analyze",
-        "awaiting_product_confirmation": "provide_product_info" if needs_user_input else "confirm_product",
-        "product_confirmed": "generate_listing",
-        "draft_generated": "prepare_publish",
-        "awaiting_publish_approval": "publish",
-        "publishing": "poll_status",
-        "completed": "done",
-        "publishing_failed": "retry_or_edit",
-        "awaiting_sale_status_update": "update_sale_status",
-        "optimization_suggested": "review_optimization",
-    }
-    return mapping.get(status)
 
 
 def _safe_int(value: Any, default: int = 0) -> int:

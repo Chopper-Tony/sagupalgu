@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from app.domain.session_status import resolve_next_action
 from app.repositories.session_repository import SessionRepository
 from app.schemas.session import (
     AnalyzeSessionResponse,
@@ -24,28 +25,6 @@ session_repository = SessionRepository()
 session_service = SessionService(session_repository=session_repository)
 
 
-def _resolve_next_action(status: str, needs_user_input: bool) -> str | None:
-    if status == "session_created":
-        return "upload_images"
-    if status == "images_uploaded":
-        return "analyze"
-    if status == "awaiting_product_confirmation":
-        return "provide_product_info" if needs_user_input else "confirm_product"
-    if status == "product_confirmed":
-        return "generate_listing"
-    if status == "draft_generated":
-        return "prepare_publish"
-    if status == "awaiting_publish_approval":
-        return "publish"
-    if status == "publishing":
-        return "poll_status"
-    if status == "completed":
-        return "done"
-    if status in {"failed", "publishing_failed"}:
-        return "retry_or_edit"
-    return None
-
-
 def _build_session_ui_response(session: dict) -> dict:
     product_data = session.get("product_data_jsonb", {}) or {}
     listing_data = session.get("listing_data_jsonb", {}) or {}
@@ -58,7 +37,7 @@ def _build_session_ui_response(session: dict) -> dict:
         "session_id": session["session_id"],
         "status": status,
         "checkpoint": workflow_meta.get("checkpoint"),
-        "next_action": _resolve_next_action(status, needs_user_input),
+        "next_action": resolve_next_action(status, needs_user_input),
         "needs_user_input": needs_user_input,
         "user_input_prompt": product_data.get("user_input_prompt"),
         "selected_platforms": session.get("selected_platforms_jsonb", []) or [],
