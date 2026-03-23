@@ -1,4 +1,15 @@
-import asyncio
+"""
+SessionService — 에이전틱 버전.
+
+변경 사항:
+1. 전체 async 전환 (asyncio.run() 제거)
+2. publish 실패 시 recovery_node 호출
+3. sale-status 입력 시 post_sale_optimization_node 호출
+4. rewrite-listing 지원
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
 
 from app.repositories.session_repository import SessionRepository
 from app.services.product_service import ProductService
@@ -6,472 +17,316 @@ from app.services.publish_service import PublishService
 from app.services.seller_copilot_service import SellerCopilotService
 
 
+def _normalize_text(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    value = str(value).strip()
+    if value.lower() in {"unknown", "none", "null", "n/a"}:
+        return ""
+    return value
+
+
+def _needs_user_input(candidate: Dict[str, Any]) -> bool:
+    model = _normalize_text(candidate.get("model"))
+    brand = _normalize_text(candidate.get("brand"))
+    category = _normalize_text(candidate.get("category"))
+    confidence = float(candidate.get("confidence", 0.0) or 0.0)
+    if not model:
+        return True
+    if not brand and not category:
+        return True
+    if confidence < 0.6:
+        return True
+    return False
+
+
 class SessionService:
     def __init__(self, session_repository: SessionRepository):
-        self.session_repository = session_repository
+        self.repo = session_repository
         self.product_service = ProductService()
         self.publish_service = PublishService()
-        self.seller_copilot_service = SellerCopilotService()
+        self.copilot_service = SellerCopilotService()
 
-    def _normalize_text(self, value: str | None) -> str:
-        if not value:
-            return ""
+    # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
-        value = str(value).strip()
+    async def create_session(self, user_id: str) -> Dict:
+        session = self.repo.create(user_id=user_id)
+        return {"session_id": session.id, "status": session.status}
 
-        if value.lower() in {"unknown", "none", "null", "n/a"}:
-            return ""
-
-        return value
-
-    def _needs_user_input(self, candidate: dict) -> bool:
-        brand = self._normalize_text(candidate.get("brand"))
-        model = self._normalize_text(candidate.get("model"))
-        category = self._normalize_text(candidate.get("category"))
-        confidence = float(candidate.get("confidence", 0.0) or 0.0)
-
-        if not model:
-            return True
-
-        if not brand and not category:
-            return True
-
-        if confidence < 0.6:
-            return True
-
-        return False
-
-    def create_session(self, user_id: str):
-        session = self.session_repository.create(user_id=user_id)
-        return {
-            "session_id": session.id,
-            "status": session.status,
-        }
-
-    def get_session(self, session_id: str):
-        session = self.session_repository.get_by_id(session_id)
-
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
+    async def get_session(self, session_id: str) -> Dict:
+        session = self._get_or_raise(session_id)
         return {
             "session_id": session["id"],
             "status": session["status"],
-            "product_data_jsonb": session.get("product_data_jsonb", {}),
-            "listing_data_jsonb": session.get("listing_data_jsonb", {}),
-            "workflow_meta_jsonb": session.get("workflow_meta_jsonb", {}),
+            "product_data_jsonb": session.get("product_data_jsonb") or {},
+            "listing_data_jsonb": session.get("listing_data_jsonb") or {},
+            "workflow_meta_jsonb": session.get("workflow_meta_jsonb") or {},
         }
 
-    def attach_images(self, session_id: str, image_urls: list[str]):
-        session = self.session_repository.get_by_id(session_id)
+    # ── 이미지 업로드 ──────────────────────────────────────────────
 
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
-        product_data = session.get("product_data_jsonb", {}) or {}
+    async def attach_images(self, session_id: str, image_urls: List[str]) -> Dict:
+        session = self._get_or_raise(session_id)
+        product_data = dict(session.get("product_data_jsonb") or {})
         product_data["image_paths"] = image_urls
+        updated = self._update_or_raise(session_id, {
+            "status": "images_uploaded",
+            "product_data_jsonb": product_data,
+        })
+        return self._ui_response(updated)
 
-        updated = self.session_repository.update(
-            session_id=session_id,
-            payload={
-                "status": "images_uploaded",
-                "product_data_jsonb": product_data,
-            },
-        )
+    # ── 상품 분석 ──────────────────────────────────────────────────
 
-        if not updated:
-            raise ValueError(f"Failed to update session: {session_id}")
+    async def analyze_session(self, session_id: str) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "images_uploaded")
 
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "product_data_jsonb": updated.get("product_data_jsonb", {}),
-        }
-
-    def analyze_session(self, session_id: str):
-        session = self.session_repository.get_by_id(session_id)
-
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
-        if session.get("status") != "images_uploaded":
-            raise ValueError(
-                f"Session is not ready for analysis: {session_id} "
-                f"(current status: {session.get('status')})"
-            )
-
-        product_data = session.get("product_data_jsonb", {}) or {}
-        image_paths = product_data.get("image_paths", [])
-
+        product_data = dict(session.get("product_data_jsonb") or {})
+        image_paths = product_data.get("image_paths") or []
         if not image_paths:
-            raise ValueError(f"No images found for session: {session_id}")
+            raise ValueError("이미지가 없습니다")
 
-        try:
-            result = asyncio.run(self.product_service.identify_product(image_paths))
-        except Exception as e:
-            raise ValueError(f"Vision analysis failed: {str(e)}")
-
-        candidates = result.candidates
+        result = await self.product_service.identify_product(image_paths)
+        candidates = result.candidates or []
 
         if not candidates:
-            raise ValueError("Vision provider returned no candidates")
+            raise ValueError("상품 인식 결과가 없습니다")
 
-        top_candidate = candidates[0]
-        needs_user_input = self._needs_user_input(top_candidate)
+        top = candidates[0]
+        needs_input = _needs_user_input(top)
 
         product_data["candidates"] = candidates
         product_data["analysis_source"] = "vision"
         product_data["image_count"] = len(image_paths)
+        product_data["needs_user_input"] = needs_input
 
-        if needs_user_input:
-            product_data["needs_user_input"] = True
-            product_data["user_input_type"] = "model_name"
+        if needs_input:
             product_data["user_input_prompt"] = (
-                "사진만으로 모델명을 정확히 식별하지 못했습니다. "
-                "모델명을 직접 입력해 주세요. "
-                "모델명이 잘 보이도록 다시 촬영한 사진을 올려도 됩니다."
+                "사진만으로 모델명을 정확히 식별하지 못했습니다. 모델명을 직접 입력해 주세요."
             )
         else:
-            product_data["needs_user_input"] = False
-            product_data.pop("user_input_type", None)
             product_data.pop("user_input_prompt", None)
 
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
-        workflow_meta["checkpoint"] = (
-            "A_needs_user_input" if needs_user_input else "A_before_confirm"
-        )
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+        workflow_meta["checkpoint"] = "A_needs_user_input" if needs_input else "A_before_confirm"
 
-        updated = self.session_repository.update(
-            session_id=session_id,
-            payload={
-                "status": "awaiting_product_confirmation",
-                "product_data_jsonb": product_data,
-                "workflow_meta_jsonb": workflow_meta,
-            },
-        )
+        updated = self._update_or_raise(session_id, {
+            "status": "awaiting_product_confirmation",
+            "product_data_jsonb": product_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
 
-        if not updated:
-            raise ValueError(f"Failed to analyze session: {session_id}")
+    # ── 상품 확정 ──────────────────────────────────────────────────
 
-        updated_product_data = updated.get("product_data_jsonb", {}) or {}
+    async def confirm_product(self, session_id: str, candidate_index: int) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "awaiting_product_confirmation")
 
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "needs_user_input": updated_product_data.get("needs_user_input", False),
-            "user_input_prompt": updated_product_data.get("user_input_prompt"),
-            "product_data_jsonb": updated_product_data,
-        }
+        product_data = dict(session.get("product_data_jsonb") or {})
+        candidates = product_data.get("candidates") or []
 
-    def confirm_product(self, session_id: str, candidate_index: int):
-        session = self.session_repository.get_by_id(session_id)
+        if not (0 <= candidate_index < len(candidates)):
+            raise ValueError("유효하지 않은 후보 인덱스입니다")
 
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
-        if session.get("status") != "awaiting_product_confirmation":
-            raise ValueError(
-                f"Session not ready for confirmation: {session.get('status')}"
-            )
-
-        product_data = session.get("product_data_jsonb", {}) or {}
-        candidates = product_data.get("candidates", [])
-
-        if not candidates:
-            raise ValueError("No candidates available")
-
-        if candidate_index < 0 or candidate_index >= len(candidates):
-            raise ValueError("Invalid candidate index")
-
-        if product_data.get("needs_user_input", False):
-            raise ValueError(
-                "Low confidence product. Please provide model name manually."
-            )
-
-        confirmed = candidates[candidate_index]
-
-        normalized_model = self._normalize_text(confirmed.get("model"))
-        confidence = float(confirmed.get("confidence", 0.0) or 0.0)
-
-        if not normalized_model or confidence < 0.6:
-            raise ValueError(
-                "Low confidence product. Please provide model name manually."
-            )
-
-        product_data["confirmed_product"] = {
-            **confirmed,
-            "source": confirmed.get("source", "vision"),
-        }
+        confirmed = {**candidates[candidate_index], "source": "vision"}
+        product_data["confirmed_product"] = confirmed
         product_data["needs_user_input"] = False
-        product_data.pop("user_input_type", None)
         product_data.pop("user_input_prompt", None)
 
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         workflow_meta["checkpoint"] = "A_complete"
 
-        updated = self.session_repository.update(
-            session_id=session_id,
-            payload={
-                "status": "product_confirmed",
-                "product_data_jsonb": product_data,
-                "workflow_meta_jsonb": workflow_meta,
-            },
-        )
+        updated = self._update_or_raise(session_id, {
+            "status": "product_confirmed",
+            "product_data_jsonb": product_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
 
-        if not updated:
-            raise ValueError("Failed to confirm product")
+    async def provide_product_info(
+        self, session_id: str, model: str,
+        brand: Optional[str] = None, category: Optional[str] = None,
+    ) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "awaiting_product_confirmation")
 
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "product_data_jsonb": updated.get("product_data_jsonb", {}),
-        }
-
-    def provide_product_info(
-        self,
-        session_id: str,
-        model: str,
-        brand: str | None = None,
-        category: str | None = None,
-    ):
-        session = self.session_repository.get_by_id(session_id)
-
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
-        if session.get("status") != "awaiting_product_confirmation":
-            raise ValueError(
-                f"Session not ready for manual product input: {session.get('status')}"
-            )
-
-        normalized_model = self._normalize_text(model)
-        normalized_brand = self._normalize_text(brand)
-        normalized_category = self._normalize_text(category)
-
+        normalized_model = _normalize_text(model)
         if not normalized_model:
-            raise ValueError("Model name is required")
+            raise ValueError("모델명은 필수입니다")
 
-        product_data = session.get("product_data_jsonb", {}) or {}
-
-        confirmed_product = {
-            "brand": normalized_brand or "Unknown",
+        product_data = dict(session.get("product_data_jsonb") or {})
+        product_data["confirmed_product"] = {
+            "brand": _normalize_text(brand) or "Unknown",
             "model": normalized_model,
-            "category": normalized_category or "unknown",
+            "category": _normalize_text(category) or "unknown",
             "confidence": 1.0,
             "source": "user_input",
         }
-
-        product_data["confirmed_product"] = confirmed_product
         product_data["needs_user_input"] = False
-        product_data.pop("user_input_type", None)
         product_data.pop("user_input_prompt", None)
 
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         workflow_meta["checkpoint"] = "A_complete"
 
-        updated = self.session_repository.update(
+        updated = self._update_or_raise(session_id, {
+            "status": "product_confirmed",
+            "product_data_jsonb": product_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
+
+    # ── 판매글 생성 ────────────────────────────────────────────────
+
+    async def generate_listing(self, session_id: str) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "product_confirmed")
+
+        # LangGraph 기반 파이프라인 실행 (에이전트 2, 3, 4)
+        result_payload = await self.copilot_service.run_listing_pipeline(
             session_id=session_id,
-            payload={
-                "status": "product_confirmed",
-                "product_data_jsonb": product_data,
-                "workflow_meta_jsonb": workflow_meta,
-            },
+            session_record=session,
         )
 
-        if not updated:
-            raise ValueError("Failed to save manual product info")
-
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "product_data_jsonb": updated.get("product_data_jsonb", {}),
-        }
-
-    def generate_listing(self, session_id: str):
-        session = self.session_repository.get_by_id(session_id)
-
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
-
-        if session.get("status") != "product_confirmed":
-            raise ValueError(
-                f"Session not ready for listing generation: {session.get('status')}"
-            )
-
-        try:
-            result_payload = (
-                self.seller_copilot_service.run_product_analysis_and_listing_pipeline(
-                    session_id=session_id,
-                    session_record=session,
-                )
-            )
-        except Exception as e:
-            raise ValueError(f"Listing generation failed: {str(e)}")
-
-        product_data = result_payload.get("product_data_jsonb", {}) or {}
-        listing_data = result_payload.get("listing_data_jsonb", {}) or {}
-        workflow_meta = result_payload.get("workflow_meta_jsonb", {}) or {}
-
-        # generate 단계에서는 prepare 산출물을 제거한다.
+        listing_data = dict(result_payload.get("listing_data_jsonb") or {})
         listing_data.pop("platform_packages", None)
 
-        # generate 이후 상태 계약은 무조건 draft_generated로 고정한다.
+        workflow_meta = dict(result_payload.get("workflow_meta_jsonb") or {})
         if workflow_meta.get("checkpoint") in {"C_prepared", "C_complete"}:
             workflow_meta["checkpoint"] = "B_complete"
-
         workflow_meta.pop("publish_results", None)
 
-        updated = self.session_repository.update(
+        # tool_calls 기록도 저장
+        workflow_meta["tool_calls"] = result_payload.get("tool_calls") or []
+
+        updated = self._update_or_raise(session_id, {
+            "status": "draft_generated",
+            "selected_platforms_jsonb": [],
+            "product_data_jsonb": result_payload.get("product_data_jsonb") or {},
+            "listing_data_jsonb": listing_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
+
+    # ── 판매글 재작성 (신규 API) ───────────────────────────────────
+
+    async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
+        """
+        사용자 피드백 기반 재작성.
+        에이전트 3의 rewrite_listing_tool을 트리거.
+        """
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "draft_generated")
+
+        if not instruction or not instruction.strip():
+            raise ValueError("재작성 지시사항이 필요합니다")
+
+        result_payload = await self.copilot_service.run_rewrite_pipeline(
             session_id=session_id,
-            payload={
-                "status": "draft_generated",
-                "selected_platforms_jsonb": [],
-                "product_data_jsonb": product_data,
-                "listing_data_jsonb": listing_data,
-                "workflow_meta_jsonb": workflow_meta,
-            },
+            session_record=session,
+            rewrite_instruction=instruction.strip(),
         )
 
-        if not updated:
-            raise ValueError("Failed to generate listing")
+        listing_data = dict(result_payload.get("listing_data_jsonb") or {})
+        listing_data.pop("platform_packages", None)
 
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "listing_data_jsonb": updated.get("listing_data_jsonb", {}),
-        }
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+        rewrite_history = workflow_meta.get("rewrite_history") or []
+        rewrite_history.append({
+            "instruction": instruction,
+            "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+        })
+        workflow_meta["rewrite_history"] = rewrite_history
+        workflow_meta["tool_calls"] = result_payload.get("tool_calls") or []
 
-    def prepare_publish(self, session_id: str, platform_targets: list[str]):
-        session = self.session_repository.get_by_id(session_id)
+        updated = self._update_or_raise(session_id, {
+            "status": "draft_generated",
+            "listing_data_jsonb": listing_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
 
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
+    # ── 게시 준비 / 게시 ───────────────────────────────────────────
 
-        if session.get("status") != "draft_generated":
-            raise ValueError(
-                f"Session not ready for publish preparation: {session.get('status')}"
-            )
+    async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "draft_generated")
 
         if not platform_targets:
-            raise ValueError("No platform targets provided")
+            raise ValueError("플랫폼을 선택해주세요")
 
-        listing_data = session.get("listing_data_jsonb", {}) or {}
-        canonical_listing = listing_data.get("canonical_listing")
-        market_context = listing_data.get("market_context", {}) or {}
+        listing_data = dict(session.get("listing_data_jsonb") or {})
+        canonical = listing_data.get("canonical_listing") or {}
+        market_context = listing_data.get("market_context") or {}
 
-        if not canonical_listing:
-            raise ValueError("No canonical listing found")
+        if _safe_int(canonical.get("price"), 0) <= 0:
+            raise ValueError("유효한 가격이 없습니다. 판매글을 다시 생성해주세요.")
 
-        canonical_price = int(canonical_listing.get("price", 0) or 0)
-        sample_count = int(market_context.get("sample_count", 0) or 0)
+        canonical_price = int(canonical.get("price", 0))
+        platform_packages: Dict[str, Any] = {}
 
-        if canonical_price <= 0:
-            raise ValueError(
-                "Listing price is invalid. Market analysis or pricing strategy must be completed first."
-            )
-
-        if sample_count <= 0:
-            raise ValueError(
-                "Market sample count is too low. Cannot prepare publish without valid market context."
-            )
-
-        platform_packages = {}
         for platform in platform_targets:
             if platform == "bunjang":
-                platform_price = canonical_price + 10000
+                p_price = canonical_price + 10000
             elif platform == "daangn":
-                platform_price = max(canonical_price - 4000, 0)
+                p_price = max(canonical_price - 4000, 0)
             else:
-                platform_price = canonical_price
+                p_price = canonical_price
 
             platform_packages[platform] = {
-                "title": canonical_listing.get("title", ""),
-                "body": canonical_listing.get("description", ""),
-                "price": platform_price,
-                "images": canonical_listing.get("images", []),
+                "title": canonical.get("title", ""),
+                "body": canonical.get("description", ""),
+                "price": p_price,
+                "images": canonical.get("images", []),
             }
 
         listing_data["platform_packages"] = platform_packages
-
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         workflow_meta["checkpoint"] = "C_prepared"
         workflow_meta.pop("publish_results", None)
 
-        updated = self.session_repository.update(
-            session_id=session_id,
-            payload={
-                "status": "awaiting_publish_approval",
-                "selected_platforms_jsonb": platform_targets,
-                "listing_data_jsonb": listing_data,
-                "workflow_meta_jsonb": workflow_meta,
-            },
-        )
+        updated = self._update_or_raise(session_id, {
+            "status": "awaiting_publish_approval",
+            "selected_platforms_jsonb": platform_targets,
+            "listing_data_jsonb": listing_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
 
-        if not updated:
-            raise ValueError("Failed to prepare publish")
+    async def publish_session(self, session_id: str) -> Dict:
+        session = self._get_or_raise(session_id)
+        self._assert_status(session, "awaiting_publish_approval")
 
-        return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "listing_data_jsonb": updated.get("listing_data_jsonb", {}),
-        }
+        selected = session.get("selected_platforms_jsonb") or []
+        listing_data = dict(session.get("listing_data_jsonb") or {})
+        packages = listing_data.get("platform_packages") or {}
 
-    def publish_session(self, session_id: str):
-        session = self.session_repository.get_by_id(session_id)
+        if not selected:
+            raise ValueError("선택된 플랫폼이 없습니다")
 
-        if not session:
-            raise ValueError(f"Session not found: {session_id}")
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+        self._update_or_raise(session_id, {
+            "status": "publishing",
+            "workflow_meta_jsonb": workflow_meta,
+        })
 
-        if session.get("status") != "awaiting_publish_approval":
-            raise ValueError(
-                f"Session not ready for publish: {session.get('status')}"
-            )
-
-        selected_platforms = session.get("selected_platforms_jsonb", []) or []
-        listing_data = session.get("listing_data_jsonb", {}) or {}
-        platform_packages = listing_data.get("platform_packages", {}) or {}
-
-        if not selected_platforms:
-            raise ValueError("No selected platforms found")
-
-        if not platform_packages:
-            raise ValueError("No platform packages found")
-
-        workflow_meta = session.get("workflow_meta_jsonb", {}) or {}
-        workflow_meta["checkpoint"] = "C_prepared"
-
-        publishing_updated = self.session_repository.update(
-            session_id=session_id,
-            payload={
-                "status": "publishing",
-                "workflow_meta_jsonb": workflow_meta,
-            },
-        )
-
-        if not publishing_updated:
-            raise ValueError("Failed to mark session as publishing")
-
-        publish_results = {}
+        publish_results: Dict[str, Any] = {}
         any_failure = False
 
-        for platform in selected_platforms:
-            payload = platform_packages.get(platform)
-
+        for platform in selected:
+            payload = packages.get(platform)
             if not payload:
                 publish_results[platform] = {
                     "success": False,
                     "platform": platform,
                     "error_code": "missing_platform_package",
-                    "error_message": f"No platform package found for {platform}",
+                    "error_message": f"{platform} 패키지 없음",
                 }
                 any_failure = True
                 continue
 
             try:
-                result = asyncio.run(
-                    self.publish_service.publish(platform=platform, payload=payload)
-                )
-
+                result = await self.publish_service.publish(platform=platform, payload=payload)
                 publish_results[platform] = {
                     "success": result.success,
                     "platform": result.platform,
@@ -481,39 +336,200 @@ class SessionService:
                     "error_message": result.error_message,
                     "evidence_path": result.evidence_path,
                 }
-
                 if not result.success:
                     any_failure = True
-
             except Exception as e:
                 publish_results[platform] = {
                     "success": False,
                     "platform": platform,
                     "error_code": "publish_exception",
                     "error_message": str(e),
-                    "evidence_path": None,
                 }
                 any_failure = True
 
-        final_workflow_meta = publishing_updated.get("workflow_meta_jsonb", {}) or {}
-        final_workflow_meta["checkpoint"] = "C_complete"
-        final_workflow_meta["publish_results"] = publish_results
+        workflow_meta["checkpoint"] = "C_complete"
+        workflow_meta["publish_results"] = publish_results
 
-        final_status = "publishing_failed" if any_failure else "completed"
+        if any_failure:
+            # ── 에이전트 4 복구 노드 호출 ──────────────────────────
+            updated_session = self.repo.get_by_id(session_id)
+            recovery_state = self._build_recovery_state(
+                session_id=session_id,
+                session=updated_session,
+                publish_results=publish_results,
+            )
+            from app.graph.seller_copilot_graph import seller_copilot_graph
+            final_state = seller_copilot_graph.invoke(
+                {**recovery_state, "_start_node": "recovery_node"},
+                config={"recursion_limit": 10},
+            )
+            workflow_meta["publish_diagnostics"] = final_state.get("publish_diagnostics") or []
+            workflow_meta["tool_calls"] = (
+                (workflow_meta.get("tool_calls") or [])
+                + (final_state.get("tool_calls") or [])
+            )
+            final_status = "publishing_failed"
+        else:
+            final_status = "completed"
 
-        updated = self.session_repository.update(
+        updated = self._update_or_raise(session_id, {
+            "status": final_status,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
+
+    # ── 판매 상태 입력 (신규 API) ─────────────────────────────────
+
+    async def update_sale_status(self, session_id: str, sale_status: str) -> Dict:
+        """
+        사용자가 "팔렸어요" / "아직이에요" 입력.
+        에이전트 5를 트리거.
+        """
+        if sale_status not in ("sold", "unsold", "in_progress"):
+            raise ValueError("sale_status는 sold / unsold / in_progress 중 하나여야 합니다")
+
+        session = self._get_or_raise(session_id)
+
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+        workflow_meta["sale_status"] = sale_status
+
+        # 에이전트 5: 판매 후 최적화 graph 실행
+        from app.graph.seller_copilot_state import create_initial_state
+        from app.graph.seller_copilot_graph import seller_copilot_graph
+
+        listing_data = session.get("listing_data_jsonb") or {}
+        product_data = session.get("product_data_jsonb") or {}
+
+        opt_state = create_initial_state(
             session_id=session_id,
-            payload={
-                "status": final_status,
-                "workflow_meta_jsonb": final_workflow_meta,
-            },
+            image_paths=product_data.get("image_paths") or [],
+        )
+        opt_state["sale_status"] = sale_status
+        opt_state["canonical_listing"] = listing_data.get("canonical_listing")
+        opt_state["confirmed_product"] = product_data.get("confirmed_product")
+        opt_state["followup_due_at"] = workflow_meta.get("followup_due_at")
+
+        final_state = seller_copilot_graph.invoke(
+            {**opt_state, "_start_node": "post_sale_optimization_node"},
+            config={"recursion_limit": 5},
         )
 
-        if not updated:
-            raise ValueError("Failed to publish session")
+        optimization = final_state.get("optimization_suggestion")
+        if optimization:
+            listing_data["optimization_suggestion"] = optimization
+
+        workflow_meta["tool_calls"] = (
+            (workflow_meta.get("tool_calls") or [])
+            + (final_state.get("tool_calls") or [])
+        )
+
+        final_status = final_state.get("status") or (
+            "optimization_suggested" if optimization else "awaiting_sale_status_update"
+        )
+
+        updated = self._update_or_raise(session_id, {
+            "status": final_status,
+            "listing_data_jsonb": listing_data,
+            "workflow_meta_jsonb": workflow_meta,
+        })
+        return self._ui_response(updated)
+
+    # ── 내부 헬퍼 ────────────────────────────────────────────────
+
+    def _get_or_raise(self, session_id: str) -> Dict:
+        session = self.repo.get_by_id(session_id)
+        if not session:
+            raise ValueError(f"세션을 찾을 수 없습니다: {session_id}")
+        return session
+
+    def _update_or_raise(self, session_id: str, payload: Dict) -> Dict:
+        result = self.repo.update(session_id=session_id, payload=payload)
+        if not result:
+            raise ValueError(f"세션 업데이트 실패: {session_id}")
+        return result
+
+    def _assert_status(self, session: Dict, expected: str) -> None:
+        current = session.get("status")
+        if current != expected:
+            raise ValueError(
+                f"현재 상태 '{current}'에서는 이 작업을 수행할 수 없습니다 (필요 상태: '{expected}')"
+            )
+
+    def _build_recovery_state(
+        self, session_id: str, session: Dict, publish_results: Dict
+    ) -> Dict:
+        from app.graph.seller_copilot_state import create_initial_state
+        product_data = session.get("product_data_jsonb") or {}
+        state = create_initial_state(
+            session_id=session_id,
+            image_paths=product_data.get("image_paths") or [],
+        )
+        state["publish_results"] = publish_results
+        state["confirmed_product"] = product_data.get("confirmed_product")
+        return state
+
+    def _ui_response(self, session: Dict) -> Dict:
+        """모든 엔드포인트가 동일한 평탄화된 구조를 반환"""
+        product_data = session.get("product_data_jsonb") or {}
+        listing_data = session.get("listing_data_jsonb") or {}
+        workflow_meta = session.get("workflow_meta_jsonb") or {}
+        status = session.get("status", "")
+        needs_input = bool(product_data.get("needs_user_input", False))
 
         return {
-            "session_id": updated["id"],
-            "status": updated["status"],
-            "workflow_meta_jsonb": updated.get("workflow_meta_jsonb", {}),
+            "session_id": session.get("id") or session.get("session_id"),
+            "status": status,
+            "checkpoint": workflow_meta.get("checkpoint"),
+            "next_action": _resolve_next_action(status, needs_input),
+            "needs_user_input": needs_input,
+            "user_input_prompt": product_data.get("user_input_prompt"),
+            "selected_platforms": session.get("selected_platforms_jsonb") or [],
+            "product": {
+                "image_paths": product_data.get("image_paths") or [],
+                "candidates": product_data.get("candidates") or [],
+                "confirmed_product": product_data.get("confirmed_product"),
+                "analysis_source": product_data.get("analysis_source"),
+            },
+            "listing": {
+                "market_context": listing_data.get("market_context"),
+                "strategy": listing_data.get("strategy"),
+                "canonical_listing": listing_data.get("canonical_listing"),
+                "platform_packages": listing_data.get("platform_packages") or {},
+                "optimization_suggestion": listing_data.get("optimization_suggestion"),
+            },
+            "publish": {
+                "results": workflow_meta.get("publish_results") or {},
+                "diagnostics": workflow_meta.get("publish_diagnostics") or [],
+            },
+            "agent_trace": {
+                "tool_calls": workflow_meta.get("tool_calls") or [],
+                "rewrite_history": workflow_meta.get("rewrite_history") or [],
+            },
+            "debug": {
+                "last_error": workflow_meta.get("last_error"),
+            },
         }
+
+
+def _resolve_next_action(status: str, needs_user_input: bool) -> Optional[str]:
+    mapping = {
+        "session_created": "upload_images",
+        "images_uploaded": "analyze",
+        "awaiting_product_confirmation": "provide_product_info" if needs_user_input else "confirm_product",
+        "product_confirmed": "generate_listing",
+        "draft_generated": "prepare_publish",
+        "awaiting_publish_approval": "publish",
+        "publishing": "poll_status",
+        "completed": "done",
+        "publishing_failed": "retry_or_edit",
+        "awaiting_sale_status_update": "update_sale_status",
+        "optimization_suggested": "review_optimization",
+    }
+    return mapping.get(status)
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default

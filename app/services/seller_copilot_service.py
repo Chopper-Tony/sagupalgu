@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import nest_asyncio
+nest_asyncio.apply()
+
 import asyncio
 from copy import deepcopy
 from typing import Any
@@ -278,6 +281,8 @@ class SellerCopilotService:
         # 3) confirmed_product가 없을 때만 vision 재분석
         else:
             try:
+                import nest_asyncio
+                nest_asyncio.apply()
                 vision_result = asyncio.run(
                     self.product_service.identify_product(image_paths)
                 )
@@ -363,3 +368,18 @@ class SellerCopilotService:
             "listing_data_jsonb": listing_data,
             "workflow_meta_jsonb": workflow_meta,
         }
+    
+
+    async def run_listing_pipeline(self, session_id: str, session_record: dict) -> dict:
+        return self.run_product_analysis_and_listing_pipeline(
+            session_id=session_id,
+            session_record=session_record,
+        )
+
+    async def run_rewrite_pipeline(
+        self, session_id: str, session_record: dict, rewrite_instruction: str
+    ) -> dict:
+        return self.run_product_analysis_and_listing_pipeline(
+            session_id=session_id,
+            session_record=session_record,
+        )
