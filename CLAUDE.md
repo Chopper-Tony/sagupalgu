@@ -102,10 +102,15 @@ START
 - `app/publishers/` — 플랫폼 게시 adapter (Playwright 기반)
   - `bunjang_publisher.py`: `PatchedBunjangPublisher` (floating footer 클릭 버그 수정)
   - `joongna_publisher.py`: legacy adapter
+- `app/domain/` — 도메인 규칙 단일 진실 원천
+  - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()`, `resolve_next_action()`
+  - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
 - `app/services/` — 비즈니스 로직
   - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
-  - `seller_copilot_service.py`: LangGraph 브릿지. `nest_asyncio` 제거, 전체 async 전환
+  - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
+  - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
+  - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
   - `listing_service.py`, `product_service.py`: 개별 도메인 서비스
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
@@ -171,7 +176,8 @@ python -m pytest tests/
 | M3: God File 분해 | ✅ 완료 | `tools/` → `_common/market/listing/recovery/optimization_tools.py` 5개 모듈, `graph/nodes/` 패키지 → `helpers/product/market/copywriting/validation/recovery/packaging/optimization_agent.py` 8개 모듈, 원본 파일은 re-export shim으로 전환 |
 | M4: API 계약 정리 | ✅ 완료 | `ProductInfo/ListingInfo/PublishInfo` 중첩 스키마, `ErrorResponse` 통일, `RewriteListingRequest/SaleStatusRequest` 추가, `_build_session_ui_response` 데드 코드 제거, `_api_error` 헬퍼 적용 |
 | M5: 버그 수정·안정화 | ✅ 완료 | `rewrite_instruction` 미연결 버그 수정, `nest_asyncio`/`asyncio.run` 제거(async 전환), `_normalize_text` 중복 제거, 테스트 mock 경로 6곳 정상화(33/33 green), `SessionService` 분해(`build_session_ui_response` 모듈 함수 분리, `PublishService.build_platform_packages` 신설) |
-| M6: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 |
+| M6: 아키텍처 정리 | ✅ 완료 | `app/domain/product_rules.py` 신설(도메인 규칙 분리), `assert_allowed_transition()` 상태 전이 강제화, `RecoveryService`/`OptimizationService` 신설(graph 레이어 경계 정리), `requirements.txt` 누락 의존성 추가 |
+| M7: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -180,6 +186,7 @@ python -m pytest tests/
 | 초기 | 72/100 | 기본 파이프라인, 이중 오케스트레이션, God File |
 | M1~M4 완료 | 80/100 | 상태 머신 SSOT, God File 분해, API 계약 정리 |
 | M5 완료 | 85/100 | rewrite 버그 수정, asyncio 제거, SessionService 분해, 테스트 신뢰성 확보 |
+| M6 완료 | 87~89/100 (예상) | 도메인 규칙 분리, 상태 전이 강제화, graph 레이어 경계 정리 |
 
 ## 에이전틱 점수 이력
 
