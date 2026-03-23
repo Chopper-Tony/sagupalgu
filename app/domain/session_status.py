@@ -50,6 +50,16 @@ def is_terminal_status(status: str) -> bool:
     return status in TERMINAL_STATUSES
 
 
+def assert_allowed_transition(current: str, next_status: str) -> None:
+    """허용되지 않은 상태 전이 시 ValueError 발생."""
+    allowed = ALLOWED_TRANSITIONS.get(current, [])
+    if next_status not in allowed:
+        raise ValueError(
+            f"허용되지 않은 상태 전이: '{current}' → '{next_status}' "
+            f"(허용: {allowed})"
+        )
+
+
 def resolve_next_action(status: str, needs_user_input: bool = False) -> Optional[str]:
     """현재 상태 → UI가 다음에 호출해야 할 액션 이름."""
     if status == "awaiting_product_confirmation":

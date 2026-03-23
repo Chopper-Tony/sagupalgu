@@ -96,3 +96,5 @@ tmp_processed/
 # =========================
 *.tmp
 *.bak
+test_image.*
+.claude/
