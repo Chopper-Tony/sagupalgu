@@ -90,6 +90,56 @@ class PublishService:
             }
         return packages
 
+    async def execute_publish(
+        self,
+        platforms: list[str],
+        packages: dict,
+    ) -> tuple[dict, bool]:
+        """
+        플랫폼 목록을 순회하며 게시 실행.
+
+        Returns:
+            (publish_results, any_failure)
+        """
+        publish_results: dict = {}
+        any_failure = False
+
+        for platform in platforms:
+            payload = packages.get(platform)
+            if not payload:
+                publish_results[platform] = {
+                    "success": False,
+                    "platform": platform,
+                    "error_code": "missing_platform_package",
+                    "error_message": f"{platform} 패키지 없음",
+                }
+                any_failure = True
+                continue
+
+            try:
+                result = await self.publish(platform=platform, payload=payload)
+                publish_results[platform] = {
+                    "success": result.success,
+                    "platform": result.platform,
+                    "external_listing_id": result.external_listing_id,
+                    "external_url": result.external_url,
+                    "error_code": result.error_code,
+                    "error_message": result.error_message,
+                    "evidence_path": result.evidence_path,
+                }
+                if not result.success:
+                    any_failure = True
+            except Exception as e:
+                publish_results[platform] = {
+                    "success": False,
+                    "platform": platform,
+                    "error_code": "publish_exception",
+                    "error_message": str(e),
+                }
+                any_failure = True
+
+        return publish_results, any_failure
+
     async def publish(self, platform: str, payload: dict) -> PublishResult:
 
         publisher = self.get_publisher(platform)
