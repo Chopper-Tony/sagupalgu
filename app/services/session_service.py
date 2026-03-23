@@ -312,37 +312,7 @@ class SessionService:
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         self._update_or_raise(session_id, {"status": "publishing", "workflow_meta_jsonb": workflow_meta})
 
-        publish_results: Dict[str, Any] = {}
-        any_failure = False
-
-        for platform in selected:
-            payload = packages.get(platform)
-            if not payload:
-                publish_results[platform] = {
-                    "success": False, "platform": platform,
-                    "error_code": "missing_platform_package",
-                    "error_message": f"{platform} 패키지 없음",
-                }
-                any_failure = True
-                continue
-            try:
-                result = await self.publish_service.publish(platform=platform, payload=payload)
-                publish_results[platform] = {
-                    "success": result.success, "platform": result.platform,
-                    "external_listing_id": result.external_listing_id,
-                    "external_url": result.external_url,
-                    "error_code": result.error_code,
-                    "error_message": result.error_message,
-                    "evidence_path": result.evidence_path,
-                }
-                if not result.success:
-                    any_failure = True
-            except Exception as e:
-                publish_results[platform] = {
-                    "success": False, "platform": platform,
-                    "error_code": "publish_exception", "error_message": str(e),
-                }
-                any_failure = True
+        publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
 
         workflow_meta["checkpoint"] = "C_complete"
         workflow_meta["publish_results"] = publish_results
