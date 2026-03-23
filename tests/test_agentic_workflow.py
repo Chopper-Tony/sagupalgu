@@ -201,7 +201,7 @@ class TestMarketIntelligenceAgent:
             }
 
             # _run_async를 우회하기 위해 직접 AsyncMock 결과 주입
-            with patch("app.graph.seller_copilot_nodes._run_async", side_effect=lambda c: mock_crawl.return_value):
+            with patch("app.graph.nodes.market_agent._run_async", side_effect=lambda c: mock_crawl.return_value):
                 result = market_intelligence_node(state)
 
             # RAG는 호출되지 않아야 함
@@ -263,8 +263,8 @@ class TestCopywritingAgent:
 
         mock_agent_result = {"messages": [llm_msg, tool_msg]}
 
-        with patch("app.graph.seller_copilot_nodes._build_react_llm", return_value=MagicMock()):
-            with patch("app.graph.seller_copilot_nodes._run_async", return_value=mock_agent_result):
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", return_value=MagicMock()):
+            with patch("app.graph.nodes.copywriting_agent._run_async", return_value=mock_agent_result):
                 result = copywriting_node(state)
 
         assert result["canonical_listing"]["title"] == rewritten["title"]
