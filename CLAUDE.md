@@ -177,7 +177,8 @@ python -m pytest tests/
 | M4: API 계약 정리 | ✅ 완료 | `ProductInfo/ListingInfo/PublishInfo` 중첩 스키마, `ErrorResponse` 통일, `RewriteListingRequest/SaleStatusRequest` 추가, `_build_session_ui_response` 데드 코드 제거, `_api_error` 헬퍼 적용 |
 | M5: 버그 수정·안정화 | ✅ 완료 | `rewrite_instruction` 미연결 버그 수정, `nest_asyncio`/`asyncio.run` 제거(async 전환), `_normalize_text` 중복 제거, 테스트 mock 경로 6곳 정상화(33/33 green), `SessionService` 분해(`build_session_ui_response` 모듈 함수 분리, `PublishService.build_platform_packages` 신설) |
 | M6: 아키텍처 정리 | ✅ 완료 | `app/domain/product_rules.py` 신설(도메인 규칙 분리), `assert_allowed_transition()` 상태 전이 강제화, `RecoveryService`/`OptimizationService` 신설(graph 레이어 경계 정리), `requirements.txt` 누락 의존성 추가 |
-| M7: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 |
+| M7: 실행 안정화·테스트 회복 | 진행 예정 | SellerCopilotRunner asyncio.run 제거·단순화, SessionService publish 분리, 테스트 green 회복(파일 분해 + patch 경로 정상화) |
+| M8: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M7 완료 후 진행 |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -186,7 +187,7 @@ python -m pytest tests/
 | 초기 | 72/100 | 기본 파이프라인, 이중 오케스트레이션, God File |
 | M1~M4 완료 | 80/100 | 상태 머신 SSOT, God File 분해, API 계약 정리 |
 | M5 완료 | 85/100 | rewrite 버그 수정, asyncio 제거, SessionService 분해, 테스트 신뢰성 확보 |
-| M6 완료 | 87~89/100 (예상) | 도메인 규칙 분리, 상태 전이 강제화, graph 레이어 경계 정리 |
+| M6 완료 | 84/100 | 도메인 규칙 분리, 상태 전이 강제화, graph 레이어 경계 정리. Runner magic/asyncio 잔재·SessionService 무게·테스트 20개 실패가 감점 요인 |
 
 ## 에이전틱 점수 이력
 
