@@ -204,7 +204,7 @@ python -m pytest tests/ -m integration
 | M12: facade 봉인·도메인 예외·HTTP 매핑 | ✅ 완료 | agentic_tools.py에서 _impl re-export 3개 제거(facade 계약 봉인) ✅, app/domain/exceptions.py 도메인 예외 5개 신설(SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502) ✅, assert_allowed_transition → InvalidStateTransitionError 발생 ✅, SessionService._get_or_raise → SessionNotFoundError ✅, main.py 글로벌 exception_handler 5개 ✅, tests/test_agentic_tools_contract.py contract 테스트(공개 심볼 18개·_impl 노출 금지 3개) ✅, 137/137 테스트 통과 ✅ |
 | M13: API 매핑 마감·LangChain 경계 정리·헬퍼 이름 정리 | ✅ 완료 | session_router.py _domain_error 헬퍼 추가(SagupalguError→HTTP 코드 명시, SessionNotFoundError→404·InvalidStateTransitionError→409·PublishExecutionError→502) ✅, market/copywriting/recovery_agent HumanMessage import를 try 블록 안으로 이동(langchain_core 미설치 시 fallback 정상 동작) ✅, _make_tool_call→make_tool_call·_extract_json→extract_json 공개형 이름 전환(5개 모듈) ✅, exceptions.py 예외 매핑 정책 주석(전 프로젝트 단일 기준) ✅, 137/137 테스트 통과 ✅ |
 | M14: 테스트 안정화·asyncio 경고 제거 | ✅ 완료 | helpers.py asyncio.get_event_loop() → asyncio.get_running_loop() 패턴 교체(Python 3.10+ DeprecationWarning 제거) ✅, test_nodes_copywriting_validation.py sys.modules patch 추가(create_agent 미존재 환경에서 ReAct 경로 보장) ✅, 137/137 테스트 통과 ✅ |
-| M15: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 |
+| M15: 배포 기반 확립 | ✅ 완료 | pytest.ini pythonpath 추가(CI 단독 실행 보장) ✅, .env.example 생성(민감정보 분리) ✅, .dockerignore 추가 ✅, Dockerfile(python:3.11-slim + playwright chromium) ✅, docker-compose.yml(backend + healthcheck) ✅, GitHub Actions ci.yml(pytest + docker build) ✅, docs/api-contract.md 초안(상태→카드→API 매핑 테이블) ✅, GitHub Secrets 7개 등록(SUPABASE/OPENAI/GEMINI/UPSTAGE/DISCORD) ✅, 137/137 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
