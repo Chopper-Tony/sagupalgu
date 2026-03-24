@@ -6,7 +6,7 @@ import { ChatComposer } from "./components/chat/ChatComposer";
 import { useSession } from "./hooks/useSession";
 import { api } from "./lib/api";
 import { getStatusUiConfig } from "./lib/sessionStatusUiMap";
-import type { TimelineItem, TimelineItemInput, SessionStatus } from "./types";
+import type { ConfirmedProduct, TimelineItem, TimelineItemInput, SessionStatus } from "./types";
 import "./App.css";
 
 let _idCounter = 0;
@@ -55,7 +55,6 @@ export default function App() {
   const handleSendText = async (text: string) => {
     if (!activeId || !currentStatus) return;
     pushItem({ type: "user_message", text });
-
     try {
       if (currentStatus === "awaiting_product_confirmation") {
         const updated = await api.provideProductInfo(activeId, { user_input: text });
@@ -82,17 +81,60 @@ export default function App() {
     }
   };
 
-  const handleAction = async (action: string) => {
+  const handleAction = async (action: string, payload?: unknown) => {
     if (!activeId) return;
-    if (action === "restart") {
-      await handleNewSession();
-    } else if (action === "retry_publish") {
-      try {
-        const updated = await api.publish(activeId);
-        setSession(updated);
-      } catch (e: unknown) {
-        pushItem({ type: "error", code: "publish_failed", message: e instanceof Error ? e.message : "게시에 실패했습니다." });
+    try {
+      switch (action) {
+        case "upload_images":
+          await handleUploadImages(payload as File[]);
+          break;
+        case "confirm_product": {
+          const product = payload as ConfirmedProduct;
+          pushItem({ type: "assistant_message", text: `${product.brand} ${product.model} (${product.category})로 확정했습니다.` });
+          const updated = await api.provideProductInfo(activeId, product);
+          setSession(updated);
+          break;
+        }
+        case "prepare_publish": {
+          const platforms = payload as string[];
+          pushItem({ type: "progress", status: "awaiting_publish_approval", message: "게시를 준비하고 있습니다..." });
+          const updated = await api.preparePublish(activeId, platforms);
+          setSession(updated);
+          break;
+        }
+        case "rewrite": {
+          pushItem({ type: "user_message", text: payload as string });
+          pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
+          const updated = await api.generateListing(activeId, payload as string);
+          setSession(updated);
+          break;
+        }
+        case "publish": {
+          pushItem({ type: "progress", status: "publishing", message: "플랫폼에 게시 중입니다..." });
+          const updated = await api.publish(activeId);
+          setSession(updated);
+          break;
+        }
+        case "edit_draft":
+          setLastRenderedStatus("awaiting_publish_approval");
+          pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
+          break;
+        case "update_sale_status": {
+          const updated = await api.updateSaleStatus(activeId, "sold");
+          setSession(updated);
+          break;
+        }
+        case "retry_publish": {
+          const updated = await api.publish(activeId);
+          setSession(updated);
+          break;
+        }
+        case "restart":
+          await handleNewSession();
+          break;
       }
+    } catch (e: unknown) {
+      pushItem({ type: "error", code: action, message: e instanceof Error ? e.message : "요청에 실패했습니다." });
     }
   };
 
@@ -117,6 +159,7 @@ export default function App() {
           <ChatWindow
             items={timeline}
             currentStatus={currentStatus}
+            session={session}
             onAction={handleAction}
           />
           <ChatComposer

@@ -19,7 +19,7 @@ export const api = {
     return client.post<SessionResponse>(`/sessions/${id}/images`, form).then((r) => r.data);
   },
 
-  provideProductInfo: (id: string, productInfo: Record<string, unknown>) =>
+  provideProductInfo: (id: string, productInfo: object) =>
     client
       .post<SessionResponse>(`/sessions/${id}/provide-product-info`, productInfo)
       .then((r) => r.data),

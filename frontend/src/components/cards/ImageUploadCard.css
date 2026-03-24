@@ -1,0 +1,46 @@
+.image-upload-card {
+  background: #1e1e22;
+  border: 2px dashed #3a3a3e;
+  border-radius: 12px;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.image-upload-card:hover {
+  border-color: #2563eb;
+  background: #16213e;
+}
+
+.image-upload-card__icon {
+  font-size: 36px;
+}
+
+.image-upload-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0;
+}
+
+.image-upload-card__subtitle {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+.image-upload-card__btn {
+  margin-top: 8px;
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  pointer-events: none;
+}

@@ -1,0 +1,93 @@
+.publish-result-card {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.publish-result-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.publish-result-card__icon { font-size: 20px; flex-shrink: 0; }
+
+.publish-result-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 4px;
+}
+
+.publish-result-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.publish-result-card__results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.publish-result-card__result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0f0f10;
+  border: 1px solid #2a2a2e;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.publish-result-card__result-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.publish-result-card__result-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.publish-result-card__result-dot--success { background: #34d399; }
+.publish-result-card__result-dot--fail { background: #f87171; }
+
+.publish-result-card__result-platform {
+  font-size: 13px;
+  color: #ececec;
+}
+
+.publish-result-card__result-link {
+  font-size: 12px;
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.publish-result-card__result-link:hover { text-decoration: underline; }
+
+.publish-result-card__result-error {
+  font-size: 12px;
+  color: #f87171;
+}
+
+.publish-result-card__status-btn {
+  background: #1e2a3a;
+  border: 1px solid #2a3a5e;
+  border-radius: 6px;
+  padding: 8px 16px;
+  color: #60a5fa;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.publish-result-card__status-btn:hover { background: #16213e; }
