@@ -18,6 +18,7 @@ class TestCopywritingAgent:
 
     def test_재작성지시_있으면_rewrite_tool_호출(self, base_state):
         """rewrite_instruction이 있으면 LLM이 lc_rewrite_listing_tool을 자율 선택한다 (ReAct)"""
+        import sys
         from app.graph.seller_copilot_nodes import copywriting_node
 
         state = {**base_state, "rewrite_instruction": "더 신뢰감 있게 작성해주세요"}
@@ -33,9 +34,16 @@ class TestCopywritingAgent:
 
         mock_agent_result = {"messages": [llm_msg, tool_msg]}
 
+        # langchain.agents.create_agent가 없는 환경에서도 ReAct 경로가 실행되도록 보장.
+        # create_agent 미존재 시 except fallback에서 _run_async(mocked)가 garbage를 반환해
+        # canonical_listing["title"] KeyError가 발생하는 것을 방지.
+        mock_agents = MagicMock()
+        mock_agents.create_agent = MagicMock(return_value=MagicMock())
+
         with patch("app.graph.nodes.copywriting_agent._build_react_llm", return_value=MagicMock()):
             with patch("app.graph.nodes.copywriting_agent._run_async", return_value=mock_agent_result):
-                result = copywriting_node(state)
+                with patch.dict(sys.modules, {"langchain.agents": mock_agents}):
+                    result = copywriting_node(state)
 
         assert result["canonical_listing"]["title"] == rewritten["title"]
         assert result["rewrite_instruction"] is None

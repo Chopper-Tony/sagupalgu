@@ -50,14 +50,14 @@ def _run_async(coro_or_factory):
     import inspect
     coro = coro_or_factory() if callable(coro_or_factory) and not inspect.iscoroutine(coro_or_factory) else coro_or_factory
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result()
-        return loop.run_until_complete(coro)
+        asyncio.get_running_loop()
+        # 이미 실행 중인 루프가 있으면 별도 스레드에서 실행
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
     except RuntimeError:
+        # 실행 중인 루프 없음 — 직접 실행
         return asyncio.run(coro)
 
 
