@@ -125,10 +125,14 @@ class TestMissionPlannerNode:
 
     @pytest.mark.integration
     def test_replan_reflects_critic_feedback(self, base_state):
+        """replan 시 critic 피드백이 반영되어 missing_information이 생성된다."""
+        from unittest.mock import patch
         state = {**base_state, "plan_revision_count": 1, "max_replans": 1,
                  "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {},
                  "critic_feedback": [{"type": "trust", "impact": "high", "reason": "신뢰 정보 부족"}]}
-        result = mission_planner_node(state)
+        # LLM을 비활성화해서 룰 기반 fallback 경로만 검증
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
         assert "product_condition_details" in result.get("missing_information", [])
 
     @pytest.mark.integration
