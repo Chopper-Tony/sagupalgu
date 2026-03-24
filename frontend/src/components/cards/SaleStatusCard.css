@@ -1,0 +1,62 @@
+.sale-status-card {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sale-status-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sale-status-card__icon { font-size: 20px; flex-shrink: 0; }
+
+.sale-status-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 4px;
+}
+
+.sale-status-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.sale-status-card__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sale-status-card__sold-btn {
+  flex: 1;
+  background: #1a3a2a;
+  border: 1px solid #2d6a4a;
+  border-radius: 8px;
+  padding: 12px;
+  color: #34d399;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sale-status-card__sold-btn:hover { background: #153020; }
+
+.sale-status-card__unsold-btn {
+  flex: 1;
+  background: #1e1e22;
+  border: 1px solid #3a3a3e;
+  border-radius: 8px;
+  padding: 12px;
+  color: #aaa;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sale-status-card__unsold-btn:hover { background: #2a2a2e; }
