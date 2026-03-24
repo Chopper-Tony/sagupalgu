@@ -120,8 +120,20 @@ START
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
   - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
   - `product_service.py`: 상품 식별 서비스
+- `app/dependencies.py` — FastAPI DI 체인: `get_session_repository`·`get_session_service` 등 6개 `lru_cache` 싱글턴. 테스트에서 `app.dependency_overrides`로 mock 주입 가능
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
+- `frontend/` — React + Vite + TypeScript SPA
+  - `src/types/` — `session.ts`(SessionStatus·SessionResponse 등), `ui.ts`(CardType·ComposerMode·TimelineItem·TimelineItemInput)
+  - `src/lib/sessionStatusUiMap.ts` — 13개 상태 → CardType·ComposerMode·polling SSOT
+  - `src/lib/api.ts` — axios 클라이언트, 전체 API 래퍼
+  - `src/hooks/useSession.ts` — 스마트 폴링 (2500ms 활성/10000ms 비활성)
+  - `src/components/layout/` — AppShell, SessionSidebar
+  - `src/components/chat/` — ChatWindow(타임라인 렌더링), ChatComposer(4가지 모드)
+  - `src/components/cards/` — ImageUploadCard, ProductConfirmationCard, DraftCard, PublishApprovalCard, PublishResultCard, SaleStatusCard, OptimizationSuggestionCard, ProgressCard, ErrorCard (13개 상태 전부 커버)
+  - `Dockerfile` — node:20-alpine 멀티스테이지 빌드 + nginx:alpine 서빙
+  - `nginx.conf` — SPA routing + `/api/` 백엔드 프록시 + 정적자산 캐시
+- `docs/deployment.md` — AWS EC2 배포 가이드 (Docker 설치·환경변수·실행·HTTPS·모니터링)
 
 ## 코딩 규칙
 
@@ -147,6 +159,11 @@ START
 - 도메인 예외는 `app/domain/exceptions.py` 단 한 곳에서 정의
 - 매핑 정책: SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400
 - 적용 위치: `main.py` 글로벌 핸들러 + `session_router.py` `_domain_error` 헬퍼 (두 곳 모두)
+
+### 의존성 주입 (DI)
+- 서비스 인스턴스는 `app/dependencies.py`의 `Depends()` 함수를 통해서만 라우터에 주입
+- 라우터에서 직접 `SessionService()` / `SessionRepository()` 생성 금지
+- 테스트 격리: `app.dependency_overrides[get_session_service] = lambda: mock_svc` 패턴 사용
 
 ### 게시 (publishers)
 - `legacy_spikes/` 직접 수정 금지 → `app/publishers/`에서 서브클래스로 패치
@@ -179,6 +196,18 @@ python scripts/manual/run_seller_copilot_graph.py
 # FastAPI 서버 실행
 uvicorn app.main:app --reload
 
+# 프론트엔드 개발 서버 실행 (별도 터미널)
+cd frontend && npm run dev
+
+# 풀스택 Docker Compose 실행 (프론트 80포트 + 백엔드 내부)
+docker compose up --build
+
+# 백그라운드 실행
+docker compose up -d --build
+
+# 로그 확인
+docker compose logs -f
+
 # 테스트 전체 (137개)
 python -m pytest tests/
 
@@ -207,8 +236,8 @@ python -m pytest tests/ -m integration
 | M12: facade 봉인·도메인 예외·HTTP 매핑 | ✅ 완료 | agentic_tools.py에서 _impl re-export 3개 제거(facade 계약 봉인) ✅, app/domain/exceptions.py 도메인 예외 5개 신설(SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502) ✅, assert_allowed_transition → InvalidStateTransitionError 발생 ✅, SessionService._get_or_raise → SessionNotFoundError ✅, main.py 글로벌 exception_handler 5개 ✅, tests/test_agentic_tools_contract.py contract 테스트(공개 심볼 18개·_impl 노출 금지 3개) ✅, 137/137 테스트 통과 ✅ |
 | M13: API 매핑 마감·LangChain 경계 정리·헬퍼 이름 정리 | ✅ 완료 | session_router.py _domain_error 헬퍼 추가(SagupalguError→HTTP 코드 명시, SessionNotFoundError→404·InvalidStateTransitionError→409·PublishExecutionError→502) ✅, market/copywriting/recovery_agent HumanMessage import를 try 블록 안으로 이동(langchain_core 미설치 시 fallback 정상 동작) ✅, _make_tool_call→make_tool_call·_extract_json→extract_json 공개형 이름 전환(5개 모듈) ✅, exceptions.py 예외 매핑 정책 주석(전 프로젝트 단일 기준) ✅, 137/137 테스트 통과 ✅ |
 | M14: 테스트 안정화·asyncio 경고 제거 | ✅ 완료 | helpers.py asyncio.get_event_loop() → asyncio.get_running_loop() 패턴 교체(Python 3.10+ DeprecationWarning 제거) ✅, test_nodes_copywriting_validation.py sys.modules patch 추가(create_agent 미존재 환경에서 ReAct 경로 보장) ✅, 137/137 테스트 통과 ✅ |
-| M15: 배포 기반 확립 | ✅ 완료 |
-| M16: 프론트엔드 기반 세팅 | ✅ 완료 | React+Vite+TypeScript 세팅 ✅, 타입 계약(session.ts·ui.ts·TimelineItemInput) ✅, sessionStatusUiMap.ts(상태→카드·ComposerMode·폴링) ✅, api.ts(axios) ✅, useSession hook(스마트 폴링) ✅, AppShell·SessionSidebar ✅, ChatWindow(타임라인) ✅, ChatComposer(모드 분기) ✅, ProgressCard·ErrorCard 공용 ✅, 빌드 통과 ✅ | pytest.ini pythonpath 추가(CI 단독 실행 보장) ✅, .env.example 생성(민감정보 분리) ✅, .dockerignore 추가 ✅, Dockerfile(python:3.11-slim + playwright chromium) ✅, docker-compose.yml(backend + healthcheck) ✅, GitHub Actions ci.yml(pytest + docker build) ✅, docs/api-contract.md 초안(상태→카드→API 매핑 테이블) ✅, GitHub Secrets 7개 등록(SUPABASE/OPENAI/GEMINI/UPSTAGE/DISCORD) ✅, 137/137 테스트 통과 ✅ |
+| M15: 배포 기반 확립 | ✅ 완료 | pytest.ini pythonpath 추가(CI 단독 실행 보장) ✅, .env.example 생성(민감정보 분리) ✅, .dockerignore 추가 ✅, Dockerfile(python:3.11-slim + playwright chromium) ✅, docker-compose.yml(backend + healthcheck) ✅, GitHub Actions ci.yml(pytest + docker build) ✅, docs/api-contract.md 초안(상태→카드→API 매핑 테이블) ✅, GitHub Secrets 7개 등록(SUPABASE/OPENAI/GEMINI/UPSTAGE/DISCORD) ✅, 137/137 테스트 통과 ✅ |
+| M16: 프론트엔드 기반 세팅 | ✅ 완료 | React+Vite+TypeScript 세팅 ✅, 타입 계약(session.ts·ui.ts·TimelineItemInput) ✅, sessionStatusUiMap.ts(상태→카드·ComposerMode·폴링) ✅, api.ts(axios) ✅, useSession hook(스마트 폴링) ✅, AppShell·SessionSidebar ✅, ChatWindow(타임라인) ✅, ChatComposer(모드 분기) ✅, ProgressCard·ErrorCard 공용 ✅, 빌드 통과 ✅ |
 | M17: 핵심 카드 구현 | ✅ 완료 | ProductConfirmationCard(후보 최대 3개·confidence bar·직접 입력) ✅, ImageUploadCard(drag&drop+click) ✅, DraftCard(listing 표시·플랫폼 선택·승인/재작성) ✅, PublishApprovalCard(게시 확인·수정 버튼) ✅, PublishResultCard(플랫폼별 성공/실패·링크·판매상태 업데이트) ✅, ChatWindow 실제 카드 컴포넌트 렌더링 연결 ✅, App.tsx handleAction 전체 switch(upload_images/confirm_product/prepare_publish/rewrite/publish/edit_draft/update_sale_status/retry_publish/restart) ✅, 빌드 통과(TypeScript 에러 0) ✅ |
 | M18: 서비스 절개·shape 강제·카드 완성 | ✅ 완료 | app/domain/schemas.py CanonicalListingSchema 신설(Pydantic shape 강제·LLM 출력 직후 validate) ✅, app/services/listing_prompt.py PromptBuilder 분리(build_copy_prompt·extract_json_object 순수 함수) ✅, app/services/session_ui.py SessionResponseAssembler 분리(build_session_ui_response 이동) ✅, listing_service.py → CanonicalListingSchema.from_llm_result/from_rewrite_result 사용 ✅, session_service.py → session_ui.py import ✅, SaleStatusCard(팔렸어요/안팔렸어요) ✅, OptimizationSuggestionCard(가격 제안·이유·새로 시작) ✅, App.tsx mark_sold/mark_unsold 액션 추가 ✅, 137/137 테스트 통과·빌드 에러 0 ✅ |
 | M19: FastAPI DI 완성 | ✅ 완료 | app/dependencies.py 신설(lru_cache 싱글턴 + Depends 체인 6개 서비스) ✅, session_router.py 전역 인스턴스 제거 → Depends(get_session_service) 전환(11개 엔드포인트) ✅, SessionRepository import 라우터에서 제거 ✅, app.dependency_overrides로 mock 주입 가능(테스트 격리 준비) ✅, 137/137 테스트 통과 ✅ |
