@@ -10,7 +10,7 @@ LangGraph Agentic Workflow로 구현.
 ## 기술 스택
 - **백엔드**: FastAPI + Pydantic v2
 - **워크플로우**: LangGraph 1.1.3 (`app/graph/`)
-- **에이전틱**: `create_react_agent` + LangChain bind_tools (langchain-google-genai, langchain-openai)
+- **에이전틱**: `langchain.agents.create_agent` + LangChain bind_tools (langchain-google-genai, langchain-openai)
 - **Vision AI**: OpenAI / Gemini (graceful fallback)
 - **Listing LLM**: Gemini 2.5 Flash (primary) → OpenAI → Solar (fallback 체인)
 - **DB**: Supabase (PostgreSQL + pgvector) — `migrations/001_pgvector_setup.sql` 적용 후 활성화
@@ -88,7 +88,7 @@ START
   - `listing_tools.py` — Agent 3 (lc_generate_listing_tool, lc_rewrite_listing_tool, _impl 분리)
   - `recovery_tools.py` — Agent 4 (lc_diagnose/auto_patch/discord_alert, _impl 분리)
   - `optimization_tools.py` — Agent 5 (price_optimization_tool)
-  - `_common.py` — 공통 헬퍼 (_make_tool_call, _extract_json)
+  - `_common.py` — 공통 헬퍼 (make_tool_call, extract_json)
 - `app/graph/nodes/` — 에이전트별 노드 모듈 (seller_copilot_nodes.py는 re-export shim)
   - `helpers.py` — _run_async, _build_react_llm, 공통 state 헬퍼
   - `product_agent.py` — Agent 1
@@ -217,7 +217,8 @@ python -m pytest tests/ -m integration
 | M7~M8 완료 | 79/100 | Runner 단순화, asyncio 제거, DI 도입, 테스트 계층 분리. tools import 구조·patch contract 불안정·데드코드 잔존이 감점 요인 |
 | M9~M10 완료 | 84→90 예상 | routing.py 분리, 데드코드 제거, tools __init__ 경량화, conditional import, SessionService 헬퍼 정리 |
 | M11~M12 완료 | 92/100 | facade 봉인, monkey patch 제거, 도메인 예외 계층, contract 테스트. 라우터 매핑·LangChain 경계가 남은 감점 요인 |
-| M13 완료 | 95 예상 | API 예외 매핑 마감, HumanMessage import 경계 정리, 헬퍼 공개형 이름 전환, 예외 정책 문서화 |
+| M13 완료 | 93/100 | API 예외 매핑 마감, HumanMessage import 경계 정리, 헬퍼 공개형 이름 전환, 예외 정책 문서화. test KeyError·asyncio 경고·SessionService ValueError가 남은 감점 요인 |
+| M14 완료 | 96 예상 | asyncio.get_running_loop() 교체(경고 제거), 테스트 ReAct 경로 sys.modules patch 안정화 |
 
 ## 에이전틱 점수 이력
 
