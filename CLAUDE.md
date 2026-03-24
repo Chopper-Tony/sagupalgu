@@ -117,7 +117,7 @@ START
   - `session_meta.py`: workflow_meta 순수 함수 집합 (`set_analysis_checkpoint`, `set_product_confirmed`, `normalize_listing_meta`, `append_rewrite_entry`, `set_publish_prepared`, `set_publish_complete`, `set_publish_diagnostics`, `set_sale_status`, `append_tool_calls`) — SessionService에서 분리
   - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). LLM 호출은 `listing_llm.py`에 위임
   - `listing_llm.py`: OpenAI/Gemini/Solar HTTP 호출 어댑터 + fallback dispatch(`generate_copy`) + 규칙 기반 폴백(`build_template_copy`) — ListingService에서 분리
-  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
+  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()`·`build_tool_calls_context()`·`build_rewrite_context()`·`build_pricing_strategy()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
@@ -218,7 +218,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (294개)
+# 테스트 전체 (324개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -263,6 +263,7 @@ python -m pytest tests/ -m integration
 | M29: 데드코드·중복 제거 + 테스트 파일 분할 | ✅ 완료 | app/core/utils.py 신설(safe_int 단일 정의) ✅, helpers.py·session_service.py 중복 _safe_int 제거→utils.py import ✅, seller_copilot_service.py 미사용 alias(_normalize_text·_needs_user_input)·normalize_text import 제거 ✅, test_session_api.py(401줄) → tests/api/ 4파일 분할(basic·product·listing·publish + conftest) ✅, 269/269 테스트 통과 ✅ |
 | M30: 테스트 환경 격리 + 출력 계약 봉합 | ✅ 완료 | app/db/client.py supabase eager import → lazy import 전환(clean env에서 pytest 수집 통과) ✅, build_template_copy 출력 계약 위반 수정(price·images·strategy·product 키 누락 → CanonicalListingSchema 계약 준수) ✅, test_output_contract.py 신설(25개: from_llm_result·from_rewrite_result·fallback·template·price coercion·tags 정규화 6경로 전수 검증) ✅, 269→294 테스트 통과 ✅ |
 | M31: SessionService 절개 | ✅ 완료 | app/services/session_product.py 신설(product_data 순수 함수 4개: attach_image_paths·apply_analysis_result·confirm_from_candidate·confirm_from_user_input) ✅, SessionService 상품 로직 인라인→순수 함수 위임(349줄→300줄) ✅, _persist_and_respond 헬퍼 신설(반복 업데이트+응답 패턴 통합) ✅, test_session_product.py 17개 unit 테스트 ✅, 286/286 테스트 통과 ✅ |
+| M32: ListingService 절개 | ✅ 완료 | listing_prompt.py에 build_tool_calls_context·build_rewrite_context·build_pricing_strategy 순수 함수 3개 추가(95줄→137줄) ✅, listing_service.py 인라인 context 빌드·pricing 로직 제거(125줄→93줄, -26%) ✅, test_listing_prompt_ext.py 13개 unit 테스트 ✅, 294→307 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -279,7 +280,8 @@ python -m pytest tests/ -m integration
 | M14 완료 | 96 예상 | asyncio.get_running_loop() 교체(경고 제거), 테스트 ReAct 경로 sys.modules patch 안정화 |
 | M15~M20 완료 | 91/100 (실제) | 배포 기반·프론트엔드·Docker·DI 완성. 배포 인프라 강화 but SessionService 무게·테스트 확충 미비 |
 | M21~M24 완료 | 97 예상 | LLM/Meta 분리, 테스트 185→240, API 통합 테스트 36개, 관찰 가능성 기반 |
-| M25~M29 완료 | 99 예상 | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거, 테스트 269개 |
+| M25~M29 완료 | 89/100 (실제) | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거. supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비가 감점 요인 |
+| M30~M32 완료 | 95 예상 | supabase lazy import, 출력 계약 25개 회귀 테스트, SessionService 절개(session_product.py), ListingService 절개(listing_prompt.py 확장), 테스트 324개 |
 
 ## 에이전틱 점수 이력
 

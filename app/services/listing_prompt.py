@@ -1,5 +1,5 @@
 """
-판매글 생성 프롬프트 빌더 및 LLM 응답 파서.
+판매글 생성 프롬프트 빌더, 응답 파서, 가격 전략.
 
 ListingService에서 순수 함수를 분리해 단독 테스트·재사용이 가능하게 한다.
 """
@@ -92,3 +92,46 @@ def extract_json_object(text: str) -> dict[str, Any]:
         if not match:
             raise ValueError("LLM did not return valid JSON")
         return json.loads(match.group(0))
+
+
+# ── Context 빌더 ─────────────────────────────────────────────────
+
+
+def build_tool_calls_context(tool_calls: list[dict]) -> str:
+    """에이전트 tool_calls 리스트를 LLM 컨텍스트 문자열로 변환."""
+    if not tool_calls:
+        return ""
+    lines = []
+    for tc in tool_calls:
+        tool_name = tc.get("tool_name", "unknown")
+        success = tc.get("success", False)
+        lines.append(f"- {tool_name}: {'success' if success else 'failed'}")
+    return "\n".join(lines)
+
+
+def build_rewrite_context(canonical_listing: dict, instruction: str) -> str:
+    """재작성 요청을 LLM 컨텍스트 문자열로 변환."""
+    return (
+        f"[재작성 요청]\n"
+        f"기존 제목: {canonical_listing.get('title', '')}\n"
+        f"기존 설명: {(canonical_listing.get('description') or '')[:200]}\n"
+        f"수정 지시: {instruction}\n"
+        f"위 지시사항을 반영해 판매글을 개선하라."
+    )
+
+
+# ── 가격 전략 ────────────────────────────────────────────────────
+
+
+def build_pricing_strategy(median_price: int | float) -> dict[str, Any]:
+    """시세 기반 가격 전략을 생성한다."""
+    if median_price <= 0:
+        recommended_price = 0
+    else:
+        recommended_price = int(median_price * 0.97)
+
+    return {
+        "goal": "fast_sell",
+        "recommended_price": recommended_price,
+        "negotiation_policy": "small negotiation allowed",
+    }
