@@ -41,8 +41,7 @@ def _api_error(status_code: int, error: str, message: str) -> HTTPException:
 async def create_session():
     try:
         result = await session_service.create_session(user_id="temp-user-id")
-        session_ui = await session_service.get_session(result["session_id"])
-        return CreateSessionResponse(**session_ui)
+        return CreateSessionResponse(**result)
     except ValueError as e:
         raise _api_error(400, "create_session_failed", str(e))
 
