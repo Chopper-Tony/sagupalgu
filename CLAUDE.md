@@ -125,6 +125,7 @@ START
 - `app/dependencies.py` — FastAPI DI 체인: `get_session_repository`·`get_session_service` 등 6개 `lru_cache` 싱글턴. 테스트에서 `app.dependency_overrides`로 mock 주입 가능
 - `app/core/logging.py` — JSON 구조화 로깅: `JsonFormatter`(log→JSON 한 줄)·`configure_logging()`·contextvars `request_id` 자동 포함
 - `app/middleware/request_id.py` — `RequestIdMiddleware`: X-Request-ID 헤더 전파·UUID4 자동 발급·응답 헤더 포함
+- `app/storage/storage_client.py` — Supabase Storage 클라이언트: `upload_image()`·`get_public_url()`. lazy import + `lru_cache` 싱글턴
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
 - `frontend/` — React + Vite + TypeScript SPA
@@ -250,7 +251,9 @@ python -m pytest tests/ -m integration
 | M22: 신설 모듈 unit 테스트 확충 | ✅ 완료 | test_session_meta.py(9개 순수 함수 27개 케이스) ✅, test_listing_llm.py(build_template_copy·3 provider·fallback dispatch 21개 케이스, mock httpx) ✅, 137→185 테스트 통과·unit 단독 0.56s ✅ |
 | M23: API 엔드포인트 통합 테스트 | ✅ 완료 | test_session_api.py 신설(TestClient + dependency_overrides mock 주입) ✅, 엔드포인트 11개 전부 커버(정상·422·도메인 예외→HTTP 매핑 36개 케이스) ✅, SessionNotFoundError→404·InvalidStateTransitionError→409·ListingGenerationError→500·PublishExecutionError→502 전수 검증 ✅, 185→221 테스트 통과 ✅ |
 | M24: 관찰 가능성(Observability) 기반 구축 | ✅ 완료 | app/core/logging.py 신설(JsonFormatter·configure_logging·contextvars request_id 자동 포함) ✅, app/middleware/request_id.py 신설(X-Request-ID 전파·UUID4 자동 발급·응답 헤더 포함) ✅, main.py 미들웨어 등록·/health 상세화(environment·checks 필드) ✅, test_observability.py(19개: JsonFormatter·contextvars·미들웨어·헬스체크) ✅, 221→240 테스트 통과 ✅ |
-| M27: DI 강화·Router 보일러플레이트 제거 | ✅ 완료 | SessionService __init__ 5개 의존성 Optional→required 전환(인라인 fallback 제거) ✅, session_router.py _handle() 공통 래퍼 신설(11개 엔드포인트 try-except 중복 제거, 234줄→178줄) ✅, 240/240 테스트 통과 ✅ |
+| M25: Supabase storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 쌍(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py 7개 추가 ✅ |
+| M26: 보안·운영 강화(CORS) | ✅ 완료 | UploadImagesRequest field validator(HTTP(S) URL 검증·빈값·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS·frozenset 검증) ✅, SaleStatusRequest Literal 타입 강화 ✅, test_security.py 22개 추가 ✅ |
+| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, app/middleware/request_id.py 제거 후 optional-required 전환 및 fallback 제거 ✅, session_router.py 전역 서비스 제거/try-except 정리 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
