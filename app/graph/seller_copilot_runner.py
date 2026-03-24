@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from app.graph.seller_copilot_graph import seller_copilot_graph
 from app.graph.seller_copilot_state import (
     SellerCopilotState,
     create_initial_state,
 )
+
+
+def _get_graph():
+    """LangGraph 컴파일 그래프를 lazy 로드한다. 미설치 환경에서 import 단계 통과."""
+    from app.graph.seller_copilot_graph import seller_copilot_graph
+    return seller_copilot_graph
 
 
 class SellerCopilotRunner:
@@ -69,7 +74,7 @@ class SellerCopilotRunner:
             rewrite_instruction=rewrite_instruction,
         )
 
-        return seller_copilot_graph.invoke(initial_state)
+        return _get_graph().invoke(initial_state)
 
 
 seller_copilot_runner = SellerCopilotRunner()
