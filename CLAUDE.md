@@ -123,6 +123,8 @@ START
   - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
   - `product_service.py`: 상품 식별 서비스
 - `app/dependencies.py` — FastAPI DI 체인: `get_session_repository`·`get_session_service` 등 6개 `lru_cache` 싱글턴. 테스트에서 `app.dependency_overrides`로 mock 주입 가능
+- `app/core/logging.py` — JSON 구조화 로깅: `JsonFormatter`(log→JSON 한 줄)·`configure_logging()`·contextvars `request_id` 자동 포함
+- `app/middleware/request_id.py` — `RequestIdMiddleware`: X-Request-ID 헤더 전파·UUID4 자동 발급·응답 헤더 포함
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
 - `frontend/` — React + Vite + TypeScript SPA
@@ -210,7 +212,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (221개)
+# 테스트 전체 (240개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -247,6 +249,7 @@ python -m pytest tests/ -m integration
 | M21: LLMAdapter·StateCoordinator 분리·gitignore 보완 | ✅ 완료 | app/services/listing_llm.py 신설(OpenAI/Gemini/Solar HTTP 호출 어댑터·fallback dispatch·규칙 기반 폴백, listing_service에서 300줄 분리) ✅, app/services/session_meta.py 신설(workflow_meta 순수 함수 9개, session_service 인라인 meta 조작 제거) ✅, listing_service.py → generate_copy() 단순 호출(LLM 세부사항 완전 분리) ✅, session_service.py → _append_tool_calls 인스턴스 메서드 제거·datetime import 제거 ✅, .gitignore frontend/node_modules·frontend/dist 명시 추가 ✅, 137/137 테스트 통과 ✅ |
 | M22: 신설 모듈 unit 테스트 확충 | ✅ 완료 | test_session_meta.py(9개 순수 함수 27개 케이스) ✅, test_listing_llm.py(build_template_copy·3 provider·fallback dispatch 21개 케이스, mock httpx) ✅, 137→185 테스트 통과·unit 단독 0.56s ✅ |
 | M23: API 엔드포인트 통합 테스트 | ✅ 완료 | test_session_api.py 신설(TestClient + dependency_overrides mock 주입) ✅, 엔드포인트 11개 전부 커버(정상·422·도메인 예외→HTTP 매핑 36개 케이스) ✅, SessionNotFoundError→404·InvalidStateTransitionError→409·ListingGenerationError→500·PublishExecutionError→502 전수 검증 ✅, 185→221 테스트 통과 ✅ |
+| M24: 관찰 가능성(Observability) 기반 구축 | ✅ 완료 | app/core/logging.py 신설(JsonFormatter·configure_logging·contextvars request_id 자동 포함) ✅, app/middleware/request_id.py 신설(X-Request-ID 전파·UUID4 자동 발급·응답 헤더 포함) ✅, main.py 미들웨어 등록·/health 상세화(environment·checks 필드) ✅, test_observability.py(19개: JsonFormatter·contextvars·미들웨어·헬스체크) ✅, 221→240 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
