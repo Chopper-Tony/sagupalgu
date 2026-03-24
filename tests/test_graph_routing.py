@@ -23,13 +23,13 @@ class TestGraphRouting:
         from app.graph.routing import route_after_product_identity
 
         state = {"needs_user_input": False}
-        assert route_after_product_identity(state) == "market_intelligence_node"
+        assert route_after_product_identity(state) == "pre_listing_clarification_node"
 
-    def test_needs_user_input_없으면_market으로_분기(self):
+    def test_needs_user_input_없으면_pre_listing으로_분기(self):
         from app.graph.routing import route_after_product_identity
 
         state = {}
-        assert route_after_product_identity(state) == "market_intelligence_node"
+        assert route_after_product_identity(state) == "pre_listing_clarification_node"
 
     def test_validation_passed_package로_분기(self):
         from app.graph.routing import route_after_validation
