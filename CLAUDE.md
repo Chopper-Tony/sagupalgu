@@ -110,6 +110,7 @@ START
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
 - `app/services/` — 비즈니스 로직
   - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거
+  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성) 유스케이스 분리
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
@@ -131,7 +132,7 @@ START
 - ReAct 에이전트는 `langchain.agents.create_agent(llm, tools, system_prompt=...)` 패턴 사용
 
 ### 툴
-- 외부 import 진입점은 반드시 `app.tools.agentic_tools` — 하위 모듈 직접 import 지양
+- 외부 import 진입점은 반드시 `app.tools.agentic_tools` — 노드·서비스·테스트 모두 여기서만 import (하위 모듈 직접 import 금지)
 - LangChain `@tool` 데코레이터 붙은 버전(`lc_` prefix)만 ReAct 에이전트에 bind
 - 내부 구현은 `_impl` 함수로 분리해 직접 호출과 lc_ 래퍼가 공유
 - 모든 툴은 `_make_tool_call()` 형식으로 결과 반환 (state 기록 용이)
@@ -192,7 +193,8 @@ python -m pytest tests/ -m integration
 | M8: 코드 품질 강화 (DI·테스트 계층·API 계약) | ✅ 완료 | SessionService 생성자 DI 도입(5개 서비스 주입 가능) ✅, create_session 더블콜 제거·get_session UI응답 통일 ✅, 테스트 계층 분리(unit/integration 마커, test_session_status.py 41개·test_domain.py 35개 신규) ✅, 112/112 테스트 통과·unit 단독 0.11초 ✅ |
 | M9: 구조 정리 (데드코드·라우팅 분리·테스트 분할) | ✅ 완료 | app/graph/routing.py 신설(langgraph 의존성 0, unit 라우팅 테스트 8개) ✅, seller_copilot_graph.py에서 중복 라우터 제거·routing.py import ✅, test_agentic_workflow.py → 4파일 분리(product_market/copywriting_validation/recovery_optimization/graph_routing) ✅, conftest.py 공유 픽스처 ✅, 데드코드 legacy_spikes/dead_code/로 이동(app/agents/ 5파일·nodes.py·graph.py) ✅, app/tools/__init__.py 명시적 export ✅, 114/114 테스트 통과 ✅ |
 | M10: import 경계·tool facade 확정 | ✅ 완료 | app/tools/__init__.py 비움(auto-import 제거) ✅, agentic_tools.py public facade 확정(독스트링·contract 명시) ✅, market/listing/recovery_tools.py conditional langchain_core import(미설치 환경 _impl 정상 동작) ✅, SessionService _ensure_transition·_append_tool_calls 헬퍼 추가(8개 메서드 중복 제거) ✅, test_graph_routing.py edge case 5개 추가(총 13개) ✅, 118/118 테스트 통과·unit 0.12s ✅ |
-| M11: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M10 완료 후 진행 |
+| M11: facade 일관성·rewrite 경로 정리 | ✅ 완료 | 노드 4개(market/copywriting/recovery/optimization) import → agentic_tools facade 통일(전수 완료) ✅, ListingService.rewrite_listing() 공식 메서드 신설(최초 생성과 재작성 유스케이스 분리) ✅, listing_tools._rewrite_listing_impl monkey patch 제거(svc.rewrite_listing() 직접 호출) ✅, 118/118 테스트 통과 ✅ |
+| M12: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M11 완료 후 진행 |
 
 ## CTO 코드리뷰 점수 이력
 

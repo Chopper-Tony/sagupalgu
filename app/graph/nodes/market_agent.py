@@ -36,7 +36,7 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         return state
 
     # ── ReAct 에이전트: LLM이 툴을 자율 선택 ────────────────────
-    from app.tools.market_tools import lc_market_crawl_tool, lc_rag_price_tool
+    from app.tools.agentic_tools import lc_market_crawl_tool, lc_rag_price_tool
     from langchain_core.messages import HumanMessage
 
     brand = product.get("brand", "")
@@ -99,7 +99,7 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         _log(state, f"agent2:react_agent:failed error={e} → fallback to direct tool call")
 
         # Fallback: 직접 툴 호출
-        from app.tools.market_tools import market_crawl_tool, rag_price_tool
+        from app.tools.agentic_tools import market_crawl_tool, rag_price_tool
         crawl_result = _run_async(lambda: market_crawl_tool(product))
         _record_tool_call(state, crawl_result)
         crawl_output = crawl_result.get("output") or {}

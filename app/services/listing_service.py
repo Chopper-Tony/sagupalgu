@@ -452,6 +452,55 @@ Image paths:
             "product": confirmed_product,
         }
 
+    async def rewrite_listing(
+        self,
+        canonical_listing: dict,
+        rewrite_instruction: str,
+        confirmed_product: dict,
+        market_context: dict,
+        strategy: dict,
+    ) -> dict:
+        """사용자 피드백 기반 판매글 재작성.
+
+        build_canonical_listing()과 별도 유스케이스:
+        - build_canonical_listing: 시세·상품 정보로 최초 생성
+        - rewrite_listing: 기존 draft + 사용자 피드백으로 수정
+        """
+        image_paths = canonical_listing.get("images") or []
+
+        rewrite_context = (
+            f"[재작성 요청]\n"
+            f"기존 제목: {canonical_listing.get('title', '')}\n"
+            f"기존 설명: {(canonical_listing.get('description') or '')[:200]}\n"
+            f"수정 지시: {rewrite_instruction}\n"
+            f"위 지시사항을 반영해 판매글을 개선하라."
+        )
+
+        llm_result = await self._generate_copy(
+            confirmed_product=confirmed_product,
+            market_context=market_context,
+            strategy=strategy,
+            image_paths=image_paths,
+            tool_calls_context=rewrite_context,
+        )
+
+        title = llm_result.get("title") or canonical_listing.get("title", "")
+        description = llm_result.get("description") or canonical_listing.get("description", "")
+        tags = llm_result.get("tags") or canonical_listing.get("tags") or []
+        if not isinstance(tags, list):
+            tags = [str(tags)]
+        tags = [str(t).strip() for t in tags if str(t).strip()][:5]
+
+        return {
+            "title": title,
+            "description": description,
+            "price": canonical_listing.get("price") or strategy.get("recommended_price", 0),
+            "tags": tags,
+            "images": image_paths,
+            "strategy": canonical_listing.get("strategy") or strategy.get("goal", "fast_sell"),
+            "product": confirmed_product,
+        }
+
     async def build_listing_package(
         self,
         confirmed_product: dict,
