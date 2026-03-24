@@ -11,8 +11,6 @@ START → product_identity → market_intelligence → pricing → copywriting
 """
 from __future__ import annotations
 
-from typing import Literal
-
 from langgraph.graph import END, START, StateGraph
 
 from app.graph.seller_copilot_nodes import (
@@ -25,30 +23,8 @@ from app.graph.seller_copilot_nodes import (
     refinement_node,
     validation_node,
 )
+from app.graph.routing import route_after_product_identity, route_after_validation
 from app.graph.seller_copilot_state import SellerCopilotState
-
-MAX_VALIDATION_RETRIES = 2
-
-
-# ── 라우터 함수들 ──────────────────────────────────────────────────
-
-def route_after_product_identity(
-    state: SellerCopilotState,
-) -> Literal["clarification_node", "market_intelligence_node"]:
-    if state.get("needs_user_input", False):
-        return "clarification_node"
-    return "market_intelligence_node"
-
-
-def route_after_validation(
-    state: SellerCopilotState,
-) -> Literal["refinement_node", "package_builder_node"]:
-    if state.get("validation_passed", False):
-        return "package_builder_node"
-    retry = int(state.get("validation_retry_count") or 0)
-    if retry >= MAX_VALIDATION_RETRIES:
-        return "package_builder_node"
-    return "refinement_node"
 
 
 # ── 그래프 빌더 ────────────────────────────────────────────────────
