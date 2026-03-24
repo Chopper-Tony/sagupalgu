@@ -152,27 +152,22 @@ async def _rewrite_listing_impl(
     market_context: Dict[str, Any],
     strategy: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """rewrite_listing_tool 내부 구현 (lc_rewrite_listing_tool과 공유)"""
+    """rewrite_listing_tool 내부 구현 (lc_rewrite_listing_tool과 공유).
+
+    ListingService.rewrite_listing()을 통해 처리 —
+    monkey patch 없이 공식 extension point 사용.
+    """
     tool_input = {"instruction": rewrite_instruction, "current_title": canonical_listing.get("title")}
     try:
         from app.services.listing_service import ListingService
 
         svc = ListingService()
-        image_paths = canonical_listing.get("images", [])
-
-        original_prompt_builder = svc._build_copy_prompt
-
-        def patched_prompt(cp, mc, st, ip, tool_calls_context=""):
-            base = original_prompt_builder(cp, mc, st, ip, tool_calls_context)
-            return base + f"\n\nUser feedback for rewrite:\n{rewrite_instruction}\nApply this feedback."
-
-        svc._build_copy_prompt = patched_prompt
-
-        result = await svc.build_canonical_listing(
+        result = await svc.rewrite_listing(
+            canonical_listing=canonical_listing,
+            rewrite_instruction=rewrite_instruction,
             confirmed_product=confirmed_product,
             market_context=market_context,
             strategy=strategy,
-            image_paths=image_paths,
         )
         return _make_tool_call("rewrite_listing_tool", tool_input, result, success=True)
 

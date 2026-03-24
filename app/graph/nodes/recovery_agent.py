@@ -29,7 +29,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
     """
     _log(state, "agent4:recovery:start")
 
-    from app.tools.recovery_tools import (
+    from app.tools.agentic_tools import (
         lc_diagnose_publish_failure_tool,
         lc_auto_patch_tool,
         lc_discord_alert_tool,
@@ -143,7 +143,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
         _record_error(state, "recovery_node", f"react_agent failed: {e}")
         _log(state, f"agent4:react_agent:failed error={e} → fallback to direct tool calls")
 
-        from app.tools.recovery_tools import (
+        from app.tools.agentic_tools import (
             diagnose_publish_failure_tool,
             auto_patch_tool,
             discord_alert_tool,

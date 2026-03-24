@@ -35,7 +35,7 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
     rewrite_instruction = state.get("rewrite_instruction")
     existing_listing = state.get("canonical_listing")
 
-    from app.tools.listing_tools import lc_generate_listing_tool, lc_rewrite_listing_tool
+    from app.tools.agentic_tools import lc_generate_listing_tool, lc_rewrite_listing_tool
     from langchain_core.messages import HumanMessage
 
     brand = product.get("brand", "")
