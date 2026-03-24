@@ -36,7 +36,6 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
     existing_listing = state.get("canonical_listing")
 
     from app.tools.agentic_tools import lc_generate_listing_tool, lc_rewrite_listing_tool
-    from langchain_core.messages import HumanMessage
 
     brand = product.get("brand", "")
     model = product.get("model", "")
@@ -95,6 +94,8 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
     new_listing = None
 
     try:
+        from langchain_core.messages import HumanMessage
+
         llm = _build_react_llm()
         if llm is None:
             raise ValueError("LLM 초기화 실패 — API 키 확인 필요")

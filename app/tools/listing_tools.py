@@ -18,7 +18,7 @@ except ImportError:  # langchain-core 미설치 환경 — _impl 함수는 정�
     def _lc_tool(fn):  # type: ignore[misc]
         return fn
 
-from app.tools._common import _make_tool_call
+from app.tools._common import make_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -169,11 +169,11 @@ async def _rewrite_listing_impl(
             market_context=market_context,
             strategy=strategy,
         )
-        return _make_tool_call("rewrite_listing_tool", tool_input, result, success=True)
+        return make_tool_call("rewrite_listing_tool", tool_input, result, success=True)
 
     except Exception as e:
         logger.error(f"[rewrite_listing_tool] failed: {e}")
-        return _make_tool_call("rewrite_listing_tool", tool_input, canonical_listing, success=False, error=str(e))
+        return make_tool_call("rewrite_listing_tool", tool_input, canonical_listing, success=False, error=str(e))
 
 
 # ── 직접 호출용 (하위 호환) ────────────────────────────────────────

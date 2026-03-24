@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Optional
 
+from app.domain.exceptions import SessionNotFoundError
 from app.domain.product_rules import needs_user_input, normalize_text
 from app.domain.session_status import assert_allowed_transition, resolve_next_action
 from app.repositories.session_repository import SessionRepository
@@ -370,7 +371,7 @@ class SessionService:
     def _get_or_raise(self, session_id: str) -> Dict:
         session = self.repo.get_by_id(session_id)
         if not session:
-            raise ValueError(f"세션을 찾을 수 없습니다: {session_id}")
+            raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
         return session
 
     def _update_or_raise(self, session_id: str, payload: Dict) -> Dict:

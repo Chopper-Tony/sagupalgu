@@ -19,7 +19,7 @@ except ImportError:  # langchain-core 미설치 환경 — _impl 함수는 정�
     def _lc_tool(fn):  # type: ignore[misc]
         return fn
 
-from app.tools._common import _extract_json, _make_tool_call
+from app.tools._common import extract_json, make_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +98,11 @@ async def _market_crawl_impl(confirmed_product: Dict[str, Any]) -> Dict[str, Any
 
         price_context = PriceAggregator.aggregate(all_listings)
         output = {**price_context, "crawler_sources": crawler_sources, "raw_listings": all_listings[:10]}
-        return _make_tool_call("market_crawl_tool", tool_input, output, success=True)
+        return make_tool_call("market_crawl_tool", tool_input, output, success=True)
 
     except Exception as e:
         logger.error(f"[market_crawl_tool] failed: {e}")
-        return _make_tool_call(
+        return make_tool_call(
             "market_crawl_tool", tool_input,
             {"median_price": None, "price_band": None, "sample_count": 0, "crawler_sources": [], "raw_listings": []},
             success=False, error=str(e),
@@ -204,7 +204,7 @@ async def _rag_price_impl(
                     })
                     resp.raise_for_status()
                     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                rag_result = _extract_json(text)
+                rag_result = extract_json(text)
             except Exception as e:
                 logger.warning(f"[rag_price] gemini failed: {e}")
 
@@ -222,7 +222,7 @@ async def _rag_price_impl(
                     )
                     resp.raise_for_status()
                     text = resp.json()["choices"][0]["message"]["content"]
-                    rag_result = _extract_json(text)
+                    rag_result = extract_json(text)
             except Exception as e:
                 logger.warning(f"[rag_price] openai failed: {e}")
 
@@ -235,11 +235,11 @@ async def _rag_price_impl(
         output["source_count"] = len(retrieved_docs)
         output["retrieval_source"] = retrieval_source
 
-        return _make_tool_call("rag_price_tool", tool_input, output, success=True)
+        return make_tool_call("rag_price_tool", tool_input, output, success=True)
 
     except Exception as e:
         logger.error(f"[rag_price_tool] failed: {e}")
-        return _make_tool_call(
+        return make_tool_call(
             "rag_price_tool", tool_input,
             {"rag_available": False, "rag_summary": "", "estimated_price_band": [], "confidence": "low"},
             success=False, error=str(e),

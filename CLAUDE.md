@@ -106,8 +106,9 @@ START
   - `bunjang_publisher.py`: `PatchedBunjangPublisher` (floating footer 클릭 버그 수정)
   - `joongna_publisher.py`: legacy adapter
 - `app/domain/` — 도메인 규칙 단일 진실 원천
-  - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()`, `resolve_next_action()`
+  - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()` → InvalidStateTransitionError, `resolve_next_action()`
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
+  - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
 - `app/services/` — 비즈니스 로직
   - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거
   - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성) 유스케이스 분리
@@ -135,8 +136,14 @@ START
 - 외부 import 진입점은 반드시 `app.tools.agentic_tools` — 노드·서비스·테스트 모두 여기서만 import (하위 모듈 직접 import 금지)
 - LangChain `@tool` 데코레이터 붙은 버전(`lc_` prefix)만 ReAct 에이전트에 bind
 - 내부 구현은 `_impl` 함수로 분리해 직접 호출과 lc_ 래퍼가 공유
-- 모든 툴은 `_make_tool_call()` 형식으로 결과 반환 (state 기록 용이)
+- 모든 툴은 `make_tool_call()` 형식으로 결과 반환 (state 기록 용이) — `app/tools/_common.py`
 - `langchain_core` conditional import — 미설치 환경에서도 `_impl` 함수 정상 동작
+- `HumanMessage` 등 langchain_core 의존 import는 try 블록 안에 배치 — 미설치 시 except 폴백 보장
+
+### 예외 처리
+- 도메인 예외는 `app/domain/exceptions.py` 단 한 곳에서 정의
+- 매핑 정책: SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400
+- 적용 위치: `main.py` 글로벌 핸들러 + `session_router.py` `_domain_error` 헬퍼 (두 곳 모두)
 
 ### 게시 (publishers)
 - `legacy_spikes/` 직접 수정 금지 → `app/publishers/`에서 서브클래스로 패치
@@ -169,7 +176,7 @@ python scripts/manual/run_seller_copilot_graph.py
 # FastAPI 서버 실행
 uvicorn app.main:app --reload
 
-# 테스트 전체 (118개)
+# 테스트 전체 (137개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.12s)
@@ -194,7 +201,9 @@ python -m pytest tests/ -m integration
 | M9: 구조 정리 (데드코드·라우팅 분리·테스트 분할) | ✅ 완료 | app/graph/routing.py 신설(langgraph 의존성 0, unit 라우팅 테스트 8개) ✅, seller_copilot_graph.py에서 중복 라우터 제거·routing.py import ✅, test_agentic_workflow.py → 4파일 분리(product_market/copywriting_validation/recovery_optimization/graph_routing) ✅, conftest.py 공유 픽스처 ✅, 데드코드 legacy_spikes/dead_code/로 이동(app/agents/ 5파일·nodes.py·graph.py) ✅, app/tools/__init__.py 명시적 export ✅, 114/114 테스트 통과 ✅ |
 | M10: import 경계·tool facade 확정 | ✅ 완료 | app/tools/__init__.py 비움(auto-import 제거) ✅, agentic_tools.py public facade 확정(독스트링·contract 명시) ✅, market/listing/recovery_tools.py conditional langchain_core import(미설치 환경 _impl 정상 동작) ✅, SessionService _ensure_transition·_append_tool_calls 헬퍼 추가(8개 메서드 중복 제거) ✅, test_graph_routing.py edge case 5개 추가(총 13개) ✅, 118/118 테스트 통과·unit 0.12s ✅ |
 | M11: facade 일관성·rewrite 경로 정리 | ✅ 완료 | 노드 4개(market/copywriting/recovery/optimization) import → agentic_tools facade 통일(전수 완료) ✅, ListingService.rewrite_listing() 공식 메서드 신설(최초 생성과 재작성 유스케이스 분리) ✅, listing_tools._rewrite_listing_impl monkey patch 제거(svc.rewrite_listing() 직접 호출) ✅, 118/118 테스트 통과 ✅ |
-| M12: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M11 완료 후 진행 |
+| M12: facade 봉인·도메인 예외·HTTP 매핑 | ✅ 완료 | agentic_tools.py에서 _impl re-export 3개 제거(facade 계약 봉인) ✅, app/domain/exceptions.py 도메인 예외 5개 신설(SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502) ✅, assert_allowed_transition → InvalidStateTransitionError 발생 ✅, SessionService._get_or_raise → SessionNotFoundError ✅, main.py 글로벌 exception_handler 5개 ✅, tests/test_agentic_tools_contract.py contract 테스트(공개 심볼 18개·_impl 노출 금지 3개) ✅, 137/137 테스트 통과 ✅ |
+| M13: API 매핑 마감·LangChain 경계 정리·헬퍼 이름 정리 | ✅ 완료 | session_router.py _domain_error 헬퍼 추가(SagupalguError→HTTP 코드 명시, SessionNotFoundError→404·InvalidStateTransitionError→409·PublishExecutionError→502) ✅, market/copywriting/recovery_agent HumanMessage import를 try 블록 안으로 이동(langchain_core 미설치 시 fallback 정상 동작) ✅, _make_tool_call→make_tool_call·_extract_json→extract_json 공개형 이름 전환(5개 모듈) ✅, exceptions.py 예외 매핑 정책 주석(전 프로젝트 단일 기준) ✅, 137/137 테스트 통과 ✅ |
+| M14: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -206,6 +215,8 @@ python -m pytest tests/ -m integration
 | M6 완료 | 84/100 | 도메인 규칙 분리, 상태 전이 강제화, graph 레이어 경계 정리. Runner magic/asyncio 잔재·SessionService 무게·테스트 20개 실패가 감점 요인 |
 | M7~M8 완료 | 79/100 | Runner 단순화, asyncio 제거, DI 도입, 테스트 계층 분리. tools import 구조·patch contract 불안정·데드코드 잔존이 감점 요인 |
 | M9~M10 완료 | 84→90 예상 | routing.py 분리, 데드코드 제거, tools __init__ 경량화, conditional import, SessionService 헬퍼 정리 |
+| M11~M12 완료 | 92/100 | facade 봉인, monkey patch 제거, 도메인 예외 계층, contract 테스트. 라우터 매핑·LangChain 경계가 남은 감점 요인 |
+| M13 완료 | 95 예상 | API 예외 매핑 마감, HumanMessage import 경계 정리, 헬퍼 공개형 이름 전환, 예외 정책 문서화 |
 
 ## 에이전틱 점수 이력
 
