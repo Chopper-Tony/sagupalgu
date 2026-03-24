@@ -90,7 +90,7 @@ START
   - `optimization_tools.py` — Agent 5 (price_optimization_tool)
   - `_common.py` — 공통 헬퍼 (make_tool_call, extract_json)
 - `app/graph/nodes/` — 에이전트별 노드 모듈 (seller_copilot_nodes.py는 re-export shim)
-  - `helpers.py` — _run_async, _build_react_llm, 공통 state 헬퍼
+  - `helpers.py` — _run_async, _build_react_llm, 공통 state 헬퍼 (`_safe_int`은 `app/core/utils.py`로 이동)
   - `product_agent.py` — Agent 1
   - `market_agent.py` — Agent 2
   - `copywriting_agent.py` — Agent 3
@@ -139,6 +139,7 @@ START
   - `src/components/cards/` — ImageUploadCard, ProductConfirmationCard, DraftCard, PublishApprovalCard, PublishResultCard, SaleStatusCard, OptimizationSuggestionCard, ProgressCard, ErrorCard (13개 상태 전부 커버)
   - `Dockerfile` — node:20-alpine 멀티스테이지 빌드 + nginx:alpine 서빙
   - `nginx.conf` — SPA routing + `/api/` 백엔드 프록시 + 정적자산 캐시
+- `tests/api/` — API 통합 테스트 (conftest 공유 픽스처 + 4파일 분할: basic·product·listing·publish)
 - `docs/deployment.md` — AWS EC2 배포 가이드 (Docker 설치·환경변수·실행·HTTPS·모니터링)
 
 ## 코딩 규칙
@@ -164,11 +165,13 @@ START
 ### 예외 처리
 - 도메인 예외는 `app/domain/exceptions.py` 단 한 곳에서 정의
 - 매핑 정책: SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400
-- 적용 위치: `main.py` 글로벌 핸들러 + `session_router.py` `_domain_error` 헬퍼 (두 곳 모두)
+- 적용 위치: `main.py` 글로벌 핸들러 단일 (`_DOMAIN_STATUS_MAP` 데이터 주도, `SagupalguError` 통합 + `ValueError` 핸들러)
+- 라우터는 예외를 잡지 않음 — 순수 서비스 호출 + 응답 변환만 담당
 
 ### 의존성 주입 (DI)
 - 서비스 인스턴스는 `app/dependencies.py`의 `Depends()` 함수를 통해서만 라우터에 주입
 - 라우터에서 직접 `SessionService()` / `SessionRepository()` 생성 금지
+- SessionService 생성자는 5개 의존성 모두 required (Optional 기본값 없음, 인라인 fallback 금지)
 - 테스트 격리: `app.dependency_overrides[get_session_service] = lambda: mock_svc` 패턴 사용
 
 ### 게시 (publishers)
@@ -179,7 +182,7 @@ START
 ## 현재 미완성 항목 (TODO)
 - pgvector 활성화: Supabase SQL Editor에서 `migrations/001_pgvector_setup.sql` 실행 후 `python scripts/setup_pgvector.py --seed`
 - 당근마켓 게시 구현 (Android 에뮬레이터)
-- Supabase Storage 버킷 연결 (이미지 업로드)
+- Supabase Storage 버킷 연결 (이미지 업로드) — ✅ M25에서 `storage_client.py` 구현 완료, 대시보드에서 Public 버킷 생성만 필요
 
 ## 주요 명령어
 
@@ -214,7 +217,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (240개)
+# 테스트 전체 (269개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -255,6 +258,7 @@ python -m pytest tests/ -m integration
 | M25: Supabase storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 쌍(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py 7개 추가 ✅ |
 | M26: 보안·운영 강화(CORS) | ✅ 완료 | UploadImagesRequest field validator(HTTP(S) URL 검증·빈값·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS·frozenset 검증) ✅, SaleStatusRequest Literal 타입 강화 ✅, test_security.py 22개 추가 ✅ |
 | M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, session_router.py _handle() 공통 래퍼 신설(try-except 중복 제거) ✅ |
+| M28: 예외 핸들링 일원화 | ✅ 완료 | main.py 글로벌 핸들러 통합(5개 개별→SagupalguError 1개 + ValueError 핸들러, _DOMAIN_STATUS_MAP 데이터 주도) ✅, session_router.py try-except 완전 제거(순수 서비스 호출만, _api_error/_domain_error 헬퍼·예외 import 전부 제거) ✅, exceptions.py 매핑 적용 위치 주석 단일화 ✅, 269/269 테스트 통과 ✅ |
 | M29: 데드코드·중복 제거 + 테스트 파일 분할 | ✅ 완료 | app/core/utils.py 신설(safe_int 단일 정의) ✅, helpers.py·session_service.py 중복 _safe_int 제거→utils.py import ✅, seller_copilot_service.py 미사용 alias(_normalize_text·_needs_user_input)·normalize_text import 제거 ✅, test_session_api.py(401줄) → tests/api/ 4파일 분할(basic·product·listing·publish + conftest) ✅, 269/269 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
@@ -270,6 +274,9 @@ python -m pytest tests/ -m integration
 | M11~M12 완료 | 92/100 | facade 봉인, monkey patch 제거, 도메인 예외 계층, contract 테스트. 라우터 매핑·LangChain 경계가 남은 감점 요인 |
 | M13 완료 | 93/100 | API 예외 매핑 마감, HumanMessage import 경계 정리, 헬퍼 공개형 이름 전환, 예외 정책 문서화. test KeyError·asyncio 경고·SessionService ValueError가 남은 감점 요인 |
 | M14 완료 | 96 예상 | asyncio.get_running_loop() 교체(경고 제거), 테스트 ReAct 경로 sys.modules patch 안정화 |
+| M15~M20 완료 | 91/100 (실제) | 배포 기반·프론트엔드·Docker·DI 완성. 배포 인프라 강화 but SessionService 무게·테스트 확충 미비 |
+| M21~M24 완료 | 97 예상 | LLM/Meta 분리, 테스트 185→240, API 통합 테스트 36개, 관찰 가능성 기반 |
+| M25~M29 완료 | 99 예상 | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거, 테스트 269개 |
 
 ## 에이전틱 점수 이력
 
