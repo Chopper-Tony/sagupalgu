@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.dependencies import get_session_service
 from app.domain.exceptions import (
     InvalidStateTransitionError,
     ListingGenerationError,
@@ -8,7 +9,6 @@ from app.domain.exceptions import (
     SagupalguError,
     SessionNotFoundError,
 )
-from app.repositories.session_repository import SessionRepository
 from app.schemas.session import (
     AnalyzeSessionResponse,
     ConfirmProductRequest,
@@ -33,9 +33,6 @@ from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
-session_repository = SessionRepository()
-session_service = SessionService(session_repository=session_repository)
-
 
 def _api_error(status_code: int, error: str, message: str) -> HTTPException:
     """통일된 에러 응답 생성."""
@@ -59,7 +56,9 @@ def _domain_error(exc: SagupalguError) -> HTTPException:
 
 
 @router.post("", response_model=CreateSessionResponse)
-async def create_session():
+async def create_session(
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.create_session(user_id="temp-user-id")
         return CreateSessionResponse(**result)
@@ -70,7 +69,10 @@ async def create_session():
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)
-async def get_session(session_id: str):
+async def get_session(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         session_ui = await session_service.get_session(session_id)
         return SessionDetailResponse(**session_ui)
@@ -81,7 +83,11 @@ async def get_session(session_id: str):
 
 
 @router.post("/{session_id}/images", response_model=UploadImagesResponse)
-async def upload_images(session_id: str, request: UploadImagesRequest):
+async def upload_images(
+    session_id: str,
+    request: UploadImagesRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.attach_images(
             session_id=session_id,
@@ -95,7 +101,10 @@ async def upload_images(session_id: str, request: UploadImagesRequest):
 
 
 @router.post("/{session_id}/analyze", response_model=AnalyzeSessionResponse)
-async def analyze_session(session_id: str):
+async def analyze_session(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.analyze_session(session_id=session_id)
         return AnalyzeSessionResponse(**result)
@@ -106,7 +115,11 @@ async def analyze_session(session_id: str):
 
 
 @router.post("/{session_id}/confirm-product", response_model=ConfirmProductResponse)
-async def confirm_product(session_id: str, request: ConfirmProductRequest):
+async def confirm_product(
+    session_id: str,
+    request: ConfirmProductRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.confirm_product(
             session_id=session_id,
@@ -120,7 +133,11 @@ async def confirm_product(session_id: str, request: ConfirmProductRequest):
 
 
 @router.post("/{session_id}/provide-product-info", response_model=ProvideProductInfoResponse)
-async def provide_product_info(session_id: str, request: ProvideProductInfoRequest):
+async def provide_product_info(
+    session_id: str,
+    request: ProvideProductInfoRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.provide_product_info(
             session_id=session_id,
@@ -136,7 +153,10 @@ async def provide_product_info(session_id: str, request: ProvideProductInfoReque
 
 
 @router.post("/{session_id}/generate-listing", response_model=GenerateListingResponse)
-async def generate_listing(session_id: str):
+async def generate_listing(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.generate_listing(session_id=session_id)
         return GenerateListingResponse(**result)
@@ -147,7 +167,11 @@ async def generate_listing(session_id: str):
 
 
 @router.post("/{session_id}/prepare-publish", response_model=PreparePublishResponse)
-async def prepare_publish(session_id: str, request: PreparePublishRequest):
+async def prepare_publish(
+    session_id: str,
+    request: PreparePublishRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.prepare_publish(
             session_id=session_id,
@@ -161,7 +185,10 @@ async def prepare_publish(session_id: str, request: PreparePublishRequest):
 
 
 @router.post("/{session_id}/publish", response_model=PublishResponse)
-async def publish_session(session_id: str):
+async def publish_session(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.publish_session(session_id=session_id)
         return PublishResponse(**result)
@@ -172,7 +199,11 @@ async def publish_session(session_id: str):
 
 
 @router.post("/{session_id}/rewrite-listing", response_model=RewriteListingResponse)
-async def rewrite_listing(session_id: str, request: RewriteListingRequest):
+async def rewrite_listing(
+    session_id: str,
+    request: RewriteListingRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.rewrite_listing(
             session_id=session_id,
@@ -186,7 +217,11 @@ async def rewrite_listing(session_id: str, request: RewriteListingRequest):
 
 
 @router.post("/{session_id}/sale-status", response_model=SaleStatusResponse)
-async def update_sale_status(session_id: str, request: SaleStatusRequest):
+async def update_sale_status(
+    session_id: str,
+    request: SaleStatusRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
     try:
         result = await session_service.update_sale_status(
             session_id=session_id,
