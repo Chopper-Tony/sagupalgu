@@ -80,10 +80,13 @@ START
 
 - `app/domain/session_status.py` — SessionStatus SSOT, ALLOWED_TRANSITIONS, resolve_next_action, is_terminal_status
 - `app/graph/` — LangGraph StateGraph, 노드, 상태, 러너
-- `app/tools/` — 에이전트별 툴 모듈 (agentic_tools.py는 re-export shim)
-  - `market_tools.py` — Agent 2 (lc_market_crawl_tool, lc_rag_price_tool)
-  - `listing_tools.py` — Agent 3 (lc_generate_listing_tool, lc_rewrite_listing_tool)
-  - `recovery_tools.py` — Agent 4 (lc_diagnose/auto_patch/discord_alert)
+  - `routing.py` — 순수 라우팅 함수 (langgraph 의존성 0, unit 테스트 가능)
+  - `seller_copilot_graph.py` — StateGraph 빌드·컴파일 (routing.py import)
+- `app/tools/` — 에이전트별 툴 모듈
+  - `agentic_tools.py` — **public facade** (외부 코드의 단일 import 진입점, patch 경로 고정)
+  - `market_tools.py` — Agent 2 (lc_market_crawl_tool, lc_rag_price_tool, _impl 분리)
+  - `listing_tools.py` — Agent 3 (lc_generate_listing_tool, lc_rewrite_listing_tool, _impl 분리)
+  - `recovery_tools.py` — Agent 4 (lc_diagnose/auto_patch/discord_alert, _impl 분리)
   - `optimization_tools.py` — Agent 5 (price_optimization_tool)
   - `_common.py` — 공통 헬퍼 (_make_tool_call, _extract_json)
 - `app/graph/nodes/` — 에이전트별 노드 모듈 (seller_copilot_nodes.py는 re-export shim)
@@ -106,7 +109,7 @@ START
   - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()`, `resolve_next_action()`
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
 - `app/services/` — 비즈니스 로직
-  - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리
+  - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
@@ -124,13 +127,15 @@ START
 
 ### 에이전트 노드
 - 반드시 `state: SellerCopilotState` 인자를 받는 동기 함수로 구현
-- async 도구 호출은 `_run_async()` 헬퍼 경유
-- ReAct 에이전트는 `create_react_agent(llm, tools)` 패턴 사용
+- async 도구 호출은 `_run_async(lambda: coro())` 헬퍼 경유 (lambda 패턴 — RuntimeWarning 방지)
+- ReAct 에이전트는 `langchain.agents.create_agent(llm, tools, system_prompt=...)` 패턴 사용
 
 ### 툴
-- LangChain `@tool` 데코레이터 붙은 버전(`lc_` prefix)만 `create_react_agent`에 bind
+- 외부 import 진입점은 반드시 `app.tools.agentic_tools` — 하위 모듈 직접 import 지양
+- LangChain `@tool` 데코레이터 붙은 버전(`lc_` prefix)만 ReAct 에이전트에 bind
 - 내부 구현은 `_impl` 함수로 분리해 직접 호출과 lc_ 래퍼가 공유
 - 모든 툴은 `_make_tool_call()` 형식으로 결과 반환 (state 기록 용이)
+- `langchain_core` conditional import — 미설치 환경에서도 `_impl` 함수 정상 동작
 
 ### 게시 (publishers)
 - `legacy_spikes/` 직접 수정 금지 → `app/publishers/`에서 서브클래스로 패치
@@ -163,8 +168,14 @@ python scripts/manual/run_seller_copilot_graph.py
 # FastAPI 서버 실행
 uvicorn app.main:app --reload
 
-# 테스트 (33개)
+# 테스트 전체 (118개)
 python -m pytest tests/
+
+# unit 테스트만 (langchain 불필요, 0.12s)
+python -m pytest tests/ -m unit
+
+# integration 테스트만
+python -m pytest tests/ -m integration
 ```
 
 ## 리팩토링 마일스톤 이력 (CTO 코드리뷰 대응)
@@ -191,6 +202,8 @@ python -m pytest tests/
 | M1~M4 완료 | 80/100 | 상태 머신 SSOT, God File 분해, API 계약 정리 |
 | M5 완료 | 85/100 | rewrite 버그 수정, asyncio 제거, SessionService 분해, 테스트 신뢰성 확보 |
 | M6 완료 | 84/100 | 도메인 규칙 분리, 상태 전이 강제화, graph 레이어 경계 정리. Runner magic/asyncio 잔재·SessionService 무게·테스트 20개 실패가 감점 요인 |
+| M7~M8 완료 | 79/100 | Runner 단순화, asyncio 제거, DI 도입, 테스트 계층 분리. tools import 구조·patch contract 불안정·데드코드 잔존이 감점 요인 |
+| M9~M10 완료 | 84→90 예상 | routing.py 분리, 데드코드 제거, tools __init__ 경량화, conditional import, SessionService 헬퍼 정리 |
 
 ## 에이전틱 점수 이력
 
