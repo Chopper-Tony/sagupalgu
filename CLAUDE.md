@@ -253,7 +253,8 @@ python -m pytest tests/ -m integration
 | M24: 관찰 가능성(Observability) 기반 구축 | ✅ 완료 | app/core/logging.py 신설(JsonFormatter·configure_logging·contextvars request_id 자동 포함) ✅, app/middleware/request_id.py 신설(X-Request-ID 전파·UUID4 자동 발급·응답 헤더 포함) ✅, main.py 미들웨어 등록·/health 상세화(environment·checks 필드) ✅, test_observability.py(19개: JsonFormatter·contextvars·미들웨어·헬스체크) ✅, 221→240 테스트 통과 ✅ |
 | M25: Supabase storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 쌍(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py 7개 추가 ✅ |
 | M26: 보안·운영 강화(CORS) | ✅ 완료 | UploadImagesRequest field validator(HTTP(S) URL 검증·빈값·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS·frozenset 검증) ✅, SaleStatusRequest Literal 타입 강화 ✅, test_security.py 22개 추가 ✅ |
-| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, app/middleware/request_id.py 제거 후 optional-required 전환 및 fallback 제거 ✅, session_router.py 전역 서비스 제거/try-except 정리 ✅ |
+| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, session_router.py _handle() 공통 래퍼 신설(try-except 중복 제거) ✅ |
+| M28: 예외 핸들링 일원화 | ✅ 완료 | main.py 글로벌 핸들러 통합(5개 개별→SagupalguError 1개 + ValueError 핸들러, _DOMAIN_STATUS_MAP 데이터 주도) ✅, session_router.py try-except 완전 제거(순수 서비스 호출만) ✅, _api_error/_domain_error 헬퍼·ErrorResponse import·예외 import 전부 제거 ✅, exceptions.py 매핑 적용 위치 주석 단일화 ✅, 240/240 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

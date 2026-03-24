@@ -15,6 +15,7 @@ from app.domain.exceptions import (
     ListingGenerationError,
     ListingRewriteError,
     PublishExecutionError,
+    SagupalguError,
     SessionNotFoundError,
 )
 from app.middleware.request_id import RequestIdMiddleware
@@ -39,29 +40,37 @@ app.add_middleware(
 app.add_middleware(RequestIdMiddleware)
 
 
-@app.exception_handler(SessionNotFoundError)
-async def session_not_found_handler(request: Request, exc: SessionNotFoundError):
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+# ── 예외 매핑 정책 (단일 진실 원천) ─────────────────────────────────
+# SessionNotFoundError       → 404
+# InvalidStateTransitionError → 409
+# ListingGenerationError/ListingRewriteError → 500
+# PublishExecutionError      → 502
+# ValueError                 → 400
+
+_DOMAIN_STATUS_MAP: dict[type, tuple[int, str]] = {
+    SessionNotFoundError: (404, "session_not_found"),
+    InvalidStateTransitionError: (409, "invalid_state_transition"),
+    ListingGenerationError: (500, "listing_error"),
+    ListingRewriteError: (500, "listing_error"),
+    PublishExecutionError: (502, "publish_execution_error"),
+}
 
 
-@app.exception_handler(InvalidStateTransitionError)
-async def invalid_transition_handler(request: Request, exc: InvalidStateTransitionError):
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
+@app.exception_handler(SagupalguError)
+async def sagupalgu_error_handler(request: Request, exc: SagupalguError):
+    status_code, error_key = _DOMAIN_STATUS_MAP.get(type(exc), (500, "domain_error"))
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": {"error": error_key, "message": str(exc)}},
+    )
 
 
-@app.exception_handler(ListingGenerationError)
-async def listing_generation_handler(request: Request, exc: ListingGenerationError):
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
-
-
-@app.exception_handler(ListingRewriteError)
-async def listing_rewrite_handler(request: Request, exc: ListingRewriteError):
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
-
-
-@app.exception_handler(PublishExecutionError)
-async def publish_execution_handler(request: Request, exc: PublishExecutionError):
-    return JSONResponse(status_code=502, content={"detail": str(exc)})
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": {"error": "validation_error", "message": str(exc)}},
+    )
 
 
 @app.get("/health")

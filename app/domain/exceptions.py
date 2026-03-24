@@ -11,8 +11,7 @@
   범용 ValueError              → HTTP 400  (입력 검증 실패 — 위 타입에 해당하지 않는 것)
 
 매핑 적용 위치:
-  app/main.py           — 글로벌 exception_handler (FastAPI 앱 레벨)
-  app/api/session_router.py — _domain_error 헬퍼 (라우터 레벨 명시)
+  app/main.py — 글로벌 exception_handler 단일 (SagupalguError + ValueError)
 """
 from __future__ import annotations
 
