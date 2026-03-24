@@ -227,7 +227,11 @@ def build_template_copy(
     return {
         "title": title,
         "description": description,
+        "price": recommended_price,
         "tags": deduped_tags[:5],
+        "images": [],
+        "strategy": strategy.get("goal", "fast_sell"),
+        "product": confirmed_product,
     }
 
 
