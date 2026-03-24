@@ -8,7 +8,7 @@ SessionService — 세션 라이프사이클 오케스트레이터.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from app.domain.exceptions import SessionNotFoundError
 from app.domain.product_rules import needs_user_input, normalize_text
@@ -30,14 +30,8 @@ from app.services.session_meta import (
     set_publish_prepared,
     set_sale_status,
 )
+from app.core.utils import safe_int as _safe_int
 from app.services.session_ui import build_session_ui_response  # noqa: F401 — re-export
-
-
-def _safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 class SessionService:
