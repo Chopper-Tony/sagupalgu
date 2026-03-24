@@ -1,0 +1,42 @@
+.progress-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.progress-card__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #3a3a3e;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.progress-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0;
+}
+
+.progress-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}

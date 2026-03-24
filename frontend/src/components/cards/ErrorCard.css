@@ -1,0 +1,59 @@
+.error-card {
+  background: #1e1515;
+  border: 1px solid #5a2020;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-card__icon {
+  font-size: 16px;
+}
+
+.error-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f87171;
+}
+
+.error-card__message {
+  font-size: 13px;
+  color: #ccc;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.error-card__code {
+  font-size: 11px;
+  color: #666;
+  margin: 0;
+  font-family: monospace;
+}
+
+.error-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.error-card__action-btn {
+  background: #2a1515;
+  border: 1px solid #5a2020;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #f87171;
+  cursor: pointer;
+}
+
+.error-card__action-btn:hover {
+  background: #3a1515;
+}
