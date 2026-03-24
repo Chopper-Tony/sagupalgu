@@ -72,29 +72,31 @@ def build_session_ui_response(session: Dict) -> Dict:
 
 
 class SessionService:
-    def __init__(self, session_repository: SessionRepository):
+    def __init__(
+        self,
+        session_repository: SessionRepository,
+        product_service: Optional["ProductService"] = None,
+        publish_service: Optional["PublishService"] = None,
+        copilot_service: Optional["SellerCopilotService"] = None,
+        recovery_service: Optional["RecoveryService"] = None,
+        optimization_service: Optional["OptimizationService"] = None,
+    ):
         self.repo = session_repository
-        self.product_service = ProductService()
-        self.publish_service = PublishService()
-        self.copilot_service = SellerCopilotService()
-        self.recovery_service = RecoveryService()
-        self.optimization_service = OptimizationService()
+        self.product_service = product_service or ProductService()
+        self.publish_service = publish_service or PublishService()
+        self.copilot_service = copilot_service or SellerCopilotService()
+        self.recovery_service = recovery_service or RecoveryService()
+        self.optimization_service = optimization_service or OptimizationService()
 
     # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
     async def create_session(self, user_id: str) -> Dict:
         session = self.repo.create(user_id=user_id)
-        return {"session_id": session.id, "status": session.status}
+        return build_session_ui_response(session.to_record())
 
     async def get_session(self, session_id: str) -> Dict:
         session = self._get_or_raise(session_id)
-        return {
-            "session_id": session["id"],
-            "status": session["status"],
-            "product_data_jsonb": session.get("product_data_jsonb") or {},
-            "listing_data_jsonb": session.get("listing_data_jsonb") or {},
-            "workflow_meta_jsonb": session.get("workflow_meta_jsonb") or {},
-        }
+        return build_session_ui_response(session)
 
     # ── 이미지 업로드 ──────────────────────────────────────────────
 

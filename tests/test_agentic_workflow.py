@@ -1,5 +1,5 @@
 """
-사구팔구 Agentic Workflow 테스트 스위트
+사구팔구 Agentic Workflow 테스트 스위트 (integration)
 
 테스트 범위:
 1. 에이전트별 도구 선택 자율성
@@ -7,12 +7,16 @@
 3. 검증·복구 에이전트 (Agent 4) 진단 로직
 4. 판매 후 최적화 에이전트 (Agent 5)
 5. 판매글 재작성 tool 트리거
+
+마커: @pytest.mark.integration — LangGraph 노드·mock 의존
 """
 from __future__ import annotations
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Any, Dict
+
+pytestmark = pytest.mark.integration
 
 
 # ─────────────────────────────────────────────────────────────────

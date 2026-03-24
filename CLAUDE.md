@@ -178,7 +178,8 @@ python -m pytest tests/
 | M5: 버그 수정·안정화 | ✅ 완료 | `rewrite_instruction` 미연결 버그 수정, `nest_asyncio`/`asyncio.run` 제거(async 전환), `_normalize_text` 중복 제거, 테스트 mock 경로 6곳 정상화(33/33 green), `SessionService` 분해(`build_session_ui_response` 모듈 함수 분리, `PublishService.build_platform_packages` 신설) |
 | M6: 아키텍처 정리 | ✅ 완료 | `app/domain/product_rules.py` 신설(도메인 규칙 분리), `assert_allowed_transition()` 상태 전이 강제화, `RecoveryService`/`OptimizationService` 신설(graph 레이어 경계 정리), `requirements.txt` 누락 의존성 추가 |
 | M7: 실행 안정화·테스트 회복 | ✅ 완료 | SellerCopilotRunner 단순화(325줄→68줄) ✅, PublishService.execute_publish 분리 ✅, SessionService publish 루프 위임 ✅, create_react_agent → langchain.agents.create_agent 교체 ✅, _run_async lambda 패턴 도입(RuntimeWarning 제거) ✅, requirements.txt cp949 버그·langchain 누락 수정 ✅, 테스트 33/33 경고 0개 ✅ |
-| M8: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M7 완료 후 진행 |
+| M8: 코드 품질 강화 (DI·테스트 계층·API 계약) | ✅ 완료 | SessionService 생성자 DI 도입(5개 서비스 주입 가능) ✅, create_session 더블콜 제거·get_session UI응답 통일 ✅, 테스트 계층 분리(unit/integration 마커, test_session_status.py 41개·test_domain.py 35개 신규) ✅, 112/112 테스트 통과·unit 단독 0.11초 ✅ |
+| M9: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M8 완료 후 진행 |
 
 ## CTO 코드리뷰 점수 이력
 
