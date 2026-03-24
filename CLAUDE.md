@@ -113,6 +113,9 @@ START
   - `recovery_agent.py` — Agent 4 복구
   - `packaging_agent.py` — 패키지 빌더 + 게시
   - `optimization_agent.py` — Agent 5
+  - `planner_agent.py` — Agent 0 Mission Planner (LLM 계획 생성 + 룰 기반 fallback)
+  - `critic_agent.py` — Agent 6 Listing Critic (LLM 품질 비평 + 룰 기반 fallback)
+  - `clarification_listing_agent.py` — Pre-listing Clarification (판매글 전 정보 부족 감지·질문 생성)
 - `app/db/client.py` — Supabase 클라이언트 싱글턴 (`get_supabase()`, lazy import — 미설치 환경 호환)
 - `app/db/pgvector_store.py` — pgvector 임베딩 생성·검색·삽입 (OpenAI embedding)
 - `migrations/001_pgvector_setup.sql` — pgvector 확장, price_history 테이블, RPC 함수
@@ -181,7 +184,7 @@ START
 
 ### 예외 처리
 - 도메인 예외는 `app/domain/exceptions.py` 단 한 곳에서 정의
-- 매핑 정책: SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400
+- 매핑 정책: SessionNotFoundError→404, InvalidUserInputError→400, InvalidStateTransitionError→409, SessionUpdateError→500, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502
 - 적용 위치: `main.py` 글로벌 핸들러 단일 (`_DOMAIN_STATUS_MAP` 데이터 주도, `SagupalguError` 통합 + `ValueError` 핸들러)
 - 라우터는 예외를 잡지 않음 — 순수 서비스 호출 + 응답 변환만 담당
 
@@ -195,6 +198,12 @@ START
 - supabase, langgraph, langchain 등 무거운 런타임 의존성은 반드시 **lazy import** (함수 내부에서 import)
 - 모듈 최상단 eager import 금지 — clean env(미설치 환경)에서 pytest 수집이 통과해야 함
 - TYPE_CHECKING 블록은 타입 힌트 용도로만 사용
+
+### 테스트
+- **unit**: 순수 함수 직접 호출, mock 불필요, CI 필수 통과
+- **integration**: 노드 함수 호출하되 **외부 LLM은 반드시 mock** (`_build_react_llm` → `None`). CI 안정성 확보
+- **e2e**: 실제 LLM 호출, CI 필수 아님 (별도 환경)
+- LLM 응답에 의존하는 assertion 금지 — 룰 기반 fallback 경로만 검증
 
 ### 게시 (publishers)
 - `legacy_spikes/` 직접 수정 금지 → `app/publishers/`에서 서브클래스로 패치
@@ -239,7 +248,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (340개)
+# 테스트 전체 (369개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -309,7 +318,8 @@ python -m pytest tests/ -m integration
 | M15~M20 완료 | 91/100 (실제) | 배포 기반·프론트엔드·Docker·DI 완성. 배포 인프라 강화 but SessionService 무게·테스트 확충 미비 |
 | M21~M24 완료 | 97 예상 | LLM/Meta 분리, 테스트 185→240, API 통합 테스트 36개, 관찰 가능성 기반 |
 | M25~M29 완료 | 89→90/100 (실제) | 1차 89점(supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비), 2차 90점(supabase 해결 but langgraph import 실패 잔존) |
-| M30~M34 완료 | 95 예상 | supabase+langgraph lazy import, 출력 계약 25+14개 회귀 테스트, SessionService 절개(session_product.py), ListingService 절개(listing_prompt.py 확장), 상태 전이 계약 검증, 테스트 338개 |
+| M30~M34 완료 | 90/100 (CTO2 실제) | supabase+langgraph lazy import, 출력 계약 봉합, SessionService·ListingService 절개. CTO2 84점 (rewrite 깨짐·legacy 의존·예외 남용 지적) → M35~M36으로 대응 후 CTO1 재평가 90점 |
+| M35~M39 완료 | 95 예상 | rewrite 계약 봉합, 예외 세분화(InvalidUserInputError·SessionUpdateError), health/live·ready 분리, **Critic+Planner+Clarification 3개 에이전트 추가** (7에이전트 체제), rewrite·replan·clarification 3개 agentic loop 완성, 테스트 369개 |
 
 ## 에이전틱 점수 이력
 
@@ -318,3 +328,4 @@ python -m pytest tests/ -m integration
 | 초기 | 28/100 | 파이프라인 구조, LLM 툴 선택 없음 |
 | 1차 개선 | 88/100 | Agent 2 ReAct, publish_node 추가, recovery_node 연결, auto_patch_tool 구현 |
 | 2차 개선 | 100/100 | Agent 3/4 ReAct 전환, lc_ 툴 7개로 확대, Supabase pgvector RAG 연결 |
+| 3차 개선 (M37~M39) | — | Listing Critic(생성→비평→재생성 루프), Mission Planner(계획→실행→재계획 루프), Pre-listing Clarification(정보 부족→질문→재진입 루프). 5→7 에이전트, deterministic shell + agentic core 하이브리드 아키텍처 |
