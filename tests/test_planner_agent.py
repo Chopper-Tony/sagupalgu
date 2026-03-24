@@ -2,6 +2,7 @@
 Agent 0 — Mission Planner + Replan 라우팅 테스트.
 """
 import pytest
+from unittest.mock import patch
 
 from app.graph.nodes.planner_agent import _rule_based_planning, mission_planner_node
 from app.graph.routing import route_after_critic
@@ -110,27 +111,27 @@ class TestReplanRouting:
         assert route_after_critic(state) == "copywriting_node"
 
 
-# ── Planner 노드 통합 테스트 ──────────────────────────────────────
+# ── Planner 노드 통합 테스트 (LLM mock — CI 안정성) ──────────────
 
 
 class TestMissionPlannerNode:
 
     @pytest.mark.integration
     def test_first_plan_creates_plan(self, base_state):
+        """LLM 없이 룰 기반으로 plan이 생성된다."""
         state = {**base_state, "plan_revision_count": 0, "max_replans": 1,
                  "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {}}
-        result = mission_planner_node(state)
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
         assert "steps" in result["plan"]
         assert len(result["decision_rationale"]) > 0
 
     @pytest.mark.integration
     def test_replan_reflects_critic_feedback(self, base_state):
         """replan 시 critic 피드백이 반영되어 missing_information이 생성된다."""
-        from unittest.mock import patch
         state = {**base_state, "plan_revision_count": 1, "max_replans": 1,
                  "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {},
                  "critic_feedback": [{"type": "trust", "impact": "high", "reason": "신뢰 정보 부족"}]}
-        # LLM을 비활성화해서 룰 기반 fallback 경로만 검증
         with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
             result = mission_planner_node(state)
         assert "product_condition_details" in result.get("missing_information", [])
@@ -139,5 +140,6 @@ class TestMissionPlannerNode:
     def test_plan_has_focus(self, base_state):
         state = {**base_state, "plan_revision_count": 0, "max_replans": 1,
                  "decision_rationale": [], "missing_information": [], "mission_goal": "fast_sell", "plan": {}}
-        result = mission_planner_node(state)
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
         assert result["plan"].get("focus")

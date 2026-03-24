@@ -2,8 +2,10 @@
 Agent 6 — Listing Critic 에이전트 + routing 테스트.
 
 critic_score에 따라 pass/rewrite 분기가 올바르게 동작하는지 검증.
+통합 테스트는 LLM을 mock해서 CI에서 결정론적으로 동작.
 """
 import pytest
+from unittest.mock import patch
 
 from app.graph.nodes.critic_agent import _rule_based_critique, listing_critic_node
 from app.graph.routing import route_after_critic
@@ -167,7 +169,8 @@ class TestListingCriticNode:
         state["critic_retry_count"] = 0
         state["max_critic_retries"] = 2
 
-        result = listing_critic_node(state)
+        with patch("app.graph.nodes.critic_agent._build_react_llm", return_value=None):
+            result = listing_critic_node(state)
         assert isinstance(result["critic_score"], int)
         assert result["critic_score"] > 0
         assert isinstance(result["critic_feedback"], list)
@@ -188,7 +191,8 @@ class TestListingCriticNode:
         state["critic_retry_count"] = 0
         state["max_critic_retries"] = 2
 
-        result = listing_critic_node(state)
+        with patch("app.graph.nodes.critic_agent._build_react_llm", return_value=None):
+            result = listing_critic_node(state)
         assert result["critic_score"] < 70
         assert result["critic_retry_count"] == 1
         assert result.get("rewrite_instruction") is not None
@@ -200,7 +204,8 @@ class TestListingCriticNode:
         state["critic_retry_count"] = 0
         state["max_critic_retries"] = 2
 
-        result = listing_critic_node(state)
+        with patch("app.graph.nodes.critic_agent._build_react_llm", return_value=None):
+            result = listing_critic_node(state)
         assert result["critic_score"] == 0
 
     @pytest.mark.integration
@@ -214,6 +219,7 @@ class TestListingCriticNode:
         state["critic_retry_count"] = 2
         state["max_critic_retries"] = 2
 
-        result = listing_critic_node(state)
+        with patch("app.graph.nodes.critic_agent._build_react_llm", return_value=None):
+            result = listing_critic_node(state)
         # max retries 도달 → rewrite_instruction 설정하지 않아야 함
         assert result["critic_retry_count"] == 2  # 증가하지 않음
