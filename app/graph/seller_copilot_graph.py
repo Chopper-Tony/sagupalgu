@@ -27,9 +27,15 @@ def build_seller_copilot_graph():
         refinement_node,
         validation_node,
     )
+    from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
     from app.graph.nodes.critic_agent import listing_critic_node
     from app.graph.nodes.planner_agent import mission_planner_node
-    from app.graph.routing import route_after_critic, route_after_product_identity, route_after_validation
+    from app.graph.routing import (
+        route_after_critic,
+        route_after_pre_listing_clarification,
+        route_after_product_identity,
+        route_after_validation,
+    )
     from app.graph.seller_copilot_state import SellerCopilotState
 
     graph = StateGraph(SellerCopilotState)
@@ -45,6 +51,7 @@ def build_seller_copilot_graph():
     graph.add_node("package_builder_node", package_builder_node)
     graph.add_node("listing_critic_node", listing_critic_node)
     graph.add_node("mission_planner_node", mission_planner_node)
+    graph.add_node("pre_listing_clarification_node", pre_listing_clarification_node)
 
     # ── 메인 플로우 ──────────────────────────────────────────────
     graph.add_edge(START, "mission_planner_node")
@@ -55,11 +62,22 @@ def build_seller_copilot_graph():
         route_after_product_identity,
         {
             "clarification_node": "clarification_node",
-            "market_intelligence_node": "market_intelligence_node",
+            "pre_listing_clarification_node": "pre_listing_clarification_node",
         },
     )
 
     graph.add_edge("clarification_node", END)
+
+    # Pre-listing clarification → (충분: market / 부족: END 사용자 답변 대기)
+    graph.add_conditional_edges(
+        "pre_listing_clarification_node",
+        route_after_pre_listing_clarification,
+        {
+            "market_intelligence_node": "market_intelligence_node",
+            "__end__": END,
+        },
+    )
+
     graph.add_edge("market_intelligence_node", "pricing_strategy_node")
     graph.add_edge("pricing_strategy_node", "copywriting_node")
     graph.add_edge("copywriting_node", "listing_critic_node")

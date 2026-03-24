@@ -18,6 +18,13 @@ MAX_REPLANS = 1
 def route_after_product_identity(state: SellerCopilotState) -> str:
     if state.get("needs_user_input", False):
         return "clarification_node"
+    return "pre_listing_clarification_node"
+
+
+def route_after_pre_listing_clarification(state: SellerCopilotState) -> str:
+    """정보 부족이면 END (사용자 답변 대기), 충분하면 market으로."""
+    if state.get("needs_user_input", False) and not state.get("pre_listing_done", False):
+        return "__end__"
     return "market_intelligence_node"
 
 

@@ -167,6 +167,11 @@ class SellerCopilotState(TypedDict, total=False):
     decision_rationale: List[str]               # 의사결정 근거 이력
     missing_information: List[str]              # 부족한 정보 목록
 
+    # ── Pre-listing Clarification ───────────────────────────────────
+    pre_listing_questions: List[Dict[str, Any]]     # [{id, question}]
+    pre_listing_answers: Dict[str, str]             # {question_id: answer}
+    pre_listing_done: bool                          # 질문 완료 여부
+
     # ── Critic / Rewrite 루프 ────────────────────────────────────────
     critic_score: int                           # 0~100
     critic_feedback: List[Dict[str, Any]]       # [{type, impact, reason}]
@@ -228,6 +233,9 @@ def create_initial_state(
         max_replans=1,
         decision_rationale=[],
         missing_information=[],
+        pre_listing_questions=[],
+        pre_listing_answers={},
+        pre_listing_done=False,
         critic_score=0,
         critic_feedback=[],
         critic_rewrite_instructions=[],

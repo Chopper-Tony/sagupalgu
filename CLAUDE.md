@@ -58,15 +58,17 @@ START
   → mission_planner_node (Agent 0)  ★ 목표 해석·계획 생성
   → product_identity_node
       ├─ needs_user_input → clarification_node → END
-      └─ confirmed → market_intelligence_node (ReAct)
-           → pricing_strategy_node
-           → copywriting_node (ReAct)
-           → listing_critic_node (Agent 6)
-               ├─ pass (score ≥ 70) → validation_node
-               │     ├─ failed (retry < 2) → refinement_node → validation_node
-               │     └─ passed → package_builder_node → END
-               ├─ rewrite (score < 70, retry < 2) → copywriting_node  ★ REWRITE LOOP
-               └─ replan (rewrite 한도 초과) → mission_planner_node  ★ REPLAN LOOP
+      └─ confirmed → pre_listing_clarification_node  ★ 정보 부족 감지
+             ├─ needs_more_info → END (사용자 답변 대기)
+             └─ enough_info → market_intelligence_node (ReAct)
+                    → pricing_strategy_node
+                    → copywriting_node (ReAct)
+                    → listing_critic_node (Agent 6)
+                        ├─ pass (score ≥ 70) → validation_node
+                        │     ├─ failed → refinement_node → validation_node
+                        │     └─ passed → package_builder_node → END
+                        ├─ rewrite (retry < 2) → copywriting_node  ★ REWRITE LOOP
+                        └─ replan (rewrite 한도 초과) → mission_planner_node  ★ REPLAN LOOP
 ```
 
 > 그래프 책임: 판매글 패키지 생성까지.
@@ -289,6 +291,7 @@ python -m pytest tests/ -m integration
 | M36: CTO2 지적 대응 — 노드 분리·예외 세분화·운영성 보강 | ✅ 완료 | copywriting_node 3함수 분리(_run_copywriting_agent·_extract_listing_payload·_build_prompts + 기존 _normalize_listing·_fallback_generate) ✅, InvalidUserInputError·SessionUpdateError 도메인 예외 신설(ValueError 6곳→도메인 예외 전환) ✅, repository.update() expected_status 조건부 업데이트(race condition 방어) ✅, /health/live·/health/ready 분리(readiness probe 보강) ✅, 338→340 테스트 통과 ✅ |
 | M37: Listing Critic + Rewrite 루프 | ✅ 완료 | Agent 6 listing_critic_node 신설(LLM 품질 비평 + 룰 기반 fallback, score/issues/rewrite_instructions 출력) ✅, SellerCopilotState에 critic 필드 5개 추가(critic_score·critic_feedback·critic_rewrite_instructions·critic_retry_count·max_critic_retries) ✅, route_after_critic 라우터(pass→validation / rewrite→copywriting, max retry 방어) ✅, 그래프에 copywriting→critic→(pass:validation / rewrite:copywriting) 루프 연결 ✅, test_critic_agent.py 15개(룰 기반 6·라우팅 5·통합 4) ✅, 340→355 테스트 통과 ✅ |
 | M38: Mission Planner + Replan 루프 | ✅ 완료 | Agent 0 mission_planner_node 신설(LLM 계획 생성 + 룰 기반 fallback, goal·plan·rationale·missing_information 출력) ✅, SellerCopilotState에 planner 필드 6개 추가(mission_goal·plan·plan_revision_count·max_replans·decision_rationale·missing_information) ✅, route_after_critic에 replan 분기 추가(rewrite 한도 초과→planner 재호출) ✅, 그래프 진입점 START→mission_planner→product_identity 변경 ✅, test_planner_agent.py 13개(룰 기반 7·replan 라우팅 3·통합 3) ✅, 기존 340개 + 신규 29개 테스트 통과 ✅ |
+| M39: Pre-listing Clarification | ✅ 완료 | pre_listing_clarification_node 신설(상품 상태·사용기간·구성품·거래방법 4항목 정보 부족 감지, LLM 질문 생성 + 룰 기반 fallback) ✅, SellerCopilotState에 3필드 추가(pre_listing_questions·pre_listing_answers·pre_listing_done) ✅, route_after_pre_listing_clarification 라우터(부족→END 사용자 대기 / 충분→market) ✅, 그래프에 product_identity→pre_listing_clarification→market 경로 추가 ✅, test_pre_listing_clarification.py 14개(탐지 5·질문 생성 2·라우팅 3·통합 4) ✅, 기존 340개 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
