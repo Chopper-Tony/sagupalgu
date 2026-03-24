@@ -11,25 +11,25 @@ START → product_identity → market_intelligence → pricing → copywriting
 """
 from __future__ import annotations
 
-from langgraph.graph import END, START, StateGraph
-
-from app.graph.seller_copilot_nodes import (
-    clarification_node,
-    copywriting_node,
-    market_intelligence_node,
-    package_builder_node,
-    pricing_strategy_node,
-    product_identity_node,
-    refinement_node,
-    validation_node,
-)
-from app.graph.routing import route_after_product_identity, route_after_validation
-from app.graph.seller_copilot_state import SellerCopilotState
-
 
 # ── 그래프 빌더 ────────────────────────────────────────────────────
 
 def build_seller_copilot_graph():
+    from langgraph.graph import END, START, StateGraph  # lazy import
+
+    from app.graph.seller_copilot_nodes import (
+        clarification_node,
+        copywriting_node,
+        market_intelligence_node,
+        package_builder_node,
+        pricing_strategy_node,
+        product_identity_node,
+        refinement_node,
+        validation_node,
+    )
+    from app.graph.routing import route_after_product_identity, route_after_validation
+    from app.graph.seller_copilot_state import SellerCopilotState
+
     graph = StateGraph(SellerCopilotState)
 
     # 노드 등록
@@ -74,4 +74,25 @@ def build_seller_copilot_graph():
     return graph.compile()
 
 
-seller_copilot_graph = build_seller_copilot_graph()
+# lazy 빌드 — 모듈 import 시점에 langgraph가 없어도 통과
+_compiled_graph = None
+
+
+def _get_compiled_graph():
+    global _compiled_graph
+    if _compiled_graph is None:
+        _compiled_graph = build_seller_copilot_graph()
+    return _compiled_graph
+
+
+# 하위 호환: 기존 코드에서 seller_copilot_graph.invoke() 하던 것 유지
+class _LazyGraphProxy:
+    """seller_copilot_graph.invoke() 호출을 lazy 빌드로 연결."""
+    def invoke(self, *args, **kwargs):
+        return _get_compiled_graph().invoke(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(_get_compiled_graph(), name)
+
+
+seller_copilot_graph = _LazyGraphProxy()
