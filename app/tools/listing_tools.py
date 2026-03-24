@@ -12,7 +12,11 @@ import json
 import logging
 from typing import Any, Dict
 
-from langchain_core.tools import tool
+try:
+    from langchain_core.tools import tool as _lc_tool
+except ImportError:  # langchain-core 미설치 환경 — _impl 함수는 정상 동작
+    def _lc_tool(fn):  # type: ignore[misc]
+        return fn
 
 from app.tools._common import _make_tool_call
 
@@ -21,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── LangChain Tool 버전 (create_react_agent bind) ─────────────────
 
-@tool
+@_lc_tool
 async def lc_generate_listing_tool(
     brand: str,
     model: str,
@@ -79,7 +83,7 @@ async def lc_generate_listing_tool(
         }, ensure_ascii=False)
 
 
-@tool
+@_lc_tool
 async def lc_rewrite_listing_tool(
     rewrite_instruction: str,
     current_title: str,

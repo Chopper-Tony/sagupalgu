@@ -13,7 +13,11 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from langchain_core.tools import tool
+try:
+    from langchain_core.tools import tool as _lc_tool
+except ImportError:  # langchain-core 미설치 환경 — _impl 함수는 정상 동작
+    def _lc_tool(fn):  # type: ignore[misc]
+        return fn
 
 from app.tools._common import _extract_json, _make_tool_call
 
@@ -22,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── LangChain Tool 버전 (create_react_agent bind) ─────────────────
 
-@tool
+@_lc_tool
 async def lc_market_crawl_tool(brand: str, model: str, category: str) -> str:
     """
     번개장터·중고나라에서 중고 시세를 실시간 크롤링합니다.
@@ -36,7 +40,7 @@ async def lc_market_crawl_tool(brand: str, model: str, category: str) -> str:
     return json.dumps(output, ensure_ascii=False)
 
 
-@tool
+@_lc_tool
 async def lc_rag_price_tool(brand: str, model: str, recent_listings_json: str = "") -> str:
     """
     과거 거래 기록 기반 RAG로 가격 참고값을 조회합니다.
