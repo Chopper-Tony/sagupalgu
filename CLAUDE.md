@@ -210,10 +210,10 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (137개)
+# 테스트 전체 (185개)
 python -m pytest tests/
 
-# unit 테스트만 (langchain 불필요, 0.12s)
+# unit 테스트만 (langchain 불필요, 0.56s)
 python -m pytest tests/ -m unit
 
 # integration 테스트만
