@@ -37,7 +37,6 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
 
     # ── ReAct 에이전트: LLM이 툴을 자율 선택 ────────────────────
     from app.tools.agentic_tools import lc_market_crawl_tool, lc_rag_price_tool
-    from langchain_core.messages import HumanMessage
 
     brand = product.get("brand", "")
     model = product.get("model", "")
@@ -64,6 +63,8 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
     market_context_result = None
 
     try:
+        from langchain_core.messages import HumanMessage
+
         llm = _build_react_llm()
         if llm is None:
             raise ValueError("LLM 초기화 실패 — API 키 확인 필요")

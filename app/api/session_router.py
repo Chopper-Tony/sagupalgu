@@ -1,5 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
+from app.domain.exceptions import (
+    InvalidStateTransitionError,
+    ListingGenerationError,
+    ListingRewriteError,
+    PublishExecutionError,
+    SagupalguError,
+    SessionNotFoundError,
+)
 from app.repositories.session_repository import SessionRepository
 from app.schemas.session import (
     AnalyzeSessionResponse,
@@ -37,11 +45,26 @@ def _api_error(status_code: int, error: str, message: str) -> HTTPException:
     )
 
 
+def _domain_error(exc: SagupalguError) -> HTTPException:
+    """도메인 예외 → HTTP 코드 매핑."""
+    if isinstance(exc, SessionNotFoundError):
+        return _api_error(404, "session_not_found", str(exc))
+    if isinstance(exc, InvalidStateTransitionError):
+        return _api_error(409, "invalid_state_transition", str(exc))
+    if isinstance(exc, (ListingGenerationError, ListingRewriteError)):
+        return _api_error(500, "listing_error", str(exc))
+    if isinstance(exc, PublishExecutionError):
+        return _api_error(502, "publish_execution_error", str(exc))
+    return _api_error(500, "domain_error", str(exc))
+
+
 @router.post("", response_model=CreateSessionResponse)
 async def create_session():
     try:
         result = await session_service.create_session(user_id="temp-user-id")
         return CreateSessionResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "create_session_failed", str(e))
 
@@ -51,8 +74,10 @@ async def get_session(session_id: str):
     try:
         session_ui = await session_service.get_session(session_id)
         return SessionDetailResponse(**session_ui)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
-        raise _api_error(404, "session_not_found", str(e))
+        raise _api_error(400, "session_not_found", str(e))
 
 
 @router.post("/{session_id}/images", response_model=UploadImagesResponse)
@@ -63,6 +88,8 @@ async def upload_images(session_id: str, request: UploadImagesRequest):
             image_urls=request.image_urls,
         )
         return UploadImagesResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "upload_images_failed", str(e))
 
@@ -72,6 +99,8 @@ async def analyze_session(session_id: str):
     try:
         result = await session_service.analyze_session(session_id=session_id)
         return AnalyzeSessionResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "analyze_failed", str(e))
 
@@ -84,6 +113,8 @@ async def confirm_product(session_id: str, request: ConfirmProductRequest):
             candidate_index=request.candidate_index,
         )
         return ConfirmProductResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "confirm_product_failed", str(e))
 
@@ -98,6 +129,8 @@ async def provide_product_info(session_id: str, request: ProvideProductInfoReque
             category=request.category,
         )
         return ProvideProductInfoResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "provide_product_info_failed", str(e))
 
@@ -107,6 +140,8 @@ async def generate_listing(session_id: str):
     try:
         result = await session_service.generate_listing(session_id=session_id)
         return GenerateListingResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "generate_listing_failed", str(e))
 
@@ -119,6 +154,8 @@ async def prepare_publish(session_id: str, request: PreparePublishRequest):
             platform_targets=request.platform_targets,
         )
         return PreparePublishResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "prepare_publish_failed", str(e))
 
@@ -128,6 +165,8 @@ async def publish_session(session_id: str):
     try:
         result = await session_service.publish_session(session_id=session_id)
         return PublishResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "publish_failed", str(e))
 
@@ -140,6 +179,8 @@ async def rewrite_listing(session_id: str, request: RewriteListingRequest):
             instruction=request.instruction,
         )
         return RewriteListingResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "rewrite_listing_failed", str(e))
 
@@ -152,5 +193,7 @@ async def update_sale_status(session_id: str, request: SaleStatusRequest):
             sale_status=request.sale_status,
         )
         return SaleStatusResponse(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
     except ValueError as e:
         raise _api_error(400, "update_sale_status_failed", str(e))

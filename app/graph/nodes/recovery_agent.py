@@ -34,7 +34,6 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
         lc_auto_patch_tool,
         lc_discord_alert_tool,
     )
-    from langchain_core.messages import HumanMessage
 
     publish_results = state.get("publish_results") or {}
     canonical = state.get("canonical_listing") or {}
@@ -86,6 +85,8 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
     any_auto_recoverable = False
 
     try:
+        from langchain_core.messages import HumanMessage
+
         llm = _build_react_llm()
         if llm is None:
             raise ValueError("LLM 초기화 실패")
