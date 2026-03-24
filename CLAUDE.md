@@ -16,9 +16,9 @@ LangGraph Agentic Workflow로 구현.
 - **DB**: Supabase (PostgreSQL + pgvector) — `migrations/001_pgvector_setup.sql` 적용 후 활성화
 - **크롤러/게시**: Playwright (웹 자동화), uiautomator2 (Android — 미구현)
 
-## 에이전트 구조 (5 에이전트 / 10 툴)
+## 에이전트 구조 (6 에이전트 / 10 툴)
 
-### Agent 1: 상품 식별 에이전트
+### Agent 1: 상품 식별 에이전트 (deterministic)
 - 노드: `product_identity_node`, `clarification_node`
 - 툴: 없음 (Vision AI 직접 호출, 룰 기반 분기)
 - 동작: user_product_input → 바로 확정 / candidates → confidence 체크 / 없으면 사용자 입력 요청
@@ -31,19 +31,23 @@ LangGraph Agentic Workflow로 구현.
 ### Agent 3: 판매글 생성 에이전트 ★ ReAct
 - 노드: `copywriting_node`, `refinement_node`
 - 툴: `lc_generate_listing_tool`, `lc_rewrite_listing_tool`
-- 동작: `create_react_agent`로 LLM이 상황 판단. rewrite_instruction 있으면 rewrite, 없으면 generate 자율 선택
+- 동작: `create_react_agent`로 LLM이 상황 판단. rewrite_instruction 있으면 rewrite, 없으면 generate 자율 선택. Critic 피드백 기반 재작성 루프 지원
 
 ### Agent 4: 검증·복구 에이전트 ★ ReAct
 - 노드: `validation_node`, `recovery_node`
 - 툴: `lc_diagnose_publish_failure_tool`, `lc_auto_patch_tool`, `lc_discord_alert_tool`
 - 동작: `create_react_agent`로 LLM이 진단 → 패치 → Discord 알림 순서 자율 결정. auto_recoverable이면 재시도
 
-### Agent 5: 판매 후 최적화 에이전트
+### Agent 5: 판매 후 최적화 에이전트 (deterministic)
 - 노드: `post_sale_optimization_node`
 - 툴: `price_optimization_tool` (내부 계산 기반)
 - 동작: sale_status == "unsold" 시 트리거. 경과 일수에 따라 가격 인하 제안
 
-## 그래프 플로우 (M2 이후 — 게시/복구는 그래프 외부)
+### Agent 6: Listing Critic 에이전트 ★ NEW
+- 노드: `listing_critic_node`
+- 동작: LLM 기반 판매글 품질 비평 (구매자 관점). 점수/문제 유형/수정 지시를 생성. score < 70이면 copywriting에 rewrite 지시 후 재생성 루프. 최대 2회 retry 후 강제 통과. LLM 실패 시 룰 기반 fallback
+
+## 그래프 플로우 (M37 이후 — Critic Rewrite 루프 추가)
 
 ```
 START
@@ -52,9 +56,11 @@ START
       └─ confirmed → market_intelligence_node (ReAct)
            → pricing_strategy_node
            → copywriting_node (ReAct)
-           → validation_node
-               ├─ failed (retry < 2) → refinement_node → validation_node
-               └─ passed → package_builder_node → END
+           → listing_critic_node (ReAct — Agent 6)  ★ NEW
+               ├─ pass (score ≥ 70) → validation_node
+               │     ├─ failed (retry < 2) → refinement_node → validation_node
+               │     └─ passed → package_builder_node → END
+               └─ rewrite (score < 70, retry < 2) → copywriting_node  ★ LOOP
 ```
 
 > 그래프 책임: 판매글 패키지 생성까지.
@@ -275,6 +281,7 @@ python -m pytest tests/ -m integration
 | M34: langgraph import 격리 | ✅ 완료 | seller_copilot_graph.py eager import → build 내부 lazy import 전환 ✅, _LazyGraphProxy + _get_compiled_graph로 lazy 빌드 구조 전환 ✅, seller_copilot_runner.py _get_graph() lazy 호출로 변경 ✅, clean env(langgraph 미설치) pytest 수집 통과 ✅, 324/324 테스트 통과 ✅ |
 | M35: rewrite 출력 계약 봉합 + datetime 경고 제거 | ✅ 완료 | copywriting_agent.py _normalize_listing() 신설(ReAct 결과→CanonicalListingSchema 검증, 필수 키 보장 fallback) ✅, session_meta.py datetime.utcnow()→datetime.now(timezone.utc) 전환(DeprecationWarning 제거) ✅, 338/338 테스트 통과·경고 0개 ✅ |
 | M36: CTO2 지적 대응 — 노드 분리·예외 세분화·운영성 보강 | ✅ 완료 | copywriting_node 3함수 분리(_run_copywriting_agent·_extract_listing_payload·_build_prompts + 기존 _normalize_listing·_fallback_generate) ✅, InvalidUserInputError·SessionUpdateError 도메인 예외 신설(ValueError 6곳→도메인 예외 전환) ✅, repository.update() expected_status 조건부 업데이트(race condition 방어) ✅, /health/live·/health/ready 분리(readiness probe 보강) ✅, 338→340 테스트 통과 ✅ |
+| M37: Listing Critic + Rewrite 루프 | ✅ 완료 | Agent 6 listing_critic_node 신설(LLM 품질 비평 + 룰 기반 fallback, score/issues/rewrite_instructions 출력) ✅, SellerCopilotState에 critic 필드 5개 추가(critic_score·critic_feedback·critic_rewrite_instructions·critic_retry_count·max_critic_retries) ✅, route_after_critic 라우터(pass→validation / rewrite→copywriting, max retry 방어) ✅, 그래프에 copywriting→critic→(pass:validation / rewrite:copywriting) 루프 연결 ✅, test_critic_agent.py 15개(룰 기반 6·라우팅 5·통합 4) ✅, 340→355 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

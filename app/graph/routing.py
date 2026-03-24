@@ -18,6 +18,26 @@ def route_after_product_identity(state: SellerCopilotState) -> str:
     return "market_intelligence_node"
 
 
+CRITIC_PASS_THRESHOLD = 70
+MAX_CRITIC_RETRIES = 2
+
+
+def route_after_critic(state: SellerCopilotState) -> str:
+    """critic 평가 후 분기: pass → validation / rewrite → copywriting."""
+    score = int(state.get("critic_score") or 0)
+    retry_count = int(state.get("critic_retry_count") or 0)
+    max_retries = int(state.get("max_critic_retries") or MAX_CRITIC_RETRIES)
+
+    if score >= CRITIC_PASS_THRESHOLD:
+        return "validation_node"
+
+    if retry_count < max_retries and state.get("rewrite_instruction"):
+        return "copywriting_node"
+
+    # max retries 도달하거나 rewrite 지시 없으면 그냥 통과
+    return "validation_node"
+
+
 def route_after_validation(state: SellerCopilotState) -> str:
     if state.get("validation_passed", False):
         return "package_builder_node"
