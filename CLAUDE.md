@@ -218,7 +218,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (294개)
+# 테스트 전체 (324개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -280,7 +280,8 @@ python -m pytest tests/ -m integration
 | M14 완료 | 96 예상 | asyncio.get_running_loop() 교체(경고 제거), 테스트 ReAct 경로 sys.modules patch 안정화 |
 | M15~M20 완료 | 91/100 (실제) | 배포 기반·프론트엔드·Docker·DI 완성. 배포 인프라 강화 but SessionService 무게·테스트 확충 미비 |
 | M21~M24 완료 | 97 예상 | LLM/Meta 분리, 테스트 185→240, API 통합 테스트 36개, 관찰 가능성 기반 |
-| M25~M29 완료 | 99 예상 | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거, 테스트 269개 |
+| M25~M29 완료 | 89/100 (실제) | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거. supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비가 감점 요인 |
+| M30~M32 완료 | 95 예상 | supabase lazy import, 출력 계약 25개 회귀 테스트, SessionService 절개(session_product.py), ListingService 절개(listing_prompt.py 확장), 테스트 324개 |
 
 ## 에이전틱 점수 이력
 
