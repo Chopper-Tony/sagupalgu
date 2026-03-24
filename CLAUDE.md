@@ -111,9 +111,11 @@ START
   - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
   - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
 - `app/services/` — 비즈니스 로직
-  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거. UI 응답 조립은 `session_ui.py`에 위임
+  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()` 내부 헬퍼. workflow_meta 조작은 `session_meta.py`에 위임. UI 응답 조립은 `session_ui.py`에 위임
   - `session_ui.py`: `build_session_ui_response()` — DB 레코드 → UI 응답 평탄화 (SessionService에서 분리)
-  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). CanonicalListingSchema로 shape 보장
+  - `session_meta.py`: workflow_meta 순수 함수 집합 (`set_analysis_checkpoint`, `set_product_confirmed`, `normalize_listing_meta`, `append_rewrite_entry`, `set_publish_prepared`, `set_publish_complete`, `set_publish_diagnostics`, `set_sale_status`, `append_tool_calls`) — SessionService에서 분리
+  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). LLM 호출은 `listing_llm.py`에 위임
+  - `listing_llm.py`: OpenAI/Gemini/Solar HTTP 호출 어댑터 + fallback dispatch(`generate_copy`) + 규칙 기반 폴백(`build_template_copy`) — ListingService에서 분리
   - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
@@ -242,6 +244,7 @@ python -m pytest tests/ -m integration
 | M18: 서비스 절개·shape 강제·카드 완성 | ✅ 완료 | app/domain/schemas.py CanonicalListingSchema 신설(Pydantic shape 강제·LLM 출력 직후 validate) ✅, app/services/listing_prompt.py PromptBuilder 분리(build_copy_prompt·extract_json_object 순수 함수) ✅, app/services/session_ui.py SessionResponseAssembler 분리(build_session_ui_response 이동) ✅, listing_service.py → CanonicalListingSchema.from_llm_result/from_rewrite_result 사용 ✅, session_service.py → session_ui.py import ✅, SaleStatusCard(팔렸어요/안팔렸어요) ✅, OptimizationSuggestionCard(가격 제안·이유·새로 시작) ✅, App.tsx mark_sold/mark_unsold 액션 추가 ✅, 137/137 테스트 통과·빌드 에러 0 ✅ |
 | M19: FastAPI DI 완성 | ✅ 완료 | app/dependencies.py 신설(lru_cache 싱글턴 + Depends 체인 6개 서비스) ✅, session_router.py 전역 인스턴스 제거 → Depends(get_session_service) 전환(11개 엔드포인트) ✅, SessionRepository import 라우터에서 제거 ✅, app.dependency_overrides로 mock 주입 가능(테스트 격리 준비) ✅, 137/137 테스트 통과 ✅ |
 | M20: Docker 풀스택 통합·AWS 배포 준비 | ✅ 완료 | frontend/Dockerfile 신설(node:20-alpine 멀티스테이지 빌드 + nginx:alpine 서빙) ✅, frontend/nginx.conf(SPA routing + /api/ 백엔드 프록시 + 정적자산 캐시) ✅, docker-compose.yml backend+frontend 풀스택 구성(healthcheck depends_on) ✅, frontend/.dockerignore 추가 ✅, ci.yml frontend-build 잡 추가(node:20 캐시·npm ci·npm run build) + docker-build가 두 이미지 빌드 ✅, docs/deployment.md AWS EC2 배포 가이드(Docker 설치·환경변수·실행·HTTPS·모니터링·트러블슈팅) ✅, 137/137 테스트 통과·빌드 에러 0 ✅ |
+| M21: LLMAdapter·StateCoordinator 분리·gitignore 보완 | ✅ 완료 | app/services/listing_llm.py 신설(OpenAI/Gemini/Solar HTTP 호출 어댑터·fallback dispatch·규칙 기반 폴백, listing_service에서 300줄 분리) ✅, app/services/session_meta.py 신설(workflow_meta 순수 함수 9개, session_service 인라인 meta 조작 제거) ✅, listing_service.py → generate_copy() 단순 호출(LLM 세부사항 완전 분리) ✅, session_service.py → _append_tool_calls 인스턴스 메서드 제거·datetime import 제거 ✅, .gitignore frontend/node_modules·frontend/dist 명시 추가 ✅, 137/137 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
