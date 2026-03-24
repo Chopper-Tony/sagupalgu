@@ -117,7 +117,7 @@ START
   - `session_meta.py`: workflow_meta 순수 함수 집합 (`set_analysis_checkpoint`, `set_product_confirmed`, `normalize_listing_meta`, `append_rewrite_entry`, `set_publish_prepared`, `set_publish_complete`, `set_publish_diagnostics`, `set_sale_status`, `append_tool_calls`) — SessionService에서 분리
   - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). LLM 호출은 `listing_llm.py`에 위임
   - `listing_llm.py`: OpenAI/Gemini/Solar HTTP 호출 어댑터 + fallback dispatch(`generate_copy`) + 규칙 기반 폴백(`build_template_copy`) — ListingService에서 분리
-  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
+  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()`·`build_tool_calls_context()`·`build_rewrite_context()`·`build_pricing_strategy()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
@@ -263,6 +263,7 @@ python -m pytest tests/ -m integration
 | M29: 데드코드·중복 제거 + 테스트 파일 분할 | ✅ 완료 | app/core/utils.py 신설(safe_int 단일 정의) ✅, helpers.py·session_service.py 중복 _safe_int 제거→utils.py import ✅, seller_copilot_service.py 미사용 alias(_normalize_text·_needs_user_input)·normalize_text import 제거 ✅, test_session_api.py(401줄) → tests/api/ 4파일 분할(basic·product·listing·publish + conftest) ✅, 269/269 테스트 통과 ✅ |
 | M30: 테스트 환경 격리 + 출력 계약 봉합 | ✅ 완료 | app/db/client.py supabase eager import → lazy import 전환(clean env에서 pytest 수집 통과) ✅, build_template_copy 출력 계약 위반 수정(price·images·strategy·product 키 누락 → CanonicalListingSchema 계약 준수) ✅, test_output_contract.py 신설(25개: from_llm_result·from_rewrite_result·fallback·template·price coercion·tags 정규화 6경로 전수 검증) ✅, 269→294 테스트 통과 ✅ |
 | M31: SessionService 절개 | ✅ 완료 | app/services/session_product.py 신설(product_data 순수 함수 4개: attach_image_paths·apply_analysis_result·confirm_from_candidate·confirm_from_user_input) ✅, SessionService 상품 로직 인라인→순수 함수 위임(349줄→300줄) ✅, _persist_and_respond 헬퍼 신설(반복 업데이트+응답 패턴 통합) ✅, test_session_product.py 17개 unit 테스트 ✅, 286/286 테스트 통과 ✅ |
+| M32: ListingService 절개 | ✅ 완료 | listing_prompt.py에 build_tool_calls_context·build_rewrite_context·build_pricing_strategy 순수 함수 3개 추가(95줄→137줄) ✅, listing_service.py 인라인 context 빌드·pricing 로직 제거(125줄→93줄, -26%) ✅, test_listing_prompt_ext.py 13개 unit 테스트 ✅, 294→307 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
