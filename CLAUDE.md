@@ -81,7 +81,8 @@ START
 - `app/domain/session_status.py` — SessionStatus SSOT, ALLOWED_TRANSITIONS, resolve_next_action, is_terminal_status
 - `app/graph/` — LangGraph StateGraph, 노드, 상태, 러너
   - `routing.py` — 순수 라우팅 함수 (langgraph 의존성 0, unit 테스트 가능)
-  - `seller_copilot_graph.py` — StateGraph 빌드·컴파일 (routing.py import)
+  - `seller_copilot_graph.py` — StateGraph 빌드·컴파일 (langgraph lazy import + `_LazyGraphProxy` lazy 빌드)
+  - `seller_copilot_runner.py` — LangGraph 실행 진입점 (`_get_graph()` lazy 로드, 초기 state 조립)
 - `app/tools/` — 에이전트별 툴 모듈
   - `agentic_tools.py` — **public facade** (외부 코드의 단일 import 진입점, patch 경로 고정)
   - `market_tools.py` — Agent 2 (lc_market_crawl_tool, lc_rag_price_tool, _impl 분리)
@@ -98,6 +99,7 @@ START
   - `recovery_agent.py` — Agent 4 복구
   - `packaging_agent.py` — 패키지 빌더 + 게시
   - `optimization_agent.py` — Agent 5
+- `app/db/client.py` — Supabase 클라이언트 싱글턴 (`get_supabase()`, lazy import — 미설치 환경 호환)
 - `app/db/pgvector_store.py` — pgvector 임베딩 생성·검색·삽입 (OpenAI embedding)
 - `migrations/001_pgvector_setup.sql` — pgvector 확장, price_history 테이블, RPC 함수
 - `scripts/setup_pgvector.py` — 테이블 확인 + 크롤 데이터 시딩 자동화
@@ -175,6 +177,11 @@ START
 - SessionService 생성자는 5개 의존성 모두 required (Optional 기본값 없음, 인라인 fallback 금지)
 - 테스트 격리: `app.dependency_overrides[get_session_service] = lambda: mock_svc` 패턴 사용
 
+### 외부 의존성 import
+- supabase, langgraph, langchain 등 무거운 런타임 의존성은 반드시 **lazy import** (함수 내부에서 import)
+- 모듈 최상단 eager import 금지 — clean env(미설치 환경)에서 pytest 수집이 통과해야 함
+- TYPE_CHECKING 블록은 타입 힌트 용도로만 사용
+
 ### 게시 (publishers)
 - `legacy_spikes/` 직접 수정 금지 → `app/publishers/`에서 서브클래스로 패치
 - 당근은 Android 에뮬레이터 기반, 현재 미구현
@@ -218,7 +225,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (324개)
+# 테스트 전체 (338개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -264,7 +271,7 @@ python -m pytest tests/ -m integration
 | M30: 테스트 환경 격리 + 출력 계약 봉합 | ✅ 완료 | app/db/client.py supabase eager import → lazy import 전환(clean env에서 pytest 수집 통과) ✅, build_template_copy 출력 계약 위반 수정(price·images·strategy·product 키 누락 → CanonicalListingSchema 계약 준수) ✅, test_output_contract.py 신설(25개: from_llm_result·from_rewrite_result·fallback·template·price coercion·tags 정규화 6경로 전수 검증) ✅, 269→294 테스트 통과 ✅ |
 | M31: SessionService 절개 | ✅ 완료 | app/services/session_product.py 신설(product_data 순수 함수 4개: attach_image_paths·apply_analysis_result·confirm_from_candidate·confirm_from_user_input) ✅, SessionService 상품 로직 인라인→순수 함수 위임(349줄→300줄) ✅, _persist_and_respond 헬퍼 신설(반복 업데이트+응답 패턴 통합) ✅, test_session_product.py 17개 unit 테스트 ✅, 286/286 테스트 통과 ✅ |
 | M32: ListingService 절개 | ✅ 완료 | listing_prompt.py에 build_tool_calls_context·build_rewrite_context·build_pricing_strategy 순수 함수 3개 추가(95줄→137줄) ✅, listing_service.py 인라인 context 빌드·pricing 로직 제거(125줄→93줄, -26%) ✅, test_listing_prompt_ext.py 13개 unit 테스트 ✅, 294→307 테스트 통과 ✅ |
-| M33: 상태 전이 계약 + UI 응답 shape 검증 | ✅ 완료 | test_status_contract.py 신설(14개: ALLOWED_TRANSITIONS 완전성·전이 대상 유효성·self-loop 검증·터미널 상태·resolve_next_action 전수·happy path 체인·UI 응답 shape×13상태·섹션 존재 검증) ✅, 307→321 테스트 통과 ✅ |
+| M33: 상태 전이 계약 + UI 응답 shape 검증 | ✅ 완료 | test_status_contract.py 신설(14개: ALLOWED_TRANSITIONS 완전성·전이 대상 유효성·self-loop 검증·터미널 상태·resolve_next_action 전수·happy path 체인·UI 응답 shape×13상태·섹션 존재 검증) ✅, 324→338 테스트 통과 ✅ |
 | M34: langgraph import 격리 | ✅ 완료 | seller_copilot_graph.py eager import → build 내부 lazy import 전환 ✅, _LazyGraphProxy + _get_compiled_graph로 lazy 빌드 구조 전환 ✅, seller_copilot_runner.py _get_graph() lazy 호출로 변경 ✅, clean env(langgraph 미설치) pytest 수집 통과 ✅, 324/324 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
@@ -282,8 +289,8 @@ python -m pytest tests/ -m integration
 | M14 완료 | 96 예상 | asyncio.get_running_loop() 교체(경고 제거), 테스트 ReAct 경로 sys.modules patch 안정화 |
 | M15~M20 완료 | 91/100 (실제) | 배포 기반·프론트엔드·Docker·DI 완성. 배포 인프라 강화 but SessionService 무게·테스트 확충 미비 |
 | M21~M24 완료 | 97 예상 | LLM/Meta 분리, 테스트 185→240, API 통합 테스트 36개, 관찰 가능성 기반 |
-| M25~M29 완료 | 89/100 (실제) | Storage 클라이언트, 입력 검증 강화, DI required, 예외 핸들링 일원화, 중복 제거. supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비가 감점 요인 |
-| M30~M32 완료 | 95 예상 | supabase lazy import, 출력 계약 25개 회귀 테스트, SessionService 절개(session_product.py), ListingService 절개(listing_prompt.py 확장), 테스트 324개 |
+| M25~M29 완료 | 89→90/100 (실제) | 1차 89점(supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비), 2차 90점(supabase 해결 but langgraph import 실패 잔존) |
+| M30~M34 완료 | 95 예상 | supabase+langgraph lazy import, 출력 계약 25+14개 회귀 테스트, SessionService 절개(session_product.py), ListingService 절개(listing_prompt.py 확장), 상태 전이 계약 검증, 테스트 338개 |
 
 ## 에이전틱 점수 이력
 
