@@ -44,18 +44,18 @@ class SessionService:
     def __init__(
         self,
         session_repository: SessionRepository,
-        product_service: Optional["ProductService"] = None,
-        publish_service: Optional["PublishService"] = None,
-        copilot_service: Optional["SellerCopilotService"] = None,
-        recovery_service: Optional["RecoveryService"] = None,
-        optimization_service: Optional["OptimizationService"] = None,
+        product_service: "ProductService",
+        publish_service: "PublishService",
+        copilot_service: "SellerCopilotService",
+        recovery_service: "RecoveryService",
+        optimization_service: "OptimizationService",
     ):
         self.repo = session_repository
-        self.product_service = product_service or ProductService()
-        self.publish_service = publish_service or PublishService()
-        self.copilot_service = copilot_service or SellerCopilotService()
-        self.recovery_service = recovery_service or RecoveryService()
-        self.optimization_service = optimization_service or OptimizationService()
+        self.product_service = product_service
+        self.publish_service = publish_service
+        self.copilot_service = copilot_service
+        self.recovery_service = recovery_service
+        self.optimization_service = optimization_service
 
     # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
