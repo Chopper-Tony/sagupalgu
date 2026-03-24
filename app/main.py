@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.api.session_router import router as session_router
 from app.core.config import settings
+from app.core.logging import configure_logging
 from app.domain.exceptions import (
     InvalidStateTransitionError,
     ListingGenerationError,
@@ -15,11 +16,16 @@ from app.domain.exceptions import (
     PublishExecutionError,
     SessionNotFoundError,
 )
+from app.middleware.request_id import RequestIdMiddleware
+
+configure_logging(level="DEBUG" if settings.debug else "INFO")
 
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
 )
+
+app.add_middleware(RequestIdMiddleware)
 
 
 @app.exception_handler(SessionNotFoundError)
@@ -49,6 +55,16 @@ async def publish_execution_handler(request: Request, exc: PublishExecutionError
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": settings.app_name}
+    checks = {
+        "supabase_url": bool(settings.supabase_url),
+        "openai_key": bool(settings.openai_api_key),
+        "gemini_key": bool(settings.gemini_api_key),
+    }
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "environment": settings.environment,
+        "checks": checks,
+    }
 
 app.include_router(session_router, prefix=settings.api_v1_prefix)
