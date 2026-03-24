@@ -8,7 +8,6 @@ SessionService — 세션 라이프사이클 오케스트레이터.
 """
 from __future__ import annotations
 
-import datetime
 from typing import Any, Dict, List, Optional
 
 from app.domain.exceptions import SessionNotFoundError
@@ -20,6 +19,17 @@ from app.services.product_service import ProductService
 from app.services.publish_service import PublishService
 from app.services.recovery_service import RecoveryService
 from app.services.seller_copilot_service import SellerCopilotService
+from app.services.session_meta import (
+    append_rewrite_entry,
+    append_tool_calls,
+    normalize_listing_meta,
+    set_analysis_checkpoint,
+    set_product_confirmed,
+    set_publish_complete,
+    set_publish_diagnostics,
+    set_publish_prepared,
+    set_sale_status,
+)
 from app.services.session_ui import build_session_ui_response  # noqa: F401 — re-export
 
 
@@ -99,7 +109,7 @@ class SessionService:
             product_data.pop("user_input_prompt", None)
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        workflow_meta["checkpoint"] = "A_needs_user_input" if needs_input else "A_before_confirm"
+        set_analysis_checkpoint(workflow_meta, needs_input)
 
         updated = self._update_or_raise(session_id, {
             "status": "awaiting_product_confirmation",
@@ -123,7 +133,7 @@ class SessionService:
         product_data.pop("user_input_prompt", None)
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        workflow_meta["checkpoint"] = "A_complete"
+        set_product_confirmed(workflow_meta)
 
         updated = self._update_or_raise(session_id, {
             "status": "product_confirmed",
@@ -154,7 +164,7 @@ class SessionService:
         product_data.pop("user_input_prompt", None)
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        workflow_meta["checkpoint"] = "A_complete"
+        set_product_confirmed(workflow_meta)
 
         updated = self._update_or_raise(session_id, {
             "status": "product_confirmed",
@@ -177,10 +187,7 @@ class SessionService:
         listing_data.pop("platform_packages", None)
 
         workflow_meta = dict(result_payload.get("workflow_meta_jsonb") or {})
-        if workflow_meta.get("checkpoint") in {"C_prepared", "C_complete"}:
-            workflow_meta["checkpoint"] = "B_complete"
-        workflow_meta.pop("publish_results", None)
-        self._append_tool_calls(workflow_meta, result_payload.get("tool_calls") or [])
+        normalize_listing_meta(workflow_meta, result_payload.get("tool_calls") or [])
 
         updated = self._update_or_raise(session_id, {
             "status": "draft_generated",
@@ -207,13 +214,7 @@ class SessionService:
         listing_data.pop("platform_packages", None)
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        rewrite_history = workflow_meta.get("rewrite_history") or []
-        rewrite_history.append({
-            "instruction": instruction,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-        })
-        workflow_meta["rewrite_history"] = rewrite_history
-        self._append_tool_calls(workflow_meta, result_payload.get("tool_calls") or [])
+        append_rewrite_entry(workflow_meta, instruction, result_payload.get("tool_calls") or [])
 
         updated = self._update_or_raise(session_id, {
             "status": "draft_generated",
@@ -242,8 +243,7 @@ class SessionService:
         )
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        workflow_meta["checkpoint"] = "C_prepared"
-        workflow_meta.pop("publish_results", None)
+        set_publish_prepared(workflow_meta)
 
         updated = self._update_or_raise(session_id, {
             "status": "awaiting_publish_approval",
@@ -267,8 +267,7 @@ class SessionService:
 
         publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
 
-        workflow_meta["checkpoint"] = "C_complete"
-        workflow_meta["publish_results"] = publish_results
+        set_publish_complete(workflow_meta, publish_results)
 
         if any_failure:
             product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
@@ -277,8 +276,11 @@ class SessionService:
                 product_data=product_data,
                 publish_results=publish_results,
             )
-            workflow_meta["publish_diagnostics"] = recovery_result["publish_diagnostics"]
-            self._append_tool_calls(workflow_meta, recovery_result["tool_calls"])
+            set_publish_diagnostics(
+                workflow_meta,
+                recovery_result["publish_diagnostics"],
+                recovery_result["tool_calls"],
+            )
             final_status = "publishing_failed"
         else:
             final_status = "completed"
@@ -299,7 +301,7 @@ class SessionService:
         listing_data = dict(session.get("listing_data_jsonb") or {})
         product_data = session.get("product_data_jsonb") or {}
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        workflow_meta["sale_status"] = sale_status
+        set_sale_status(workflow_meta, sale_status)
 
         opt_result = self.optimization_service.run_post_sale_optimization(
             session_id=session_id,
@@ -312,7 +314,7 @@ class SessionService:
         if optimization:
             listing_data["optimization_suggestion"] = optimization
 
-        self._append_tool_calls(workflow_meta, opt_result["tool_calls"])
+        append_tool_calls(workflow_meta, opt_result["tool_calls"])
         final_status = opt_result["status"] or (
             "optimization_suggested" if optimization else "awaiting_sale_status_update"
         )
@@ -344,7 +346,4 @@ class SessionService:
         assert_allowed_transition(session["status"], next_status)
         return session
 
-    def _append_tool_calls(self, workflow_meta: Dict, new_calls: List[Dict]) -> None:
-        """workflow_meta의 tool_calls 리스트에 새 항목을 병합한다."""
-        workflow_meta["tool_calls"] = (workflow_meta.get("tool_calls") or []) + new_calls
 
