@@ -105,12 +105,27 @@ class TestRouteAfterCritic:
         assert route_after_critic(state) == "copywriting_node"
 
     @pytest.mark.unit
-    def test_low_score_max_retries_reached(self):
+    def test_low_score_max_retries_triggers_replan(self):
+        """rewrite 한도 초과 + replan 가능하면 planner로."""
         state = {
             "critic_score": 50,
             "critic_retry_count": 2,
             "max_critic_retries": 2,
+            "plan_revision_count": 0,
+            "max_replans": 1,
             "rewrite_instruction": "수정 지시",
+        }
+        assert route_after_critic(state) == "mission_planner_node"
+
+    @pytest.mark.unit
+    def test_low_score_all_exhausted_forces_pass(self):
+        """rewrite + replan 모두 한도 초과 시 강제 통과."""
+        state = {
+            "critic_score": 50,
+            "critic_retry_count": 2,
+            "max_critic_retries": 2,
+            "plan_revision_count": 1,
+            "max_replans": 1,
         }
         assert route_after_critic(state) == "validation_node"
 

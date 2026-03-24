@@ -28,6 +28,7 @@ def build_seller_copilot_graph():
         validation_node,
     )
     from app.graph.nodes.critic_agent import listing_critic_node
+    from app.graph.nodes.planner_agent import mission_planner_node
     from app.graph.routing import route_after_critic, route_after_product_identity, route_after_validation
     from app.graph.seller_copilot_state import SellerCopilotState
 
@@ -43,9 +44,11 @@ def build_seller_copilot_graph():
     graph.add_node("refinement_node", refinement_node)
     graph.add_node("package_builder_node", package_builder_node)
     graph.add_node("listing_critic_node", listing_critic_node)
+    graph.add_node("mission_planner_node", mission_planner_node)
 
     # ── 메인 플로우 ──────────────────────────────────────────────
-    graph.add_edge(START, "product_identity_node")
+    graph.add_edge(START, "mission_planner_node")
+    graph.add_edge("mission_planner_node", "product_identity_node")
 
     graph.add_conditional_edges(
         "product_identity_node",
@@ -61,13 +64,14 @@ def build_seller_copilot_graph():
     graph.add_edge("pricing_strategy_node", "copywriting_node")
     graph.add_edge("copywriting_node", "listing_critic_node")
 
-    # Critic → (pass: validation / rewrite: copywriting)
+    # Critic → (pass: validation / rewrite: copywriting / replan: planner)
     graph.add_conditional_edges(
         "listing_critic_node",
         route_after_critic,
         {
             "validation_node": "validation_node",
             "copywriting_node": "copywriting_node",
+            "mission_planner_node": "mission_planner_node",
         },
     )
 

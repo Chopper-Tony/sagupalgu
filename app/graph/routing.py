@@ -10,6 +10,9 @@ from __future__ import annotations
 from app.graph.seller_copilot_state import SellerCopilotState
 
 MAX_VALIDATION_RETRIES = 2
+CRITIC_PASS_THRESHOLD = 70
+MAX_CRITIC_RETRIES = 2
+MAX_REPLANS = 1
 
 
 def route_after_product_identity(state: SellerCopilotState) -> str:
@@ -18,23 +21,26 @@ def route_after_product_identity(state: SellerCopilotState) -> str:
     return "market_intelligence_node"
 
 
-CRITIC_PASS_THRESHOLD = 70
-MAX_CRITIC_RETRIES = 2
-
-
 def route_after_critic(state: SellerCopilotState) -> str:
-    """critic 평가 후 분기: pass → validation / rewrite → copywriting."""
+    """critic 평가 후 3갈래 분기: pass / rewrite / replan."""
     score = int(state.get("critic_score") or 0)
     retry_count = int(state.get("critic_retry_count") or 0)
     max_retries = int(state.get("max_critic_retries") or MAX_CRITIC_RETRIES)
+    plan_revision = int(state.get("plan_revision_count") or 0)
+    max_replans = int(state.get("max_replans") or MAX_REPLANS)
 
     if score >= CRITIC_PASS_THRESHOLD:
         return "validation_node"
 
+    # rewrite 가능하면 rewrite
     if retry_count < max_retries and state.get("rewrite_instruction"):
         return "copywriting_node"
 
-    # max retries 도달하거나 rewrite 지시 없으면 그냥 통과
+    # rewrite 한도 초과 → replan 가능하면 replan
+    if retry_count >= max_retries and plan_revision < max_replans:
+        return "mission_planner_node"
+
+    # 모두 한도 초과 → 강제 통과
     return "validation_node"
 
 

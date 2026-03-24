@@ -159,6 +159,14 @@ class SellerCopilotState(TypedDict, total=False):
 
     # ── 에이전틱 핵심 필드 ──────────────────────────────────────────
 
+    # ── Mission Planner ──────────────────────────────────────────────
+    mission_goal: str                           # fast_sell | balanced | profit_max
+    plan: Dict[str, Any]                        # 현재 실행 계획
+    plan_revision_count: int                    # replan 횟수
+    max_replans: int                            # replan 최대 횟수 (기본 1)
+    decision_rationale: List[str]               # 의사결정 근거 이력
+    missing_information: List[str]              # 부족한 정보 목록
+
     # ── Critic / Rewrite 루프 ────────────────────────────────────────
     critic_score: int                           # 0~100
     critic_feedback: List[Dict[str, Any]]       # [{type, impact, reason}]
@@ -214,6 +222,12 @@ def create_initial_state(
         canonical_listing=None,
         platform_packages={},
         rewrite_instruction=None,
+        mission_goal="balanced",
+        plan={},
+        plan_revision_count=0,
+        max_replans=1,
+        decision_rationale=[],
+        missing_information=[],
         critic_score=0,
         critic_feedback=[],
         critic_rewrite_instructions=[],

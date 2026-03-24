@@ -16,7 +16,11 @@ LangGraph Agentic Workflow로 구현.
 - **DB**: Supabase (PostgreSQL + pgvector) — `migrations/001_pgvector_setup.sql` 적용 후 활성화
 - **크롤러/게시**: Playwright (웹 자동화), uiautomator2 (Android — 미구현)
 
-## 에이전트 구조 (6 에이전트 / 10 툴)
+## 에이전트 구조 (7 에이전트 / 10 툴)
+
+### Agent 0: Mission Planner ★ NEW
+- 노드: `mission_planner_node`
+- 동작: 세션 상태 해석 → 실행 계획 생성 (goal·steps·focus·rationale·missing_information). Critic이 replan 요청 시 비평 피드백을 반영해 계획 수정. LLM 실패 시 룰 기반 fallback
 
 ### Agent 1: 상품 식별 에이전트 (deterministic)
 - 노드: `product_identity_node`, `clarification_node`
@@ -47,20 +51,22 @@ LangGraph Agentic Workflow로 구현.
 - 노드: `listing_critic_node`
 - 동작: LLM 기반 판매글 품질 비평 (구매자 관점). 점수/문제 유형/수정 지시를 생성. score < 70이면 copywriting에 rewrite 지시 후 재생성 루프. 최대 2회 retry 후 강제 통과. LLM 실패 시 룰 기반 fallback
 
-## 그래프 플로우 (M37 이후 — Critic Rewrite 루프 추가)
+## 그래프 플로우 (M38 이후 — Planner + Critic + Replan 루프)
 
 ```
 START
+  → mission_planner_node (Agent 0)  ★ 목표 해석·계획 생성
   → product_identity_node
       ├─ needs_user_input → clarification_node → END
       └─ confirmed → market_intelligence_node (ReAct)
            → pricing_strategy_node
            → copywriting_node (ReAct)
-           → listing_critic_node (ReAct — Agent 6)  ★ NEW
+           → listing_critic_node (Agent 6)
                ├─ pass (score ≥ 70) → validation_node
                │     ├─ failed (retry < 2) → refinement_node → validation_node
                │     └─ passed → package_builder_node → END
-               └─ rewrite (score < 70, retry < 2) → copywriting_node  ★ LOOP
+               ├─ rewrite (score < 70, retry < 2) → copywriting_node  ★ REWRITE LOOP
+               └─ replan (rewrite 한도 초과) → mission_planner_node  ★ REPLAN LOOP
 ```
 
 > 그래프 책임: 판매글 패키지 생성까지.
@@ -282,6 +288,7 @@ python -m pytest tests/ -m integration
 | M35: rewrite 출력 계약 봉합 + datetime 경고 제거 | ✅ 완료 | copywriting_agent.py _normalize_listing() 신설(ReAct 결과→CanonicalListingSchema 검증, 필수 키 보장 fallback) ✅, session_meta.py datetime.utcnow()→datetime.now(timezone.utc) 전환(DeprecationWarning 제거) ✅, 338/338 테스트 통과·경고 0개 ✅ |
 | M36: CTO2 지적 대응 — 노드 분리·예외 세분화·운영성 보강 | ✅ 완료 | copywriting_node 3함수 분리(_run_copywriting_agent·_extract_listing_payload·_build_prompts + 기존 _normalize_listing·_fallback_generate) ✅, InvalidUserInputError·SessionUpdateError 도메인 예외 신설(ValueError 6곳→도메인 예외 전환) ✅, repository.update() expected_status 조건부 업데이트(race condition 방어) ✅, /health/live·/health/ready 분리(readiness probe 보강) ✅, 338→340 테스트 통과 ✅ |
 | M37: Listing Critic + Rewrite 루프 | ✅ 완료 | Agent 6 listing_critic_node 신설(LLM 품질 비평 + 룰 기반 fallback, score/issues/rewrite_instructions 출력) ✅, SellerCopilotState에 critic 필드 5개 추가(critic_score·critic_feedback·critic_rewrite_instructions·critic_retry_count·max_critic_retries) ✅, route_after_critic 라우터(pass→validation / rewrite→copywriting, max retry 방어) ✅, 그래프에 copywriting→critic→(pass:validation / rewrite:copywriting) 루프 연결 ✅, test_critic_agent.py 15개(룰 기반 6·라우팅 5·통합 4) ✅, 340→355 테스트 통과 ✅ |
+| M38: Mission Planner + Replan 루프 | ✅ 완료 | Agent 0 mission_planner_node 신설(LLM 계획 생성 + 룰 기반 fallback, goal·plan·rationale·missing_information 출력) ✅, SellerCopilotState에 planner 필드 6개 추가(mission_goal·plan·plan_revision_count·max_replans·decision_rationale·missing_information) ✅, route_after_critic에 replan 분기 추가(rewrite 한도 초과→planner 재호출) ✅, 그래프 진입점 START→mission_planner→product_identity 변경 ✅, test_planner_agent.py 13개(룰 기반 7·replan 라우팅 3·통합 3) ✅, 기존 340개 + 신규 29개 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

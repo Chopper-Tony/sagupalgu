@@ -11,6 +11,7 @@ from app.graph.nodes.copywriting_agent import (
     refinement_node,
 )
 from app.graph.nodes.critic_agent import listing_critic_node
+from app.graph.nodes.planner_agent import mission_planner_node
 from app.graph.nodes.validation_agent import validation_node
 from app.graph.nodes.recovery_agent import recovery_node
 from app.graph.nodes.packaging_agent import package_builder_node, publish_node
@@ -36,6 +37,8 @@ __all__ = [
     "copywriting_node",
     "refinement_node",
     "_build_template_listing",
+    # Agent 0 (Planner)
+    "mission_planner_node",
     # Agent 6 (Critic)
     "listing_critic_node",
     # Agent 4
