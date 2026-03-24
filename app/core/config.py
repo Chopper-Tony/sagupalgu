@@ -117,6 +117,25 @@ class Settings(BaseSettings):
         alias="SCREENSHOT_DIR",
     )
 
+    # ------------------------------
+    # Supabase Storage
+    # ------------------------------
+
+    storage_bucket_name: str = Field(
+        default="product-images",
+        alias="STORAGE_BUCKET_NAME",
+    )
+
+    # ------------------------------
+    # CORS
+    # ------------------------------
+
+    allowed_origins: str = Field(
+        default="*",
+        alias="ALLOWED_ORIGINS",
+        description="콤마 구분 origin 목록. prod에서는 실제 도메인으로 제한.",
+    )
+
 
 @lru_cache
 def get_settings() -> "Settings":

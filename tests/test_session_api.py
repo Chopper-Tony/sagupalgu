@@ -337,7 +337,7 @@ class TestPreparePublish:
         mock_svc.prepare_publish.side_effect = ValueError("플랫폼을 선택해주세요")
         resp = client.post(
             f"{BASE}/sess-001/prepare-publish",
-            json={"platform_targets": []},
+            json={"platform_targets": ["bunjang"]},
         )
         assert resp.status_code == 400
 
@@ -387,7 +387,7 @@ class TestUpdateSaleStatus:
         mock_svc.update_sale_status.side_effect = ValueError("invalid status")
         resp = client.post(
             f"{BASE}/sess-001/sale-status",
-            json={"sale_status": "invalid"},
+            json={"sale_status": "sold"},
         )
         assert resp.status_code == 400
 
