@@ -1,11 +1,11 @@
 import asyncio
-import json
-import re
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
+from app.domain.schemas import CanonicalListingSchema
+from app.services.listing_prompt import build_copy_prompt, extract_json_object
 from app.services.market.market_service import MarketService
 
 
@@ -33,87 +33,6 @@ class ListingService:
             "recommended_price": recommended_price,
             "negotiation_policy": "small negotiation allowed",
         }
-
-    def _build_copy_prompt(
-        self,
-        confirmed_product: dict,
-        market_context: dict,
-        strategy: dict,
-        image_paths: list[str],
-        tool_calls_context: str = "",
-    ) -> str:
-        brand = confirmed_product.get("brand", "Unknown")
-        model = confirmed_product.get("model", "상품")
-        category = confirmed_product.get("category", "unknown")
-        confidence = confirmed_product.get("confidence", 0.0)
-
-        median_price = market_context.get("median_price", 0)
-        price_band = market_context.get("price_band", [])
-        sample_count = market_context.get("sample_count", 0)
-
-        recommended_price = strategy.get("recommended_price", 0)
-        goal = strategy.get("goal", "fast_sell")
-        negotiation_policy = strategy.get("negotiation_policy", "")
-
-        prompt = f"""
-You are an expert seller copilot for secondhand marketplace listings.
-
-Return ONLY valid JSON:
-
-{{
-  "title": "string",
-  "description": "string",
-  "tags": ["string", "string", "string"]
-}}
-
-Rules:
-- Write in Korean.
-- Keep the title natural and marketplace-friendly.
-- Keep the description practical, concise, and trustworthy.
-- Do not invent specs not explicitly provided.
-- Reflect uncertainty conservatively.
-- Tags must be short and useful, maximum 5.
-- Do not wrap JSON in markdown fences.
-
-Product:
-- brand: {brand}
-- model: {model}
-- category: {category}
-- confidence: {confidence}
-
-Market:
-- median_price: {median_price}
-- price_band: {price_band}
-- sample_count: {sample_count}
-
-Strategy:
-- goal: {goal}
-- recommended_price: {recommended_price}
-- negotiation_policy: {negotiation_policy}
-
-Image paths:
-- {image_paths}
-""".strip()
-
-        if tool_calls_context:
-            prompt += f"\n\nAgent tool call history (for context):\n{tool_calls_context}"
-
-        return prompt
-
-    def _extract_json_object(self, text: str) -> dict[str, Any]:
-        text = text.strip()
-
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?", "", text).strip()
-            text = re.sub(r"```$", "", text).strip()
-
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if not match:
-                raise ValueError("LLM did not return valid JSON")
-            return json.loads(match.group(0))
 
     def _build_template_copy(
         self,
@@ -186,7 +105,7 @@ Image paths:
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is not configured")
 
-        prompt = self._build_copy_prompt(
+        prompt = build_copy_prompt(
             confirmed_product=confirmed_product,
             market_context=market_context,
             strategy=strategy,
@@ -231,7 +150,7 @@ Image paths:
                     data = response.json()
 
                 text = data["choices"][0]["message"]["content"]
-                return self._extract_json_object(text)
+                return extract_json_object(text)
 
             except httpx.HTTPStatusError as e:
                 last_error = e
@@ -256,7 +175,7 @@ Image paths:
         if not gemini_model:
             raise ValueError("GEMINI_LISTING_MODEL is not configured")
 
-        prompt = self._build_copy_prompt(
+        prompt = build_copy_prompt(
             confirmed_product=confirmed_product,
             market_context=market_context,
             strategy=strategy,
@@ -295,7 +214,7 @@ Image paths:
             raise ValueError("Gemini returned no content parts")
 
         text = "".join(part.get("text", "") for part in parts).strip()
-        return self._extract_json_object(text)
+        return extract_json_object(text)
 
     async def _generate_copy_with_solar(
         self,
@@ -312,7 +231,7 @@ Image paths:
         if not solar_model:
             raise ValueError("SOLAR_LISTING_MODEL is not configured")
 
-        prompt = self._build_copy_prompt(
+        prompt = build_copy_prompt(
             confirmed_product=confirmed_product,
             market_context=market_context,
             strategy=strategy,
@@ -350,7 +269,7 @@ Image paths:
             data = response.json()
 
         text = data["choices"][0]["message"]["content"]
-        return self._extract_json_object(text)
+        return extract_json_object(text)
 
     async def _generate_copy(
         self,
@@ -433,24 +352,12 @@ Image paths:
             tool_calls_context=tool_calls_context,
         )
 
-        title = llm_result.get("title") or f"{confirmed_product.get('model', '상품')} 판매합니다"
-        description = llm_result.get("description") or "AI가 생성한 판매글 초안"
-        tags = llm_result.get("tags") or [confirmed_product.get("model", "상품")]
-
-        if not isinstance(tags, list):
-            tags = [str(tags)]
-
-        tags = [str(tag).strip() for tag in tags if str(tag).strip()][:5]
-
-        return {
-            "title": title,
-            "description": description,
-            "price": strategy.get("recommended_price", 0),
-            "tags": tags,
-            "images": image_paths,
-            "strategy": strategy.get("goal", "fast_sell"),
-            "product": confirmed_product,
-        }
+        return CanonicalListingSchema.from_llm_result(
+            llm_result,
+            confirmed_product=confirmed_product,
+            strategy=strategy,
+            image_paths=image_paths,
+        ).model_dump()
 
     async def rewrite_listing(
         self,
@@ -484,22 +391,11 @@ Image paths:
             tool_calls_context=rewrite_context,
         )
 
-        title = llm_result.get("title") or canonical_listing.get("title", "")
-        description = llm_result.get("description") or canonical_listing.get("description", "")
-        tags = llm_result.get("tags") or canonical_listing.get("tags") or []
-        if not isinstance(tags, list):
-            tags = [str(tags)]
-        tags = [str(t).strip() for t in tags if str(t).strip()][:5]
-
-        return {
-            "title": title,
-            "description": description,
-            "price": canonical_listing.get("price") or strategy.get("recommended_price", 0),
-            "tags": tags,
-            "images": image_paths,
-            "strategy": canonical_listing.get("strategy") or strategy.get("goal", "fast_sell"),
-            "product": confirmed_product,
-        }
+        return CanonicalListingSchema.from_rewrite_result(
+            llm_result,
+            previous=canonical_listing,
+            strategy=strategy,
+        ).model_dump()
 
     async def build_listing_package(
         self,

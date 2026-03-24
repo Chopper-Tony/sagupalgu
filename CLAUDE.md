@@ -109,14 +109,17 @@ START
   - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()` → InvalidStateTransitionError, `resolve_next_action()`
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
   - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
+  - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
 - `app/services/` — 비즈니스 로직
-  - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거
-  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성) 유스케이스 분리
+  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거. UI 응답 조립은 `session_ui.py`에 위임
+  - `session_ui.py`: `build_session_ui_response()` — DB 레코드 → UI 응답 평탄화 (SessionService에서 분리)
+  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). CanonicalListingSchema로 shape 보장
+  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
   - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
-  - `listing_service.py`, `product_service.py`: 개별 도메인 서비스
+  - `product_service.py`: 상품 식별 서비스
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
 
@@ -207,6 +210,7 @@ python -m pytest tests/ -m integration
 | M15: 배포 기반 확립 | ✅ 완료 |
 | M16: 프론트엔드 기반 세팅 | ✅ 완료 | React+Vite+TypeScript 세팅 ✅, 타입 계약(session.ts·ui.ts·TimelineItemInput) ✅, sessionStatusUiMap.ts(상태→카드·ComposerMode·폴링) ✅, api.ts(axios) ✅, useSession hook(스마트 폴링) ✅, AppShell·SessionSidebar ✅, ChatWindow(타임라인) ✅, ChatComposer(모드 분기) ✅, ProgressCard·ErrorCard 공용 ✅, 빌드 통과 ✅ | pytest.ini pythonpath 추가(CI 단독 실행 보장) ✅, .env.example 생성(민감정보 분리) ✅, .dockerignore 추가 ✅, Dockerfile(python:3.11-slim + playwright chromium) ✅, docker-compose.yml(backend + healthcheck) ✅, GitHub Actions ci.yml(pytest + docker build) ✅, docs/api-contract.md 초안(상태→카드→API 매핑 테이블) ✅, GitHub Secrets 7개 등록(SUPABASE/OPENAI/GEMINI/UPSTAGE/DISCORD) ✅, 137/137 테스트 통과 ✅ |
 | M17: 핵심 카드 구현 | ✅ 완료 | ProductConfirmationCard(후보 최대 3개·confidence bar·직접 입력) ✅, ImageUploadCard(drag&drop+click) ✅, DraftCard(listing 표시·플랫폼 선택·승인/재작성) ✅, PublishApprovalCard(게시 확인·수정 버튼) ✅, PublishResultCard(플랫폼별 성공/실패·링크·판매상태 업데이트) ✅, ChatWindow 실제 카드 컴포넌트 렌더링 연결 ✅, App.tsx handleAction 전체 switch(upload_images/confirm_product/prepare_publish/rewrite/publish/edit_draft/update_sale_status/retry_publish/restart) ✅, 빌드 통과(TypeScript 에러 0) ✅ |
+| M18: 서비스 절개·shape 강제·카드 완성 | ✅ 완료 | app/domain/schemas.py CanonicalListingSchema 신설(Pydantic shape 강제·LLM 출력 직후 validate) ✅, app/services/listing_prompt.py PromptBuilder 분리(build_copy_prompt·extract_json_object 순수 함수) ✅, app/services/session_ui.py SessionResponseAssembler 분리(build_session_ui_response 이동) ✅, listing_service.py → CanonicalListingSchema.from_llm_result/from_rewrite_result 사용 ✅, session_service.py → session_ui.py import ✅, SaleStatusCard(팔렸어요/안팔렸어요) ✅, OptimizationSuggestionCard(가격 제안·이유·새로 시작) ✅, App.tsx mark_sold/mark_unsold 액션 추가 ✅, 137/137 테스트 통과·빌드 에러 0 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

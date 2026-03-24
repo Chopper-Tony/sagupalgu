@@ -7,6 +7,8 @@ import { ProductConfirmationCard } from "../cards/ProductConfirmationCard";
 import { DraftCard } from "../cards/DraftCard";
 import { PublishApprovalCard } from "../cards/PublishApprovalCard";
 import { PublishResultCard } from "../cards/PublishResultCard";
+import { SaleStatusCard } from "../cards/SaleStatusCard";
+import { OptimizationSuggestionCard } from "../cards/OptimizationSuggestionCard";
 import "./ChatWindow.css";
 
 interface ChatWindowProps {
@@ -68,6 +70,23 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
           <PublishResultCard
             results={session?.platform_results ?? []}
             onUpdateSaleStatus={() => onAction("update_sale_status")}
+          />
+        );
+
+      case "SaleStatusCard":
+        return (
+          <SaleStatusCard
+            onMarkSold={() => onAction("mark_sold")}
+            onMarkUnsold={() => onAction("mark_unsold")}
+          />
+        );
+
+      case "OptimizationSuggestionCard":
+        if (!session?.optimization_suggestion) return null;
+        return (
+          <OptimizationSuggestionCard
+            suggestion={session.optimization_suggestion}
+            onRestart={() => onAction("restart")}
           />
         );
 

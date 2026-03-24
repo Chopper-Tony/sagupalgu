@@ -1,0 +1,54 @@
+"""
+세션 DB 레코드 → UI 응답 평탄화.
+
+SessionService의 오케스트레이션 책임과 UI 응답 조립 책임을 분리.
+외부에서는 이 모듈의 build_session_ui_response()만 import한다.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from app.domain.session_status import resolve_next_action
+
+
+def build_session_ui_response(session: Dict[str, Any]) -> Dict[str, Any]:
+    """DB 레코드 → UI 응답 평탄화. SessionService 외부에서도 재사용 가능."""
+    product_data = session.get("product_data_jsonb") or {}
+    listing_data = session.get("listing_data_jsonb") or {}
+    workflow_meta = session.get("workflow_meta_jsonb") or {}
+    status = session.get("status", "")
+    needs_input = bool(product_data.get("needs_user_input", False))
+
+    return {
+        "session_id": session.get("id") or session.get("session_id"),
+        "status": status,
+        "checkpoint": workflow_meta.get("checkpoint"),
+        "next_action": resolve_next_action(status, needs_input),
+        "needs_user_input": needs_input,
+        "user_input_prompt": product_data.get("user_input_prompt"),
+        "selected_platforms": session.get("selected_platforms_jsonb") or [],
+        "product": {
+            "image_paths": product_data.get("image_paths") or [],
+            "candidates": product_data.get("candidates") or [],
+            "confirmed_product": product_data.get("confirmed_product"),
+            "analysis_source": product_data.get("analysis_source"),
+        },
+        "listing": {
+            "market_context": listing_data.get("market_context"),
+            "strategy": listing_data.get("strategy"),
+            "canonical_listing": listing_data.get("canonical_listing"),
+            "platform_packages": listing_data.get("platform_packages") or {},
+            "optimization_suggestion": listing_data.get("optimization_suggestion"),
+        },
+        "publish": {
+            "results": workflow_meta.get("publish_results") or {},
+            "diagnostics": workflow_meta.get("publish_diagnostics") or [],
+        },
+        "agent_trace": {
+            "tool_calls": workflow_meta.get("tool_calls") or [],
+            "rewrite_history": workflow_meta.get("rewrite_history") or [],
+        },
+        "debug": {
+            "last_error": workflow_meta.get("last_error"),
+        },
+    }

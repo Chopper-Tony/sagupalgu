@@ -1,0 +1,81 @@
+.optimization-card {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.optimization-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.optimization-card__icon { font-size: 20px; flex-shrink: 0; }
+
+.optimization-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 4px;
+}
+
+.optimization-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.optimization-card__body {
+  background: #0f0f10;
+  border: 1px solid #2a2a2e;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optimization-card__price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.optimization-card__price-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.optimization-card__price-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.optimization-card__reason {
+  font-size: 13px;
+  color: #aaa;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.optimization-card__actions {
+  display: flex;
+}
+
+.optimization-card__restart-btn {
+  width: 100%;
+  background: #1e1e22;
+  border: 1px solid #3a3a3e;
+  border-radius: 8px;
+  padding: 10px;
+  color: #aaa;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.optimization-card__restart-btn:hover { background: #2a2a2e; }

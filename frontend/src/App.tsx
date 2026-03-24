@@ -119,8 +119,14 @@ export default function App() {
           setLastRenderedStatus("awaiting_publish_approval");
           pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
           break;
-        case "update_sale_status": {
+        case "update_sale_status":
+        case "mark_sold": {
           const updated = await api.updateSaleStatus(activeId, "sold");
+          setSession(updated);
+          break;
+        }
+        case "mark_unsold": {
+          const updated = await api.updateSaleStatus(activeId, "unsold");
           setSession(updated);
           break;
         }
