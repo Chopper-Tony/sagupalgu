@@ -42,7 +42,7 @@ def append_rewrite_entry(
     rewrite_history = workflow_meta.get("rewrite_history") or []
     rewrite_history.append({
         "instruction": instruction,
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     })
     workflow_meta["rewrite_history"] = rewrite_history
     append_tool_calls(workflow_meta, new_tool_calls)

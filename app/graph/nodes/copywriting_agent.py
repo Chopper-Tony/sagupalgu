@@ -166,12 +166,7 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
             new_listing = _build_template_listing(product, strategy, market_context, state)
 
     if new_listing:
-        if not new_listing.get("images"):
-            new_listing["images"] = image_paths
-        if "product" not in new_listing:
-            new_listing["product"] = product
-        if "strategy" not in new_listing:
-            new_listing["strategy"] = strategy.get("goal", "fast_sell")
+        new_listing = _normalize_listing(new_listing, product, strategy, image_paths)
         state["canonical_listing"] = new_listing
         state["rewrite_instruction"] = None
     elif not state.get("canonical_listing"):
@@ -205,6 +200,36 @@ def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
     state["canonical_listing"] = canonical
     _log(state, "agent4:refinement:done")
     return state
+
+
+def _normalize_listing(
+    listing: Dict, product: Dict, strategy: Dict, image_paths: list,
+) -> Dict:
+    """ReAct/LLM 결과를 CanonicalListingSchema 계약에 맞게 정규화."""
+    try:
+        from app.domain.schemas import CanonicalListingSchema
+        if listing.get("title"):
+            schema = CanonicalListingSchema(
+                title=listing.get("title", ""),
+                description=listing.get("description", ""),
+                price=listing.get("price") or strategy.get("recommended_price", 0),
+                tags=listing.get("tags") or [],
+                images=listing.get("images") or image_paths,
+                strategy=listing.get("strategy") or strategy.get("goal", "fast_sell"),
+                product=listing.get("product") or product,
+            )
+            return schema.model_dump()
+    except Exception:
+        pass
+    # fallback: 최소 필수 키 보장
+    listing.setdefault("title", f"{product.get('model', '상품')} 판매합니다")
+    listing.setdefault("description", "AI가 생성한 판매글 초안")
+    listing.setdefault("price", _safe_int(strategy.get("recommended_price"), 0))
+    listing.setdefault("tags", [product.get("model", "상품")])
+    listing.setdefault("images", image_paths)
+    listing.setdefault("product", product)
+    listing.setdefault("strategy", strategy.get("goal", "fast_sell"))
+    return listing
 
 
 def _build_template_listing(

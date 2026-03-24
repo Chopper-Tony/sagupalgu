@@ -273,6 +273,7 @@ python -m pytest tests/ -m integration
 | M32: ListingService 절개 | ✅ 완료 | listing_prompt.py에 build_tool_calls_context·build_rewrite_context·build_pricing_strategy 순수 함수 3개 추가(95줄→137줄) ✅, listing_service.py 인라인 context 빌드·pricing 로직 제거(125줄→93줄, -26%) ✅, test_listing_prompt_ext.py 13개 unit 테스트 ✅, 294→307 테스트 통과 ✅ |
 | M33: 상태 전이 계약 + UI 응답 shape 검증 | ✅ 완료 | test_status_contract.py 신설(14개: ALLOWED_TRANSITIONS 완전성·전이 대상 유효성·self-loop 검증·터미널 상태·resolve_next_action 전수·happy path 체인·UI 응답 shape×13상태·섹션 존재 검증) ✅, 324→338 테스트 통과 ✅ |
 | M34: langgraph import 격리 | ✅ 완료 | seller_copilot_graph.py eager import → build 내부 lazy import 전환 ✅, _LazyGraphProxy + _get_compiled_graph로 lazy 빌드 구조 전환 ✅, seller_copilot_runner.py _get_graph() lazy 호출로 변경 ✅, clean env(langgraph 미설치) pytest 수집 통과 ✅, 324/324 테스트 통과 ✅ |
+| M35: rewrite 출력 계약 봉합 + datetime 경고 제거 | ✅ 완료 | copywriting_agent.py _normalize_listing() 신설(ReAct 결과→CanonicalListingSchema 검증, 필수 키 보장 fallback) ✅, session_meta.py datetime.utcnow()→datetime.now(timezone.utc) 전환(DeprecationWarning 제거) ✅, 338/338 테스트 통과·경고 0개 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
