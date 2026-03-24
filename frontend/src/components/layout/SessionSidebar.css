@@ -1,0 +1,80 @@
+.session-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px 0;
+}
+
+.session-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid #2a2a2e;
+}
+
+.session-sidebar__title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #ececec;
+}
+
+.session-sidebar__new-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.session-sidebar__new-btn:hover {
+  background: #1d4ed8;
+}
+
+.session-sidebar__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.session-sidebar__item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 2px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-sidebar__item:hover {
+  background: #1e1e22;
+}
+
+.session-sidebar__item--active {
+  background: #1e2a3a;
+}
+
+.session-sidebar__item-label {
+  font-size: 13px;
+  color: #ececec;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-sidebar__item-status {
+  font-size: 11px;
+  color: #888;
+}
+
+.session-sidebar__empty {
+  padding: 24px 16px;
+  color: #666;
+  font-size: 13px;
+  text-align: center;
+}
