@@ -109,14 +109,17 @@ START
   - `session_status.py`: SessionStatus, ALLOWED_TRANSITIONS, `assert_allowed_transition()` → InvalidStateTransitionError, `resolve_next_action()`
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
   - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
+  - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
 - `app/services/` — 비즈니스 로직
-  - `session_service.py`: 세션 오케스트레이터. `build_session_ui_response()` 모듈 함수로 UI 응답 조립 분리. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거
-  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성) 유스케이스 분리
+  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_append_tool_calls()` 내부 헬퍼로 중복 제거. UI 응답 조립은 `session_ui.py`에 위임
+  - `session_ui.py`: `build_session_ui_response()` — DB 레코드 → UI 응답 평탄화 (SessionService에서 분리)
+  - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). CanonicalListingSchema로 shape 보장
+  - `listing_prompt.py`: `build_copy_prompt()`·`extract_json_object()` 순수 함수 (ListingService에서 분리, 단독 테스트 가능)
   - `publish_service.py`: `build_platform_packages(canonical, platforms)` — 플랫폼별 가격 차등 패키지 빌드
   - `recovery_service.py`: Agent 4 복구 노드 호출 격리 — SessionService의 graph 직접 import 제거
   - `optimization_service.py`: Agent 5 최적화 노드 호출 격리
   - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
-  - `listing_service.py`, `product_service.py`: 개별 도메인 서비스
+  - `product_service.py`: 상품 식별 서비스
 - `app/crawlers/` — MarketCrawler legacy wrapper
 - `legacy_spikes/` — **읽기 전용** 참고용, 직접 수정 금지
 
