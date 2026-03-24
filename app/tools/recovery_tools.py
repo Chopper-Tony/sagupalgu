@@ -15,7 +15,11 @@ import json
 import logging
 from typing import Any, Dict
 
-from langchain_core.tools import tool
+try:
+    from langchain_core.tools import tool as _lc_tool
+except ImportError:  # langchain-core 미설치 환경 — 순수 구현 함수는 정상 동작
+    def _lc_tool(fn):  # type: ignore[misc]
+        return fn
 
 from app.tools._common import _extract_json, _make_tool_call
 
@@ -24,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # ── LangChain Tool 버전 (create_react_agent bind) ─────────────────
 
-@tool
+@_lc_tool
 def lc_diagnose_publish_failure_tool(
     platform: str,
     error_code: str,
@@ -44,7 +48,7 @@ def lc_diagnose_publish_failure_tool(
     return json.dumps(output, ensure_ascii=False)
 
 
-@tool
+@_lc_tool
 async def lc_auto_patch_tool(
     platform: str,
     likely_cause: str,
@@ -69,7 +73,7 @@ async def lc_auto_patch_tool(
     return json.dumps(output, ensure_ascii=False)
 
 
-@tool
+@_lc_tool
 async def lc_discord_alert_tool(
     message: str,
     session_id: str,

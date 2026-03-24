@@ -101,8 +101,7 @@ class SessionService:
     # ── 이미지 업로드 ──────────────────────────────────────────────
 
     async def attach_images(self, session_id: str, image_urls: List[str]) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "images_uploaded")
+        session = self._ensure_transition(session_id, "images_uploaded")
         product_data = dict(session.get("product_data_jsonb") or {})
         product_data["image_paths"] = image_urls
         updated = self._update_or_raise(session_id, {
@@ -114,8 +113,7 @@ class SessionService:
     # ── 상품 분석 ──────────────────────────────────────────────────
 
     async def analyze_session(self, session_id: str) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "awaiting_product_confirmation")
+        session = self._ensure_transition(session_id, "awaiting_product_confirmation")
 
         product_data = dict(session.get("product_data_jsonb") or {})
         image_paths = product_data.get("image_paths") or []
@@ -154,8 +152,7 @@ class SessionService:
     # ── 상품 확정 ──────────────────────────────────────────────────
 
     async def confirm_product(self, session_id: str, candidate_index: int) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "product_confirmed")
+        session = self._ensure_transition(session_id, "product_confirmed")
 
         product_data = dict(session.get("product_data_jsonb") or {})
         candidates = product_data.get("candidates") or []
@@ -180,8 +177,7 @@ class SessionService:
         self, session_id: str, model: str,
         brand: Optional[str] = None, category: Optional[str] = None,
     ) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "product_confirmed")
+        session = self._ensure_transition(session_id, "product_confirmed")
 
         normalized_model = normalize_text(model)
         if not normalized_model:
@@ -211,8 +207,7 @@ class SessionService:
     # ── 판매글 생성 / 재작성 ────────────────────────────────────────
 
     async def generate_listing(self, session_id: str) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "draft_generated")
+        session = self._ensure_transition(session_id, "draft_generated")
 
         result_payload = await self.copilot_service.run_listing_pipeline(
             session_id=session_id,
@@ -226,7 +221,7 @@ class SessionService:
         if workflow_meta.get("checkpoint") in {"C_prepared", "C_complete"}:
             workflow_meta["checkpoint"] = "B_complete"
         workflow_meta.pop("publish_results", None)
-        workflow_meta["tool_calls"] = result_payload.get("tool_calls") or []
+        self._append_tool_calls(workflow_meta, result_payload.get("tool_calls") or [])
 
         updated = self._update_or_raise(session_id, {
             "status": "draft_generated",
@@ -238,8 +233,7 @@ class SessionService:
         return build_session_ui_response(updated)
 
     async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "draft_generated")
+        session = self._ensure_transition(session_id, "draft_generated")
 
         if not instruction or not instruction.strip():
             raise ValueError("재작성 지시사항이 필요합니다")
@@ -260,7 +254,7 @@ class SessionService:
             "timestamp": datetime.datetime.utcnow().isoformat(),
         })
         workflow_meta["rewrite_history"] = rewrite_history
-        workflow_meta["tool_calls"] = result_payload.get("tool_calls") or []
+        self._append_tool_calls(workflow_meta, result_payload.get("tool_calls") or [])
 
         updated = self._update_or_raise(session_id, {
             "status": "draft_generated",
@@ -272,8 +266,7 @@ class SessionService:
     # ── 게시 준비 / 게시 ───────────────────────────────────────────
 
     async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "awaiting_publish_approval")
+        session = self._ensure_transition(session_id, "awaiting_publish_approval")
 
         if not platform_targets:
             raise ValueError("플랫폼을 선택해주세요")
@@ -302,8 +295,7 @@ class SessionService:
         return build_session_ui_response(updated)
 
     async def publish_session(self, session_id: str) -> Dict:
-        session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], "publishing")
+        session = self._ensure_transition(session_id, "publishing")
 
         selected = session.get("selected_platforms_jsonb") or []
         packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
@@ -327,9 +319,7 @@ class SessionService:
                 publish_results=publish_results,
             )
             workflow_meta["publish_diagnostics"] = recovery_result["publish_diagnostics"]
-            workflow_meta["tool_calls"] = (
-                (workflow_meta.get("tool_calls") or []) + recovery_result["tool_calls"]
-            )
+            self._append_tool_calls(workflow_meta, recovery_result["tool_calls"])
             final_status = "publishing_failed"
         else:
             final_status = "completed"
@@ -363,9 +353,7 @@ class SessionService:
         if optimization:
             listing_data["optimization_suggestion"] = optimization
 
-        workflow_meta["tool_calls"] = (
-            (workflow_meta.get("tool_calls") or []) + opt_result["tool_calls"]
-        )
+        self._append_tool_calls(workflow_meta, opt_result["tool_calls"])
         final_status = opt_result["status"] or (
             "optimization_suggested" if optimization else "awaiting_sale_status_update"
         )
@@ -390,4 +378,14 @@ class SessionService:
         if not result:
             raise ValueError(f"세션 업데이트 실패: {session_id}")
         return result
+
+    def _ensure_transition(self, session_id: str, next_status: str) -> Dict:
+        """세션 조회 + 상태 전이 유효성 검증을 한 번에 수행한다."""
+        session = self._get_or_raise(session_id)
+        assert_allowed_transition(session["status"], next_status)
+        return session
+
+    def _append_tool_calls(self, workflow_meta: Dict, new_calls: List[Dict]) -> None:
+        """workflow_meta의 tool_calls 리스트에 새 항목을 병합한다."""
+        workflow_meta["tool_calls"] = (workflow_meta.get("tool_calls") or []) + new_calls
 

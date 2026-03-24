@@ -60,3 +60,31 @@ class TestGraphRouting:
 
         state = {"validation_passed": False, "validation_retry_count": 1}
         assert route_after_validation(state) == "refinement_node"
+
+    def test_validation_passed_true_retry_초과해도_package로(self):
+        """passed=True면 retry count 무관하게 항상 package_builder_node"""
+        from app.graph.routing import route_after_validation
+
+        state = {"validation_passed": True, "validation_retry_count": 99}
+        assert route_after_validation(state) == "package_builder_node"
+
+    def test_validation_retry_count_음수는_refinement(self):
+        """비정상적인 음수 retry count는 refinement으로 분기 (MAX 미달)"""
+        from app.graph.routing import route_after_validation
+
+        state = {"validation_passed": False, "validation_retry_count": -1}
+        assert route_after_validation(state) == "refinement_node"
+
+    def test_validation_retry_count_문자열_처리(self):
+        """retry_count가 문자열로 들어와도 안전하게 처리"""
+        from app.graph.routing import route_after_validation, MAX_VALIDATION_RETRIES
+
+        state = {"validation_passed": False, "validation_retry_count": str(MAX_VALIDATION_RETRIES)}
+        assert route_after_validation(state) == "package_builder_node"
+
+    def test_needs_user_input_truthy_값_clarification(self):
+        """needs_user_input이 1 같은 truthy 값이어도 clarification으로"""
+        from app.graph.routing import route_after_product_identity
+
+        state = {"needs_user_input": 1}
+        assert route_after_product_identity(state) == "clarification_node"

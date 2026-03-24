@@ -180,7 +180,8 @@ python -m pytest tests/
 | M7: 실행 안정화·테스트 회복 | ✅ 완료 | SellerCopilotRunner 단순화(325줄→68줄) ✅, PublishService.execute_publish 분리 ✅, SessionService publish 루프 위임 ✅, create_react_agent → langchain.agents.create_agent 교체 ✅, _run_async lambda 패턴 도입(RuntimeWarning 제거) ✅, requirements.txt cp949 버그·langchain 누락 수정 ✅, 테스트 33/33 경고 0개 ✅ |
 | M8: 코드 품질 강화 (DI·테스트 계층·API 계약) | ✅ 완료 | SessionService 생성자 DI 도입(5개 서비스 주입 가능) ✅, create_session 더블콜 제거·get_session UI응답 통일 ✅, 테스트 계층 분리(unit/integration 마커, test_session_status.py 41개·test_domain.py 35개 신규) ✅, 112/112 테스트 통과·unit 단독 0.11초 ✅ |
 | M9: 구조 정리 (데드코드·라우팅 분리·테스트 분할) | ✅ 완료 | app/graph/routing.py 신설(langgraph 의존성 0, unit 라우팅 테스트 8개) ✅, seller_copilot_graph.py에서 중복 라우터 제거·routing.py import ✅, test_agentic_workflow.py → 4파일 분리(product_market/copywriting_validation/recovery_optimization/graph_routing) ✅, conftest.py 공유 픽스처 ✅, 데드코드 legacy_spikes/dead_code/로 이동(app/agents/ 5파일·nodes.py·graph.py) ✅, app/tools/__init__.py 명시적 export ✅, 114/114 테스트 통과 ✅ |
-| M10: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M9 완료 후 진행 |
+| M10: import 경계·tool facade 확정 | ✅ 완료 | app/tools/__init__.py 비움(auto-import 제거) ✅, agentic_tools.py public facade 확정(독스트링·contract 명시) ✅, market/listing/recovery_tools.py conditional langchain_core import(미설치 환경 _impl 정상 동작) ✅, SessionService _ensure_transition·_append_tool_calls 헬퍼 추가(8개 메서드 중복 제거) ✅, test_graph_routing.py edge case 5개 추가(총 13개) ✅, 118/118 테스트 통과·unit 0.12s ✅ |
+| M11: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M10 완료 후 진행 |
 
 ## CTO 코드리뷰 점수 이력
 
