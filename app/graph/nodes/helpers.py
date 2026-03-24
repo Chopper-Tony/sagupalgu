@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from app.core.utils import safe_int as _safe_int  # noqa: F401 — 노드 전역 import
 from app.graph.seller_copilot_state import SellerCopilotState
 
 
@@ -31,13 +32,6 @@ def _record_error(state: SellerCopilotState, source: str, error: str) -> None:
     })
     state["error_history"] = history
     state["last_error"] = error
-
-
-def _safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def _run_async(coro_or_factory):

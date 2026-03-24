@@ -123,6 +123,7 @@ START
   - `seller_copilot_service.py`: LangGraph 브릿지. 전체 async
   - `product_service.py`: 상품 식별 서비스
 - `app/dependencies.py` — FastAPI DI 체인: `get_session_repository`·`get_session_service` 등 6개 `lru_cache` 싱글턴. 테스트에서 `app.dependency_overrides`로 mock 주입 가능
+- `app/core/utils.py` — 공통 유틸리티: `safe_int()` (레이어 무관 순수 함수, 중복 정의 제거)
 - `app/core/logging.py` — JSON 구조화 로깅: `JsonFormatter`(log→JSON 한 줄)·`configure_logging()`·contextvars `request_id` 자동 포함
 - `app/middleware/request_id.py` — `RequestIdMiddleware`: X-Request-ID 헤더 전파·UUID4 자동 발급·응답 헤더 포함
 - `app/storage/storage_client.py` — Supabase Storage 클라이언트: `upload_image()`·`get_public_url()`. lazy import + `lru_cache` 싱글턴
@@ -253,7 +254,8 @@ python -m pytest tests/ -m integration
 | M24: 관찰 가능성(Observability) 기반 구축 | ✅ 완료 | app/core/logging.py 신설(JsonFormatter·configure_logging·contextvars request_id 자동 포함) ✅, app/middleware/request_id.py 신설(X-Request-ID 전파·UUID4 자동 발급·응답 헤더 포함) ✅, main.py 미들웨어 등록·/health 상세화(environment·checks 필드) ✅, test_observability.py(19개: JsonFormatter·contextvars·미들웨어·헬스체크) ✅, 221→240 테스트 통과 ✅ |
 | M25: Supabase storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 쌍(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py 7개 추가 ✅ |
 | M26: 보안·운영 강화(CORS) | ✅ 완료 | UploadImagesRequest field validator(HTTP(S) URL 검증·빈값·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS·frozenset 검증) ✅, SaleStatusRequest Literal 타입 강화 ✅, test_security.py 22개 추가 ✅ |
-| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, app/middleware/request_id.py 제거 후 optional-required 전환 및 fallback 제거 ✅, session_router.py 전역 서비스 제거/try-except 정리 ✅ |
+| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, session_router.py _handle() 공통 래퍼 신설(try-except 중복 제거) ✅ |
+| M29: 데드코드·중복 제거 + 테스트 파일 분할 | ✅ 완료 | app/core/utils.py 신설(safe_int 단일 정의) ✅, helpers.py·session_service.py 중복 _safe_int 제거→utils.py import ✅, seller_copilot_service.py 미사용 alias(_normalize_text·_needs_user_input)·normalize_text import 제거 ✅, test_session_api.py(401줄) → tests/api/ 4파일 분할(basic·product·listing·publish + conftest) ✅, 269/269 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

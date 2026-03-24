@@ -7,15 +7,11 @@ from app.domain.product_rules import (
     build_confirmed_product_from_candidate,
     build_confirmed_product_from_user_input,
     needs_user_input,
-    normalize_text,
 )
 from app.graph.seller_copilot_runner import SellerCopilotRunner
 from app.services.market.market_service import MarketService
 from app.services.product_service import ProductService
 
-# 하위 호환 alias — session_service.py import 경로 유지
-_normalize_text = normalize_text
-_needs_user_input = needs_user_input
 
 
 class SellerCopilotService:
