@@ -111,7 +111,8 @@ START
   - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
   - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
 - `app/services/` — 비즈니스 로직
-  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()` 내부 헬퍼. workflow_meta 조작은 `session_meta.py`에 위임. UI 응답 조립은 `session_ui.py`에 위임
+  - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_persist_and_respond()` 내부 헬퍼. 데이터 조작은 3개 순수 함수 모듈에 위임
+  - `session_product.py`: product_data 순수 함수 집합 (`attach_image_paths`, `apply_analysis_result`, `confirm_from_candidate`, `confirm_from_user_input`) — SessionService에서 분리
   - `session_ui.py`: `build_session_ui_response()` — DB 레코드 → UI 응답 평탄화 (SessionService에서 분리)
   - `session_meta.py`: workflow_meta 순수 함수 집합 (`set_analysis_checkpoint`, `set_product_confirmed`, `normalize_listing_meta`, `append_rewrite_entry`, `set_publish_prepared`, `set_publish_complete`, `set_publish_diagnostics`, `set_sale_status`, `append_tool_calls`) — SessionService에서 분리
   - `listing_service.py`: `build_canonical_listing()`(최초 생성) + `rewrite_listing()`(피드백 재작성). LLM 호출은 `listing_llm.py`에 위임
@@ -261,6 +262,7 @@ python -m pytest tests/ -m integration
 | M28: 예외 핸들링 일원화 | ✅ 완료 | main.py 글로벌 핸들러 통합(5개 개별→SagupalguError 1개 + ValueError 핸들러, _DOMAIN_STATUS_MAP 데이터 주도) ✅, session_router.py try-except 완전 제거(순수 서비스 호출만) ✅, _api_error/_domain_error 헬퍼·ErrorResponse import·예외 import 전부 제거 ✅, exceptions.py 매핑 적용 위치 주석 단일화 ✅, 269/269 테스트 통과 ✅ |
 | M29: 데드코드·중복 제거 + 테스트 파일 분할 | ✅ 완료 | app/core/utils.py 신설(safe_int 단일 정의) ✅, helpers.py·session_service.py 중복 _safe_int 제거→utils.py import ✅, seller_copilot_service.py 미사용 alias(_normalize_text·_needs_user_input)·normalize_text import 제거 ✅, test_session_api.py(401줄) → tests/api/ 4파일 분할(basic·product·listing·publish + conftest) ✅, 269/269 테스트 통과 ✅ |
 | M30: 테스트 환경 격리 + 출력 계약 봉합 | ✅ 완료 | app/db/client.py supabase eager import → lazy import 전환(clean env에서 pytest 수집 통과) ✅, build_template_copy 출력 계약 위반 수정(price·images·strategy·product 키 누락 → CanonicalListingSchema 계약 준수) ✅, test_output_contract.py 신설(25개: from_llm_result·from_rewrite_result·fallback·template·price coercion·tags 정규화 6경로 전수 검증) ✅, 269→294 테스트 통과 ✅ |
+| M31: SessionService 절개 | ✅ 완료 | app/services/session_product.py 신설(product_data 순수 함수 4개: attach_image_paths·apply_analysis_result·confirm_from_candidate·confirm_from_user_input) ✅, SessionService 상품 로직 인라인→순수 함수 위임(349줄→300줄) ✅, _persist_and_respond 헬퍼 신설(반복 업데이트+응답 패턴 통합) ✅, test_session_product.py 17개 unit 테스트 ✅, 286/286 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
