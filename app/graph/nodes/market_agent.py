@@ -68,17 +68,16 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         if llm is None:
             raise ValueError("LLM 초기화 실패 — API 키 확인 필요")
 
-        from langgraph.prebuilt import create_react_agent
-        agent = create_react_agent(
+        from langchain.agents import create_agent
+        agent = create_agent(
             llm,
             [lc_market_crawl_tool, lc_rag_price_tool],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
         _log(state, "agent2:react_agent:invoking LLM with tools=[market_crawl, rag_price]")
-        result = _run_async(agent.ainvoke({
-            "messages": [HumanMessage(content=user_prompt)]
-        }))
+        msgs = [HumanMessage(content=user_prompt)]
+        result = _run_async(lambda: agent.ainvoke({"messages": msgs}))
 
         for msg in result.get("messages", []):
             if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -101,14 +100,14 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
 
         # Fallback: 직접 툴 호출
         from app.tools.market_tools import market_crawl_tool, rag_price_tool
-        crawl_result = _run_async(market_crawl_tool(product))
+        crawl_result = _run_async(lambda: market_crawl_tool(product))
         _record_tool_call(state, crawl_result)
         crawl_output = crawl_result.get("output") or {}
         sample_count = _safe_int(crawl_output.get("sample_count"), 0)
 
         if sample_count < 3:
             _log(state, f"agent2:fallback:sample_count={sample_count}<3 → rag_price_tool")
-            rag_result = _run_async(rag_price_tool(product))
+            rag_result = _run_async(lambda: rag_price_tool(product))
             _record_tool_call(state, rag_result)
 
         market_context_result = {

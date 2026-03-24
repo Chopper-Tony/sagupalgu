@@ -40,8 +40,15 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _run_async(coro):
-    """동기 컨텍스트에서 async 도구 실행"""
+def _run_async(coro_or_factory):
+    """동기 컨텍스트에서 async 도구 실행.
+
+    callable(lambda)이 전달되면 호출해서 코루틴을 생성한다.
+    이를 통해 테스트에서 _run_async를 mock할 때 코루틴이 미리 생성되지 않아
+    'coroutine never awaited' RuntimeWarning을 방지한다.
+    """
+    import inspect
+    coro = coro_or_factory() if callable(coro_or_factory) and not inspect.iscoroutine(coro_or_factory) else coro_or_factory
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():

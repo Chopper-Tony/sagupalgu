@@ -42,7 +42,7 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
         except Exception:
             pass
 
-    opt_call = _run_async(price_optimization_tool(
+    opt_call = _run_async(lambda: price_optimization_tool(
         canonical_listing=canonical,
         confirmed_product=product,
         sale_status=sale_status,

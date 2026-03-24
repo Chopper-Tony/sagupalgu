@@ -99,17 +99,16 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
         if llm is None:
             raise ValueError("LLM 초기화 실패 — API 키 확인 필요")
 
-        from langgraph.prebuilt import create_react_agent
-        agent = create_react_agent(
+        from langchain.agents import create_agent
+        agent = create_agent(
             llm,
             [lc_generate_listing_tool, lc_rewrite_listing_tool],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
         _log(state, "agent3:react_agent:invoking LLM with tools=[generate_listing, rewrite_listing]")
-        result = _run_async(agent.ainvoke({
-            "messages": [HumanMessage(content=user_prompt)]
-        }))
+        msgs = [HumanMessage(content=user_prompt)]
+        result = _run_async(lambda: agent.ainvoke({"messages": msgs}))
 
         for msg in result.get("messages", []):
             if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -153,7 +152,7 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
         try:
             from app.services.listing_service import ListingService
             svc = ListingService()
-            new_listing = _run_async(svc.build_canonical_listing(
+            new_listing = _run_async(lambda: svc.build_canonical_listing(
                 confirmed_product=product,
                 market_context=market_context,
                 strategy=strategy,

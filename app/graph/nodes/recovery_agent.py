@@ -90,17 +90,16 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
         if llm is None:
             raise ValueError("LLM 초기화 실패")
 
-        from langgraph.prebuilt import create_react_agent
-        agent = create_react_agent(
+        from langchain.agents import create_agent
+        agent = create_agent(
             llm,
             [lc_diagnose_publish_failure_tool, lc_auto_patch_tool, lc_discord_alert_tool],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
         _log(state, "agent4:react_agent:invoking LLM with tools=[diagnose, auto_patch, discord_alert]")
-        result = _run_async(agent.ainvoke({
-            "messages": [HumanMessage(content=user_prompt)]
-        }))
+        msgs = [HumanMessage(content=user_prompt)]
+        result = _run_async(lambda: agent.ainvoke({"messages": msgs}))
 
         for msg in result.get("messages", []):
             if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -159,7 +158,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
             _record_tool_call(state, diag_call)
             diag = diag_call.get("output") or {}
 
-            patch_call = _run_async(auto_patch_tool(
+            patch_call = _run_async(lambda: auto_patch_tool(
                 platform=platform,
                 likely_cause=diag.get("likely_cause", "unknown"),
                 canonical_listing=canonical,
@@ -176,7 +175,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
                 f"[{platform}] 게시 실패 | 원인: {diag.get('likely_cause')} | "
                 f"패치: {patch.get('type')} | 자동실행: {patch.get('auto_executable')}"
             )
-            _run_async(discord_alert_tool(
+            _run_async(lambda: discord_alert_tool(
                 message=alert_msg,
                 session_id=session_id,
                 level="error",
