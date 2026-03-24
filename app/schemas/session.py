@@ -7,8 +7,10 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Literal, Optional
+from pydantic import BaseModel, Field, field_validator
+
+VALID_PLATFORMS: frozenset[str] = frozenset({"bunjang", "joongna"})
 
 
 # ── 에러 응답 ──────────────────────────────────────────────────────
@@ -118,7 +120,18 @@ class SaleStatusResponse(SessionUIResponse):
 # ── 요청 스키마 ────────────────────────────────────────────────────
 
 class UploadImagesRequest(BaseModel):
-    image_urls: List[str]
+    image_urls: List[str] = Field(..., min_length=1, description="업로드할 이미지 URL 목록 (최소 1개)")
+
+    @field_validator("image_urls")
+    @classmethod
+    def validate_image_urls(cls, urls: List[str]) -> List[str]:
+        for url in urls:
+            stripped = url.strip()
+            if not stripped:
+                raise ValueError("빈 URL은 허용되지 않습니다")
+            if not (stripped.startswith("http://") or stripped.startswith("https://")):
+                raise ValueError(f"유효한 HTTP(S) URL이 아닙니다: {stripped!r}")
+        return [u.strip() for u in urls]
 
 
 class ConfirmProductRequest(BaseModel):
@@ -132,7 +145,17 @@ class ProvideProductInfoRequest(BaseModel):
 
 
 class PreparePublishRequest(BaseModel):
-    platform_targets: List[str]
+    platform_targets: List[str] = Field(..., min_length=1, description="게시 대상 플랫폼 목록")
+
+    @field_validator("platform_targets")
+    @classmethod
+    def validate_platforms(cls, targets: List[str]) -> List[str]:
+        invalid = [t for t in targets if t not in VALID_PLATFORMS]
+        if invalid:
+            raise ValueError(
+                f"지원하지 않는 플랫폼: {invalid}. 허용값: {sorted(VALID_PLATFORMS)}"
+            )
+        return targets
 
 
 class RewriteListingRequest(BaseModel):
@@ -140,4 +163,6 @@ class RewriteListingRequest(BaseModel):
 
 
 class SaleStatusRequest(BaseModel):
-    sale_status: str = Field(..., description="sold | unsold | in_progress")
+    sale_status: Literal["sold", "unsold", "in_progress"] = Field(
+        ..., description="sold | unsold | in_progress"
+    )

@@ -5,6 +5,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.session_router import router as session_router
 from app.core.config import settings
@@ -23,6 +24,16 @@ configure_logging(level="DEBUG" if settings.debug else "INFO")
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
+)
+
+# CORS — ALLOWED_ORIGINS 환경변수로 제어 (prod에서는 실제 도메인으로 제한)
+_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.add_middleware(RequestIdMiddleware)
