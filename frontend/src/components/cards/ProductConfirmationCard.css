@@ -1,0 +1,156 @@
+.product-confirm-card {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.product-confirm-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.product-confirm-card__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.product-confirm-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 4px;
+}
+
+.product-confirm-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* 후보 목록 */
+.product-confirm-card__candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-confirm-card__candidate {
+  background: #16213e;
+  border: 1px solid #2a3a5e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+
+.product-confirm-card__candidate:hover {
+  border-color: #2563eb;
+}
+
+.product-confirm-card__candidate-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.product-confirm-card__candidate-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ececec;
+}
+
+.product-confirm-card__candidate-category {
+  font-size: 12px;
+  color: #888;
+  background: #2a2a2e;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.product-confirm-card__confidence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-confirm-card__confidence-bar {
+  height: 4px;
+  background: #2563eb;
+  border-radius: 2px;
+  max-width: 120px;
+}
+
+.product-confirm-card__confidence-label {
+  font-size: 11px;
+  color: #888;
+}
+
+/* 직접 입력 */
+.product-confirm-card__manual {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid #2a2a2e;
+}
+
+.product-confirm-card__manual-label {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+.product-confirm-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-confirm-card__input {
+  background: #0f0f10;
+  border: 1px solid #3a3a3e;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #ececec;
+  font-size: 13px;
+}
+
+.product-confirm-card__input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.product-confirm-card__input::placeholder {
+  color: #555;
+}
+
+.product-confirm-card__submit {
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.product-confirm-card__submit:disabled {
+  background: #2a2a2e;
+  color: #555;
+  cursor: default;
+}
+
+.product-confirm-card__submit:not(:disabled):hover {
+  background: #1d4ed8;
+}

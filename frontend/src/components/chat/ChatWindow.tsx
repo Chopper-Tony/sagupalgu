@@ -1,22 +1,84 @@
 import { useEffect, useRef } from "react";
-import type { TimelineItem, SessionStatus } from "../../types";
+import type { TimelineItem, SessionStatus, SessionResponse } from "../../types";
 import { ProgressCard } from "../cards/ProgressCard";
 import { ErrorCard } from "../cards/ErrorCard";
+import { ImageUploadCard } from "../cards/ImageUploadCard";
+import { ProductConfirmationCard } from "../cards/ProductConfirmationCard";
+import { DraftCard } from "../cards/DraftCard";
+import { PublishApprovalCard } from "../cards/PublishApprovalCard";
+import { PublishResultCard } from "../cards/PublishResultCard";
 import "./ChatWindow.css";
 
 interface ChatWindowProps {
   items: TimelineItem[];
   currentStatus: SessionStatus | null;
-  /** 카드 액션 콜백 (M17에서 각 카드 컴포넌트 연결 시 사용) */
-  onAction?: (action: string, payload?: unknown) => void;
+  session: SessionResponse | null;
+  onAction: (action: string, payload?: unknown) => void;
 }
 
-export function ChatWindow({ items, currentStatus, onAction }: ChatWindowProps) {
+export function ChatWindow({ items, currentStatus, session, onAction }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
+
+  const renderCard = (item: Extract<TimelineItem, { type: "card" }>) => {
+    switch (item.cardType) {
+      case "ImageUploadCard":
+        return (
+          <ImageUploadCard
+            onUpload={(files) => onAction("upload_images", files)}
+          />
+        );
+
+      case "ProductConfirmationCard":
+        return (
+          <ProductConfirmationCard
+            candidates={session?.product_candidates ?? []}
+            clarificationPrompt={session?.clarification_prompt ?? null}
+            onConfirm={(product) => onAction("confirm_product", product)}
+          />
+        );
+
+      case "DraftCard":
+        if (!session?.canonical_listing) return null;
+        return (
+          <DraftCard
+            listing={session.canonical_listing}
+            marketContext={session.market_context ?? null}
+            onApprove={(platforms) => onAction("prepare_publish", platforms)}
+            onRewrite={(instruction) => onAction("rewrite", instruction)}
+          />
+        );
+
+      case "PublishApprovalCard":
+        if (!session?.canonical_listing) return null;
+        return (
+          <PublishApprovalCard
+            listing={session.canonical_listing}
+            platforms={session.platform_results?.map((r) => r.platform) ?? ["번개장터", "중고나라"]}
+            onPublish={() => onAction("publish")}
+            onEdit={() => onAction("edit_draft")}
+          />
+        );
+
+      case "PublishResultCard":
+        return (
+          <PublishResultCard
+            results={session?.platform_results ?? []}
+            onUpdateSaleStatus={() => onAction("update_sale_status")}
+          />
+        );
+
+      default:
+        return (
+          <div className="chat-window__card-placeholder">
+            [{item.cardType}] — 구현 예정
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="chat-window">
@@ -46,13 +108,7 @@ export function ChatWindow({ items, currentStatus, onAction }: ChatWindowProps) 
             );
           }
           if (item.type === "progress") {
-            return (
-              <ProgressCard
-                key={item.id}
-                status={item.status}
-                message={item.message}
-              />
-            );
+            return <ProgressCard key={item.id} status={item.status} message={item.message} />;
           }
           if (item.type === "error") {
             return (
@@ -66,12 +122,7 @@ export function ChatWindow({ items, currentStatus, onAction }: ChatWindowProps) 
             );
           }
           if (item.type === "card") {
-            // M17에서 각 카드 컴포넌트로 교체
-            return (
-              <div key={item.id} className="chat-window__card-placeholder">
-                [{item.cardType}] — M17 구현 예정
-              </div>
-            );
+            return <div key={item.id}>{renderCard(item)}</div>;
           }
           return null;
         })}

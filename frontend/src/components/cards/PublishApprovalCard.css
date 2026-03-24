@@ -1,0 +1,98 @@
+.publish-approval-card {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.publish-approval-card__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.publish-approval-card__icon { font-size: 20px; flex-shrink: 0; }
+
+.publish-approval-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0 0 4px;
+}
+
+.publish-approval-card__subtitle {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.publish-approval-card__summary {
+  background: #0f0f10;
+  border: 1px solid #2a2a2e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.publish-approval-card__listing-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ececec;
+  margin: 0;
+}
+
+.publish-approval-card__price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #34d399;
+  margin: 0;
+}
+
+.publish-approval-card__platforms {
+  display: flex;
+  gap: 8px;
+}
+
+.publish-approval-card__platform {
+  font-size: 12px;
+  color: #60a5fa;
+  background: #16213e;
+  border: 1px solid #2a3a5e;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.publish-approval-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.publish-approval-card__publish-btn {
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.publish-approval-card__publish-btn:hover { background: #1d4ed8; }
+
+.publish-approval-card__edit-btn {
+  background: transparent;
+  border: 1px solid #3a3a3e;
+  border-radius: 6px;
+  padding: 10px 20px;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.publish-approval-card__edit-btn:hover { border-color: #888; color: #ececec; }
