@@ -210,10 +210,10 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (137개)
+# 테스트 전체 (185개)
 python -m pytest tests/
 
-# unit 테스트만 (langchain 불필요, 0.12s)
+# unit 테스트만 (langchain 불필요, 0.56s)
 python -m pytest tests/ -m unit
 
 # integration 테스트만
@@ -245,6 +245,7 @@ python -m pytest tests/ -m integration
 | M19: FastAPI DI 완성 | ✅ 완료 | app/dependencies.py 신설(lru_cache 싱글턴 + Depends 체인 6개 서비스) ✅, session_router.py 전역 인스턴스 제거 → Depends(get_session_service) 전환(11개 엔드포인트) ✅, SessionRepository import 라우터에서 제거 ✅, app.dependency_overrides로 mock 주입 가능(테스트 격리 준비) ✅, 137/137 테스트 통과 ✅ |
 | M20: Docker 풀스택 통합·AWS 배포 준비 | ✅ 완료 | frontend/Dockerfile 신설(node:20-alpine 멀티스테이지 빌드 + nginx:alpine 서빙) ✅, frontend/nginx.conf(SPA routing + /api/ 백엔드 프록시 + 정적자산 캐시) ✅, docker-compose.yml backend+frontend 풀스택 구성(healthcheck depends_on) ✅, frontend/.dockerignore 추가 ✅, ci.yml frontend-build 잡 추가(node:20 캐시·npm ci·npm run build) + docker-build가 두 이미지 빌드 ✅, docs/deployment.md AWS EC2 배포 가이드(Docker 설치·환경변수·실행·HTTPS·모니터링·트러블슈팅) ✅, 137/137 테스트 통과·빌드 에러 0 ✅ |
 | M21: LLMAdapter·StateCoordinator 분리·gitignore 보완 | ✅ 완료 | app/services/listing_llm.py 신설(OpenAI/Gemini/Solar HTTP 호출 어댑터·fallback dispatch·규칙 기반 폴백, listing_service에서 300줄 분리) ✅, app/services/session_meta.py 신설(workflow_meta 순수 함수 9개, session_service 인라인 meta 조작 제거) ✅, listing_service.py → generate_copy() 단순 호출(LLM 세부사항 완전 분리) ✅, session_service.py → _append_tool_calls 인스턴스 메서드 제거·datetime import 제거 ✅, .gitignore frontend/node_modules·frontend/dist 명시 추가 ✅, 137/137 테스트 통과 ✅ |
+| M22: 신설 모듈 unit 테스트 확충 | ✅ 완료 | test_session_meta.py(9개 순수 함수 27개 케이스) ✅, test_listing_llm.py(build_template_copy·3 provider·fallback dispatch 21개 케이스, mock httpx) ✅, 137→185 테스트 통과·unit 단독 0.56s ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
