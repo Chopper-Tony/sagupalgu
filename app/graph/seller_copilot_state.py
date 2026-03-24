@@ -159,6 +159,13 @@ class SellerCopilotState(TypedDict, total=False):
 
     # ── 에이전틱 핵심 필드 ──────────────────────────────────────────
 
+    # ── Critic / Rewrite 루프 ────────────────────────────────────────
+    critic_score: int                           # 0~100
+    critic_feedback: List[Dict[str, Any]]       # [{type, impact, reason}]
+    critic_rewrite_instructions: List[str]      # critic이 발행한 수정 지시
+    critic_retry_count: int                     # rewrite 재시도 횟수
+    max_critic_retries: int                     # rewrite 최대 횟수 (기본 2)
+
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
 
@@ -207,6 +214,11 @@ def create_initial_state(
         canonical_listing=None,
         platform_packages={},
         rewrite_instruction=None,
+        critic_score=0,
+        critic_feedback=[],
+        critic_rewrite_instructions=[],
+        critic_retry_count=0,
+        max_critic_retries=2,
         validation_passed=False,
         validation_result=ValidationResult(passed=False, issues=[]),
         validation_retry_count=0,
