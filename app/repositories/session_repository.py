@@ -34,13 +34,15 @@ class SessionRepository:
         data = response.data or []
         return data[0] if data else None
 
-    def update(self, session_id: str, payload: dict):
+    def update(self, session_id: str, payload: dict, expected_status: str | None = None):
         payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-        response = (
+        query = (
             get_supabase()
             .table(self.table_name)
             .update(payload)
             .eq("id", session_id)
-            .execute()
         )
+        if expected_status:
+            query = query.eq("status", expected_status)
+        response = query.execute()
         return response.data[0] if response.data else None

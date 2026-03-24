@@ -185,7 +185,7 @@ class TestHealthEndpoint:
     def test_status_ok(self, api_client):
         resp = api_client.get("/health")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["status"] in ("ready", "degraded")
 
     @pytest.mark.integration
     def test_service_name_present(self, api_client):

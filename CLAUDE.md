@@ -225,7 +225,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (338개)
+# 테스트 전체 (340개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -274,6 +274,7 @@ python -m pytest tests/ -m integration
 | M33: 상태 전이 계약 + UI 응답 shape 검증 | ✅ 완료 | test_status_contract.py 신설(14개: ALLOWED_TRANSITIONS 완전성·전이 대상 유효성·self-loop 검증·터미널 상태·resolve_next_action 전수·happy path 체인·UI 응답 shape×13상태·섹션 존재 검증) ✅, 324→338 테스트 통과 ✅ |
 | M34: langgraph import 격리 | ✅ 완료 | seller_copilot_graph.py eager import → build 내부 lazy import 전환 ✅, _LazyGraphProxy + _get_compiled_graph로 lazy 빌드 구조 전환 ✅, seller_copilot_runner.py _get_graph() lazy 호출로 변경 ✅, clean env(langgraph 미설치) pytest 수집 통과 ✅, 324/324 테스트 통과 ✅ |
 | M35: rewrite 출력 계약 봉합 + datetime 경고 제거 | ✅ 완료 | copywriting_agent.py _normalize_listing() 신설(ReAct 결과→CanonicalListingSchema 검증, 필수 키 보장 fallback) ✅, session_meta.py datetime.utcnow()→datetime.now(timezone.utc) 전환(DeprecationWarning 제거) ✅, 338/338 테스트 통과·경고 0개 ✅ |
+| M36: CTO2 지적 대응 — 노드 분리·예외 세분화·운영성 보강 | ✅ 완료 | copywriting_node 3함수 분리(_run_copywriting_agent·_extract_listing_payload·_build_prompts + 기존 _normalize_listing·_fallback_generate) ✅, InvalidUserInputError·SessionUpdateError 도메인 예외 신설(ValueError 6곳→도메인 예외 전환) ✅, repository.update() expected_status 조건부 업데이트(race condition 방어) ✅, /health/live·/health/ready 분리(readiness probe 보강) ✅, 338→340 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
