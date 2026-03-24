@@ -1,12 +1,18 @@
 """
 사구팔구 도메인 예외 계층.
 
-HTTP 매핑:
-  SessionNotFoundError         → 404
-  InvalidStateTransitionError  → 409
-  ListingGenerationError        → 500
-  ListingRewriteError           → 500
-  PublishExecutionError         → 502
+예외 매핑 정책 (전체 프로젝트 단일 기준):
+  SessionNotFoundError         → HTTP 404  (세션 없음)
+  InvalidStateTransitionError  → HTTP 409  (허용되지 않은 상태 전이)
+  ListingGenerationError       → HTTP 500  (판매글 생성 실패)
+  ListingRewriteError          → HTTP 500  (판매글 재작성 실패)
+  PublishExecutionError        → HTTP 502  (게시 실행 중 복구 불가 오류)
+
+  범용 ValueError              → HTTP 400  (입력 검증 실패 — 위 타입에 해당하지 않는 것)
+
+매핑 적용 위치:
+  app/main.py           — 글로벌 exception_handler (FastAPI 앱 레벨)
+  app/api/session_router.py — _domain_error 헬퍼 (라우터 레벨 명시)
 """
 from __future__ import annotations
 

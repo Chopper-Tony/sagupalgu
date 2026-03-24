@@ -29,8 +29,8 @@ PUBLIC_SYMBOLS = [
     # Agent 5
     "price_optimization_tool",
     # 공통 헬퍼
-    "_make_tool_call",
-    "_extract_json",
+    "make_tool_call",
+    "extract_json",
 ]
 
 # ── 노출 금지 심볼 (구현 내부) ─────────────────────────────────────

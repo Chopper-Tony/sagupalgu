@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from app.tools._common import _make_tool_call
+from app.tools._common import make_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ async def price_optimization_tool(
     try:
         current_price = int(canonical_listing.get("price", 0) or 0)
         if sale_status != "unsold" or current_price <= 0:
-            return _make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=True)
+            return make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=True)
 
         if days_listed >= 14:
             drop_rate, urgency = 0.10, "high"
@@ -41,7 +41,7 @@ async def price_optimization_tool(
             "reason": f"{days_listed}일간 미판매 — {int(drop_rate*100)}% 인하 제안",
             "urgency": urgency,
         }
-        return _make_tool_call("price_optimization_tool", tool_input, output, success=True)
+        return make_tool_call("price_optimization_tool", tool_input, output, success=True)
 
     except Exception as e:
-        return _make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=False, error=str(e))
+        return make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=False, error=str(e))
