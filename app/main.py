@@ -12,11 +12,13 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.domain.exceptions import (
     InvalidStateTransitionError,
+    InvalidUserInputError,
     ListingGenerationError,
     ListingRewriteError,
     PublishExecutionError,
     SagupalguError,
     SessionNotFoundError,
+    SessionUpdateError,
 )
 from app.middleware.request_id import RequestIdMiddleware
 
@@ -49,7 +51,9 @@ app.add_middleware(RequestIdMiddleware)
 
 _DOMAIN_STATUS_MAP: dict[type, tuple[int, str]] = {
     SessionNotFoundError: (404, "session_not_found"),
+    InvalidUserInputError: (400, "invalid_user_input"),
     InvalidStateTransitionError: (409, "invalid_state_transition"),
+    SessionUpdateError: (500, "session_update_error"),
     ListingGenerationError: (500, "listing_error"),
     ListingRewriteError: (500, "listing_error"),
     PublishExecutionError: (502, "publish_execution_error"),
@@ -73,18 +77,33 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 
-@app.get("/health")
-def health():
+@app.get("/health/live")
+def health_live():
+    """Liveness probe — 프로세스 살아있음."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Readiness probe — 외부 의존성 준비 상태 확인."""
     checks = {
         "supabase_url": bool(settings.supabase_url),
+        "supabase_key": bool(settings.supabase_service_role_key),
         "openai_key": bool(settings.openai_api_key),
         "gemini_key": bool(settings.gemini_api_key),
     }
+    all_ready = all(checks.values())
     return {
-        "status": "ok",
+        "status": "ready" if all_ready else "degraded",
         "service": settings.app_name,
         "environment": settings.environment,
         "checks": checks,
     }
+
+
+@app.get("/health")
+def health():
+    """하위 호환 — /health/ready와 동일."""
+    return health_ready()
 
 app.include_router(session_router, prefix=settings.api_v1_prefix)

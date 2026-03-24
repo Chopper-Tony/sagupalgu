@@ -38,3 +38,11 @@ class ListingRewriteError(SagupalguError):
 
 class PublishExecutionError(SagupalguError):
     """게시 실행 중 복구 불가능한 오류 발생."""
+
+
+class InvalidUserInputError(SagupalguError):
+    """사용자 입력이 유효하지 않음 (이미지 없음, 모델명 빈값 등)."""
+
+
+class SessionUpdateError(SagupalguError):
+    """세션 DB 업데이트 실패."""

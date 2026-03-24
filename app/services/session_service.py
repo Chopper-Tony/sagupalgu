@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from app.core.utils import safe_int as _safe_int
-from app.domain.exceptions import SessionNotFoundError
+from app.domain.exceptions import InvalidUserInputError, SessionNotFoundError, SessionUpdateError
 from app.domain.session_status import assert_allowed_transition
 from app.repositories.session_repository import SessionRepository
 from app.services.optimization_service import OptimizationService
@@ -84,7 +84,7 @@ class SessionService:
         product_data = dict(session.get("product_data_jsonb") or {})
         image_paths = product_data.get("image_paths") or []
         if not image_paths:
-            raise ValueError("이미지가 없습니다")
+            raise InvalidUserInputError("이미지가 없습니다")
 
         result = await self.product_service.identify_product(image_paths)
         product_data, needs_input = apply_analysis_result(
@@ -157,7 +157,7 @@ class SessionService:
     async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
         session = self._ensure_transition(session_id, "draft_generated")
         if not instruction or not instruction.strip():
-            raise ValueError("재작성 지시사항이 필요합니다")
+            raise InvalidUserInputError("재작성 지시사항이 필요합니다")
 
         result_payload = await self.copilot_service.run_rewrite_pipeline(
             session_id=session_id, session_record=session,
@@ -180,12 +180,12 @@ class SessionService:
     async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
         session = self._ensure_transition(session_id, "awaiting_publish_approval")
         if not platform_targets:
-            raise ValueError("플랫폼을 선택해주세요")
+            raise InvalidUserInputError("플랫폼을 선택해주세요")
 
         listing_data = dict(session.get("listing_data_jsonb") or {})
         canonical = listing_data.get("canonical_listing") or {}
         if _safe_int(canonical.get("price"), 0) <= 0:
-            raise ValueError("유효한 가격이 없습니다. 판매글을 다시 생성해주세요.")
+            raise InvalidUserInputError("유효한 가격이 없습니다. 판매글을 다시 생성해주세요.")
 
         listing_data["platform_packages"] = self.publish_service.build_platform_packages(
             canonical_listing=canonical, platform_targets=platform_targets,
@@ -207,7 +207,7 @@ class SessionService:
         selected = session.get("selected_platforms_jsonb") or []
         packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
         if not selected:
-            raise ValueError("선택된 플랫폼이 없습니다")
+            raise InvalidUserInputError("선택된 플랫폼이 없습니다")
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
         self._update_or_raise(session_id, {"status": "publishing", "workflow_meta_jsonb": workflow_meta})
@@ -233,7 +233,7 @@ class SessionService:
 
     async def update_sale_status(self, session_id: str, sale_status: str) -> Dict:
         if sale_status not in ("sold", "unsold", "in_progress"):
-            raise ValueError("sale_status는 sold / unsold / in_progress 중 하나여야 합니다")
+            raise InvalidUserInputError("sale_status는 sold / unsold / in_progress 중 하나여야 합니다")
 
         session = self._get_or_raise(session_id)
         listing_data = dict(session.get("listing_data_jsonb") or {})
@@ -270,7 +270,7 @@ class SessionService:
     def _update_or_raise(self, session_id: str, payload: Dict) -> Dict:
         result = self.repo.update(session_id=session_id, payload=payload)
         if not result:
-            raise ValueError(f"세션 업데이트 실패: {session_id}")
+            raise SessionUpdateError(f"세션 업데이트 실패: {session_id}")
         return result
 
     def _ensure_transition(self, session_id: str, next_status: str) -> Dict:

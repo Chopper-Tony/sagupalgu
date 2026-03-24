@@ -11,7 +11,21 @@ class TestHealth:
     def test_health_ok(self, client):
         resp = client.get("/health")
         assert resp.status_code == 200
+        assert resp.json()["status"] in ("ready", "degraded")
+
+    @pytest.mark.integration
+    def test_health_live(self, client):
+        resp = client.get("/health/live")
+        assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
+
+    @pytest.mark.integration
+    def test_health_ready_has_checks(self, client):
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "checks" in data
+        assert "supabase_url" in data["checks"]
 
 
 class TestCreateSession:
