@@ -1,4 +1,7 @@
+from typing import Awaitable, Type, TypeVar
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.dependencies import get_session_service
 from app.domain.exceptions import (
@@ -33,6 +36,8 @@ from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
+T = TypeVar("T", bound=BaseModel)
+
 
 def _api_error(status_code: int, error: str, message: str) -> HTTPException:
     """통일된 에러 응답 생성."""
@@ -55,17 +60,29 @@ def _domain_error(exc: SagupalguError) -> HTTPException:
     return _api_error(500, "domain_error", str(exc))
 
 
+async def _handle(
+    coro: Awaitable[dict],
+    response_cls: Type[T],
+    error_key: str,
+) -> T:
+    """공통 에러 핸들링 래퍼: 도메인 예외·ValueError를 HTTP 에러로 변환."""
+    try:
+        result = await coro
+        return response_cls(**result)
+    except SagupalguError as e:
+        raise _domain_error(e)
+    except ValueError as e:
+        raise _api_error(400, error_key, str(e))
+
+
 @router.post("", response_model=CreateSessionResponse)
 async def create_session(
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.create_session(user_id="temp-user-id")
-        return CreateSessionResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "create_session_failed", str(e))
+    return await _handle(
+        session_service.create_session(user_id="temp-user-id"),
+        CreateSessionResponse, "create_session_failed",
+    )
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)
@@ -73,13 +90,10 @@ async def get_session(
     session_id: str,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        session_ui = await session_service.get_session(session_id)
-        return SessionDetailResponse(**session_ui)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "session_not_found", str(e))
+    return await _handle(
+        session_service.get_session(session_id),
+        SessionDetailResponse, "session_not_found",
+    )
 
 
 @router.post("/{session_id}/images", response_model=UploadImagesResponse)
@@ -88,16 +102,10 @@ async def upload_images(
     request: UploadImagesRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.attach_images(
-            session_id=session_id,
-            image_urls=request.image_urls,
-        )
-        return UploadImagesResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "upload_images_failed", str(e))
+    return await _handle(
+        session_service.attach_images(session_id=session_id, image_urls=request.image_urls),
+        UploadImagesResponse, "upload_images_failed",
+    )
 
 
 @router.post("/{session_id}/analyze", response_model=AnalyzeSessionResponse)
@@ -105,13 +113,10 @@ async def analyze_session(
     session_id: str,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.analyze_session(session_id=session_id)
-        return AnalyzeSessionResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "analyze_failed", str(e))
+    return await _handle(
+        session_service.analyze_session(session_id=session_id),
+        AnalyzeSessionResponse, "analyze_failed",
+    )
 
 
 @router.post("/{session_id}/confirm-product", response_model=ConfirmProductResponse)
@@ -120,16 +125,10 @@ async def confirm_product(
     request: ConfirmProductRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.confirm_product(
-            session_id=session_id,
-            candidate_index=request.candidate_index,
-        )
-        return ConfirmProductResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "confirm_product_failed", str(e))
+    return await _handle(
+        session_service.confirm_product(session_id=session_id, candidate_index=request.candidate_index),
+        ConfirmProductResponse, "confirm_product_failed",
+    )
 
 
 @router.post("/{session_id}/provide-product-info", response_model=ProvideProductInfoResponse)
@@ -138,18 +137,13 @@ async def provide_product_info(
     request: ProvideProductInfoRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.provide_product_info(
-            session_id=session_id,
-            model=request.model,
-            brand=request.brand,
-            category=request.category,
-        )
-        return ProvideProductInfoResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "provide_product_info_failed", str(e))
+    return await _handle(
+        session_service.provide_product_info(
+            session_id=session_id, model=request.model,
+            brand=request.brand, category=request.category,
+        ),
+        ProvideProductInfoResponse, "provide_product_info_failed",
+    )
 
 
 @router.post("/{session_id}/generate-listing", response_model=GenerateListingResponse)
@@ -157,13 +151,10 @@ async def generate_listing(
     session_id: str,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.generate_listing(session_id=session_id)
-        return GenerateListingResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "generate_listing_failed", str(e))
+    return await _handle(
+        session_service.generate_listing(session_id=session_id),
+        GenerateListingResponse, "generate_listing_failed",
+    )
 
 
 @router.post("/{session_id}/prepare-publish", response_model=PreparePublishResponse)
@@ -172,16 +163,10 @@ async def prepare_publish(
     request: PreparePublishRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.prepare_publish(
-            session_id=session_id,
-            platform_targets=request.platform_targets,
-        )
-        return PreparePublishResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "prepare_publish_failed", str(e))
+    return await _handle(
+        session_service.prepare_publish(session_id=session_id, platform_targets=request.platform_targets),
+        PreparePublishResponse, "prepare_publish_failed",
+    )
 
 
 @router.post("/{session_id}/publish", response_model=PublishResponse)
@@ -189,13 +174,10 @@ async def publish_session(
     session_id: str,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.publish_session(session_id=session_id)
-        return PublishResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "publish_failed", str(e))
+    return await _handle(
+        session_service.publish_session(session_id=session_id),
+        PublishResponse, "publish_failed",
+    )
 
 
 @router.post("/{session_id}/rewrite-listing", response_model=RewriteListingResponse)
@@ -204,16 +186,10 @@ async def rewrite_listing(
     request: RewriteListingRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.rewrite_listing(
-            session_id=session_id,
-            instruction=request.instruction,
-        )
-        return RewriteListingResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "rewrite_listing_failed", str(e))
+    return await _handle(
+        session_service.rewrite_listing(session_id=session_id, instruction=request.instruction),
+        RewriteListingResponse, "rewrite_listing_failed",
+    )
 
 
 @router.post("/{session_id}/sale-status", response_model=SaleStatusResponse)
@@ -222,13 +198,7 @@ async def update_sale_status(
     request: SaleStatusRequest,
     session_service: SessionService = Depends(get_session_service),
 ):
-    try:
-        result = await session_service.update_sale_status(
-            session_id=session_id,
-            sale_status=request.sale_status,
-        )
-        return SaleStatusResponse(**result)
-    except SagupalguError as e:
-        raise _domain_error(e)
-    except ValueError as e:
-        raise _api_error(400, "update_sale_status_failed", str(e))
+    return await _handle(
+        session_service.update_sale_status(session_id=session_id, sale_status=request.sale_status),
+        SaleStatusResponse, "update_sale_status_failed",
+    )

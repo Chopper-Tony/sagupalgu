@@ -251,8 +251,9 @@ python -m pytest tests/ -m integration
 | M22: 신설 모듈 unit 테스트 확충 | ✅ 완료 | test_session_meta.py(9개 순수 함수 27개 케이스) ✅, test_listing_llm.py(build_template_copy·3 provider·fallback dispatch 21개 케이스, mock httpx) ✅, 137→185 테스트 통과·unit 단독 0.56s ✅ |
 | M23: API 엔드포인트 통합 테스트 | ✅ 완료 | test_session_api.py 신설(TestClient + dependency_overrides mock 주입) ✅, 엔드포인트 11개 전부 커버(정상·422·도메인 예외→HTTP 매핑 36개 케이스) ✅, SessionNotFoundError→404·InvalidStateTransitionError→409·ListingGenerationError→500·PublishExecutionError→502 전수 검증 ✅, 185→221 테스트 통과 ✅ |
 | M24: 관찰 가능성(Observability) 기반 구축 | ✅ 완료 | app/core/logging.py 신설(JsonFormatter·configure_logging·contextvars request_id 자동 포함) ✅, app/middleware/request_id.py 신설(X-Request-ID 전파·UUID4 자동 발급·응답 헤더 포함) ✅, main.py 미들웨어 등록·/health 상세화(environment·checks 필드) ✅, test_observability.py(19개: JsonFormatter·contextvars·미들웨어·헬스체크) ✅, 221→240 테스트 통과 ✅ |
-| M25: Supabase Storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 신설(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py(7개 unit: 업로드·공개URL·파일명 자동생성·content-type·upsert·버킷 위임) ✅, 240→247 테스트 통과 ✅ |
-| M26: 보안·운영 강화 (입력 검증·CORS) | ✅ 완료 | UploadImagesRequest @field_validator(HTTP(S) URL 검증·빈값 거부·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS frozenset 검증) ✅, SaleStatusRequest sale_status Literal 타입 강제 ✅, config.py allowed_origins 필드·main.py CORSMiddleware 등록 ✅, test_security.py(22개: CORS·URL검증·플랫폼검증·SaleStatus) ✅, test_session_api.py 스키마 강화 호환 수정 ✅, 247→269 테스트 통과 ✅ |
+| M25: Supabase storage 클라이언트 | ✅ 완료 | app/storage/storage_client.py 쌍(upload_image·get_public_url, lazy import + lru_cache 싱글턴) ✅, config.py storage_bucket_name 필드 추가 ✅, test_storage_client.py 7개 추가 ✅ |
+| M26: 보안·운영 강화(CORS) | ✅ 완료 | UploadImagesRequest field validator(HTTP(S) URL 검증·빈값·whitespace strip) ✅, PreparePublishRequest @field_validator(VALID_PLATFORMS·frozenset 검증) ✅, SaleStatusRequest Literal 타입 강화 ✅, test_security.py 22개 추가 ✅ |
+| M27: DI required 전환·Router 정리 | ✅ 완료 | SessionService DI required 전환 ✅, app/middleware/request_id.py 제거 후 optional-required 전환 및 fallback 제거 ✅, session_router.py 전역 서비스 제거/try-except 정리 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
