@@ -8,6 +8,7 @@
 """
 import pytest
 
+from app.domain.exceptions import InvalidStateTransitionError
 from app.domain.session_status import (
     ALLOWED_TRANSITIONS,
     TERMINAL_STATUSES,
@@ -97,32 +98,32 @@ class TestBlockedTransitions:
 
     @pytest.mark.unit
     def test_session_created_cannot_skip_to_draft(self):
-        with pytest.raises(ValueError, match="허용되지 않은 상태 전이"):
+        with pytest.raises(InvalidStateTransitionError, match="허용되지 않은 상태 전이"):
             assert_allowed_transition("session_created", "draft_generated")
 
     @pytest.mark.unit
     def test_completed_cannot_go_back_to_publishing(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             assert_allowed_transition("completed", "publishing")
 
     @pytest.mark.unit
     def test_optimization_suggested_is_terminal(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             assert_allowed_transition("optimization_suggested", "draft_generated")
 
     @pytest.mark.unit
     def test_failed_is_terminal(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             assert_allowed_transition("failed", "session_created")
 
     @pytest.mark.unit
     def test_unknown_status_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             assert_allowed_transition("nonexistent_status", "images_uploaded")
 
     @pytest.mark.unit
     def test_error_message_contains_current_and_next(self):
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
             assert_allowed_transition("session_created", "completed")
         msg = str(exc_info.value)
         assert "session_created" in msg
@@ -130,7 +131,7 @@ class TestBlockedTransitions:
 
     @pytest.mark.unit
     def test_error_message_contains_allowed_list(self):
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
             assert_allowed_transition("session_created", "completed")
         msg = str(exc_info.value)
         assert "images_uploaded" in msg  # allowed에 images_uploaded가 있어야 함

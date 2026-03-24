@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
+from app.domain.exceptions import InvalidStateTransitionError
+
 # ── 모든 세션 상태 ──────────────────────────────────────────────────
 SessionStatus = Literal[
     "session_created",
@@ -51,10 +53,10 @@ def is_terminal_status(status: str) -> bool:
 
 
 def assert_allowed_transition(current: str, next_status: str) -> None:
-    """허용되지 않은 상태 전이 시 ValueError 발생."""
+    """허용되지 않은 상태 전이 시 InvalidStateTransitionError 발생."""
     allowed = ALLOWED_TRANSITIONS.get(current, [])
     if next_status not in allowed:
-        raise ValueError(
+        raise InvalidStateTransitionError(
             f"허용되지 않은 상태 전이: '{current}' → '{next_status}' "
             f"(허용: {allowed})"
         )

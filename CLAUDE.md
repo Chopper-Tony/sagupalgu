@@ -169,7 +169,7 @@ python scripts/manual/run_seller_copilot_graph.py
 # FastAPI 서버 실행
 uvicorn app.main:app --reload
 
-# 테스트 전체 (118개)
+# 테스트 전체 (137개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.12s)
@@ -194,7 +194,8 @@ python -m pytest tests/ -m integration
 | M9: 구조 정리 (데드코드·라우팅 분리·테스트 분할) | ✅ 완료 | app/graph/routing.py 신설(langgraph 의존성 0, unit 라우팅 테스트 8개) ✅, seller_copilot_graph.py에서 중복 라우터 제거·routing.py import ✅, test_agentic_workflow.py → 4파일 분리(product_market/copywriting_validation/recovery_optimization/graph_routing) ✅, conftest.py 공유 픽스처 ✅, 데드코드 legacy_spikes/dead_code/로 이동(app/agents/ 5파일·nodes.py·graph.py) ✅, app/tools/__init__.py 명시적 export ✅, 114/114 테스트 통과 ✅ |
 | M10: import 경계·tool facade 확정 | ✅ 완료 | app/tools/__init__.py 비움(auto-import 제거) ✅, agentic_tools.py public facade 확정(독스트링·contract 명시) ✅, market/listing/recovery_tools.py conditional langchain_core import(미설치 환경 _impl 정상 동작) ✅, SessionService _ensure_transition·_append_tool_calls 헬퍼 추가(8개 메서드 중복 제거) ✅, test_graph_routing.py edge case 5개 추가(총 13개) ✅, 118/118 테스트 통과·unit 0.12s ✅ |
 | M11: facade 일관성·rewrite 경로 정리 | ✅ 완료 | 노드 4개(market/copywriting/recovery/optimization) import → agentic_tools facade 통일(전수 완료) ✅, ListingService.rewrite_listing() 공식 메서드 신설(최초 생성과 재작성 유스케이스 분리) ✅, listing_tools._rewrite_listing_impl monkey patch 제거(svc.rewrite_listing() 직접 호출) ✅, 118/118 테스트 통과 ✅ |
-| M12: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M11 완료 후 진행 |
+| M12: facade 봉인·도메인 예외·HTTP 매핑 | ✅ 완료 | agentic_tools.py에서 _impl re-export 3개 제거(facade 계약 봉인) ✅, app/domain/exceptions.py 도메인 예외 5개 신설(SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502) ✅, assert_allowed_transition → InvalidStateTransitionError 발생 ✅, SessionService._get_or_raise → SessionNotFoundError ✅, main.py 글로벌 exception_handler 5개 ✅, tests/test_agentic_tools_contract.py contract 테스트(공개 심볼 18개·_impl 노출 금지 3개) ✅, 137/137 테스트 통과 ✅ |
+| M13: 배포 준비 | 대기 | Dockerfile, CI(GitHub Actions), 환경변수 정리 — M12 완료 후 진행 |
 
 ## CTO 코드리뷰 점수 이력
 
