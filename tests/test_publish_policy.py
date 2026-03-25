@@ -2,6 +2,7 @@
 import pytest
 
 from app.domain.publish_policy import (
+    DISCORD_ALERT_THRESHOLD,
     FAILURE_TAXONOMY,
     MAX_PUBLISH_RETRIES,
     PUBLISH_TIMEOUT_SECONDS,
@@ -91,6 +92,15 @@ class TestConstants:
     @pytest.mark.unit
     def test_max_retries_is_reasonable(self):
         assert 1 <= MAX_PUBLISH_RETRIES <= 5
+
+    @pytest.mark.unit
+    def test_discord_alert_threshold_is_positive(self):
+        assert DISCORD_ALERT_THRESHOLD >= 1
+
+    @pytest.mark.unit
+    def test_discord_alert_threshold_at_or_above_retries(self):
+        """알림은 최소 재시도 횟수 이상이어야 의미가 있다."""
+        assert DISCORD_ALERT_THRESHOLD >= MAX_PUBLISH_RETRIES
 
     @pytest.mark.unit
     def test_taxonomy_covers_essential_categories(self):
