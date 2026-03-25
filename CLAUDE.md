@@ -311,6 +311,8 @@ python -m pytest tests/ -m integration
 | M43: E2E 경로 봉합 | ✅ 완료 | session_router.py multipart/form-data 파일 업로드 엔드포인트 전환 ✅, session_ui.py 응답 평탄화(image_urls·product_candidates·canonical_listing·platform_results 등 최상위 필드) ✅, schemas/session.py 평탄화 필드 추가 ✅, api.ts FormData+rewriteListing+platform_targets 계약 수정 ✅, App.tsx useEffect 이동+API 호출 수정 ✅, health/ready provider-aware 판정 ✅, MarketService print()→logger ✅, E2E 응답 shape 테스트 3개 ✅, 429→431 테스트 통과 ✅ |
 | M44: Publish Reliability 강화 | ✅ 완료 | app/domain/publish_policy.py 신설(FAILURE_TAXONOMY 8개 에러 분류·classify_error() 메시지 기반 추론·get_retry_delay() 지수 백오프·PUBLISH_TIMEOUT_SECONDS) ✅, publish_service.py asyncio.wait_for 타임아웃·에러 정규화 분류·auto_recoverable 판정·구조화 로깅 ✅, test_publish_policy.py 23개 unit ✅, 431→454 테스트 통과 ✅ |
 | M45: RAG stub 제거 | ✅ 완료 | rag_price_retrieval.py(3줄 TODO stub) 삭제 ✅, 실제 RAG 구현은 market_tools.py에 이미 완전 구현(pgvector 벡터 검색→키워드 검색→LLM 추정 3단계) ✅, import 전수 검증(참조 0건) ✅ |
+| M46: E2E 통합 테스트 | ✅ 완료 | test_e2e_happy_path.py 신설(전체 세션 라이프사이클 8단계 API 체인·상태 전이 순서 검증·모든 단계 프론트 필드 shape 검증) ✅, 454→457 테스트 통과 ✅ |
+| M47: 프론트엔드 타입 자동 동기화 | ✅ 완료 | scripts/generate_api_types.py 신설(OpenAPI→TypeScript 타입 생성·--check CI 모드) ✅, frontend/src/types/api-generated.ts 자동 생성(SessionStatusGenerated 13상태·SessionResponseGenerated 16필드) ✅, test_api_type_sync.py 5개(상태 집합 일치·필드 존재·파일 존재 검증) ✅, 457→462 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
