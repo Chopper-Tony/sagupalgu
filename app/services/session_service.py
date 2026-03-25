@@ -225,7 +225,8 @@ class SessionService:
     def _handle_publish_failure(
         self, session_id: str, workflow_meta: Dict, publish_results: Dict,
     ) -> None:
-        """게시 실패 시 recovery 서비스를 호출하고 진단 결과를 meta에 기록한다."""
+        """게시 실패 시 recovery 서비스를 호출하고 진단 결과를 meta에 기록한다.
+        누적 실패 횟수가 임계값 이상이면 Discord 알림을 발송한다."""
         product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
         recovery_result = self.recovery_service.run_recovery(
             session_id=session_id, product_data=product_data, publish_results=publish_results,
@@ -233,6 +234,39 @@ class SessionService:
         set_publish_diagnostics(
             workflow_meta, recovery_result["publish_diagnostics"], recovery_result["tool_calls"],
         )
+
+        # 누적 실패 횟수 기반 Discord 알림
+        from app.domain.publish_policy import DISCORD_ALERT_THRESHOLD
+        retry_count = workflow_meta.get("publish_retry_count", 0) + 1
+        workflow_meta["publish_retry_count"] = retry_count
+
+        if retry_count >= DISCORD_ALERT_THRESHOLD:
+            failed_platforms = [p for p, r in publish_results.items() if not r.get("success")]
+            self._send_discord_alert(
+                session_id=session_id,
+                message=(
+                    f"게시 {retry_count}회 연속 실패\n"
+                    f"실패 플랫폼: {', '.join(failed_platforms)}\n"
+                    f"에러: {publish_results}"
+                ),
+            )
+
+    def _send_discord_alert(self, session_id: str, message: str) -> None:
+        """Discord 알림을 비동기로 발송한다. 실패해도 예외를 던지지 않는다."""
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            import asyncio
+            from app.tools.agentic_tools import discord_alert_tool
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(discord_alert_tool(message=message, session_id=session_id))
+            else:
+                asyncio.run(discord_alert_tool(message=message, session_id=session_id))
+            logger.info("discord_alert_sent session=%s", session_id)
+        except Exception as e:
+            logger.warning("discord_alert_failed session=%s error=%s", session_id, e)
 
     # ── 판매 상태 입력 ─────────────────────────────────────────────
 

@@ -15,6 +15,7 @@ PUBLISH_TIMEOUT_SECONDS: int = 120  # 플랫폼별 게시 최대 대기
 
 MAX_PUBLISH_RETRIES: int = 2
 RETRY_BASE_DELAY_SECONDS: float = 5.0  # 지수 백오프 기저 (5, 10, 20…)
+DISCORD_ALERT_THRESHOLD: int = 3  # 이 횟수 이상 실패 시 Discord 알림 발송
 
 # ── 에러 분류 (Failure Taxonomy) ─────────────────────────────────
 
