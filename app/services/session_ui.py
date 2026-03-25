@@ -19,14 +19,38 @@ def build_session_ui_response(session: Dict[str, Any]) -> Dict[str, Any]:
     status = session.get("status", "")
     needs_input = bool(product_data.get("needs_user_input", False))
 
+    # 게시 결과를 프론트엔드 PlatformResult[] 형태로 변환
+    raw_publish = workflow_meta.get("publish_results") or {}
+    platform_results = []
+    for platform, detail in raw_publish.items():
+        if isinstance(detail, dict):
+            platform_results.append({
+                "platform": platform,
+                "success": detail.get("success", False),
+                "url": detail.get("external_url"),
+                "error": detail.get("error_message"),
+            })
+
     return {
         "session_id": session.get("id") or session.get("session_id"),
         "status": status,
         "checkpoint": workflow_meta.get("checkpoint"),
         "next_action": resolve_next_action(status, needs_input),
         "needs_user_input": needs_input,
-        "user_input_prompt": product_data.get("user_input_prompt"),
+        # 프론트엔드 계약: clarification_prompt
+        "clarification_prompt": product_data.get("user_input_prompt"),
         "selected_platforms": session.get("selected_platforms_jsonb") or [],
+        # 평탄화된 필드 (프론트엔드 SessionResponse 계약)
+        "image_urls": product_data.get("image_paths") or [],
+        "product_candidates": product_data.get("candidates") or [],
+        "confirmed_product": product_data.get("confirmed_product"),
+        "canonical_listing": listing_data.get("canonical_listing"),
+        "market_context": listing_data.get("market_context"),
+        "platform_results": platform_results,
+        "optimization_suggestion": listing_data.get("optimization_suggestion"),
+        "rewrite_instruction": listing_data.get("rewrite_instruction"),
+        "last_error": workflow_meta.get("last_error"),
+        # 중첩 필드 (하위 호환)
         "product": {
             "image_paths": product_data.get("image_paths") or [],
             "candidates": product_data.get("candidates") or [],
@@ -41,7 +65,7 @@ def build_session_ui_response(session: Dict[str, Any]) -> Dict[str, Any]:
             "optimization_suggestion": listing_data.get("optimization_suggestion"),
         },
         "publish": {
-            "results": workflow_meta.get("publish_results") or {},
+            "results": raw_publish,
             "diagnostics": workflow_meta.get("publish_diagnostics") or [],
         },
         "agent_trace": {

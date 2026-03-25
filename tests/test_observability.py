@@ -203,9 +203,8 @@ class TestHealthEndpoint:
         data = resp.json()
         assert "checks" in data
         checks = data["checks"]
-        assert "supabase_url" in checks
-        assert "openai_key" in checks
-        assert "gemini_key" in checks
+        assert "supabase" in checks
+        assert "llm_provider" in checks
 
     @pytest.mark.integration
     def test_checks_are_booleans(self, api_client):

@@ -86,11 +86,15 @@ def health_live():
 @app.get("/health/ready")
 def health_ready():
     """Readiness probe — 외부 의존성 준비 상태 확인."""
+    has_supabase = bool(settings.supabase_url and settings.supabase_service_role_key)
+    has_llm = any([
+        bool(settings.openai_api_key),
+        bool(settings.gemini_api_key),
+        bool(getattr(settings, "upstage_api_key", None)),
+    ])
     checks = {
-        "supabase_url": bool(settings.supabase_url),
-        "supabase_key": bool(settings.supabase_service_role_key),
-        "openai_key": bool(settings.openai_api_key),
-        "gemini_key": bool(settings.gemini_api_key),
+        "supabase": has_supabase,
+        "llm_provider": has_llm,
     }
     all_ready = all(checks.values())
     return {
