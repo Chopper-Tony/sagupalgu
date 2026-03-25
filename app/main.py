@@ -85,16 +85,44 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready():
-    """Readiness probe — 외부 의존성 준비 상태 확인."""
-    has_supabase = bool(settings.supabase_url and settings.supabase_service_role_key)
+    """Readiness probe — 현재 선택된 실행 경로의 준비 상태 확인."""
+    # 1. Supabase 연결 (실제 쿼리)
+    supabase_ok = False
+    try:
+        from app.db.client import get_supabase
+        client = get_supabase()
+        if client:
+            client.table("sell_sessions").select("id").limit(1).execute()
+            supabase_ok = True
+    except Exception:
+        supabase_ok = False
+
+    # 2. 현재 선택된 Vision provider 키 확인
+    vision_provider = settings.vision_provider
+    vision_ok = (
+        (vision_provider == "openai" and bool(settings.openai_api_key))
+        or (vision_provider == "gemini" and bool(settings.gemini_api_key))
+    )
+
+    # 3. LLM provider (최소 1개)
     has_llm = any([
         bool(settings.openai_api_key),
         bool(settings.gemini_api_key),
         bool(getattr(settings, "upstage_api_key", None)),
     ])
+
+    # 4. Publish credentials (선택된 플랫폼)
+    publish_targets = {"bunjang", "joongna"}
+    publish_ok = any([
+        "bunjang" in publish_targets and bool(settings.bunjang_username),
+        "joongna" in publish_targets and bool(settings.joongna_username),
+    ])
+
     checks = {
-        "supabase": has_supabase,
+        "supabase": supabase_ok,
+        "vision_provider": vision_ok,
         "llm_provider": has_llm,
+        "publish_credentials": publish_ok,
     }
     all_ready = all(checks.values())
     return {
