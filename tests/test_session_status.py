@@ -144,16 +144,18 @@ class TestBlockedTransitions:
 class TestTerminalStatus:
 
     @pytest.mark.unit
-    def test_completed_is_terminal(self):
-        assert is_terminal_status("completed") is True
+    def test_completed_is_not_terminal(self):
+        """completed → awaiting_sale_status_update 전이가 있으므로 terminal 아님."""
+        assert is_terminal_status("completed") is False
 
     @pytest.mark.unit
     def test_failed_is_terminal(self):
         assert is_terminal_status("failed") is True
 
     @pytest.mark.unit
-    def test_publishing_failed_is_terminal(self):
-        assert is_terminal_status("publishing_failed") is True
+    def test_publishing_failed_is_not_terminal(self):
+        """publishing_failed → awaiting_publish_approval 재시도가 있으므로 terminal 아님."""
+        assert is_terminal_status("publishing_failed") is False
 
     @pytest.mark.unit
     def test_optimization_suggested_is_terminal(self):

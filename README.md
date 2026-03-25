@@ -16,7 +16,7 @@
 - **Goal-driven 전략**: 빠른 판매 / 균형 / 수익 극대화 목표에 따라 가격·문구·평가 기준이 달라짐
 - **AI 카피라이팅**: LLM이 매력적인 판매글 자동 생성 + Critic 자기 비평 루프
 - **멀티 플랫폼 게시**: 번개장터·중고나라 동시 게시 (Playwright 웹 자동화)
-- **자동 복구**: 게시 실패 시 진단 → 패치 → 재시도 자동화
+- **장애 진단**: 게시 실패 시 에러 분류(8종) → 자동 복구 가능 여부 판정 → 재시도
 
 ---
 
@@ -68,7 +68,7 @@ START
 | **워크플로우** | LangGraph 1.1 (StateGraph) |
 | **에이전틱** | LangChain create_agent + bind_tools |
 | **LLM** | Gemini 2.5 Flash (primary) → OpenAI → Solar (fallback) |
-| **Vision** | OpenAI / Gemini (graceful fallback) |
+| **Vision** | OpenAI (실동작) · Gemini (mock — 향후 연동 예정) |
 | **DB** | Supabase (PostgreSQL + pgvector) |
 | **크롤러** | Playwright (웹 자동화) |
 | **프론트엔드** | React 18 + TypeScript + Vite |

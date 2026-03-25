@@ -43,8 +43,11 @@ ALLOWED_TRANSITIONS: dict[str, list[str]] = {
     "failed":                        [],
 }
 
+# truly terminal: 어떤 후속 전이도 없는 상태
+# completed → awaiting_sale_status_update 전이가 있으므로 terminal 아님
+# publishing_failed → awaiting_publish_approval 재시도가 있으므로 terminal 아님
 TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"completed", "failed", "publishing_failed", "optimization_suggested"}
+    {"failed", "optimization_suggested"}
 )
 
 
