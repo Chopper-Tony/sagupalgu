@@ -230,7 +230,7 @@ def build_template_copy(
         "price": recommended_price,
         "tags": deduped_tags[:5],
         "images": [],
-        "strategy": strategy.get("goal", "fast_sell"),
+        "strategy": strategy.get("goal", "balanced"),
         "product": confirmed_product,
     }
 

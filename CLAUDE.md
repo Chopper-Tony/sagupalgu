@@ -129,6 +129,8 @@ START
   - `product_rules.py`: `normalize_text`, `needs_user_input`, `build_confirmed_product_*` — 상품 도메인 규칙
   - `exceptions.py`: 도메인 예외 5개 + **예외 매핑 정책** (SessionNotFoundError→404, InvalidStateTransitionError→409, ListingGenerationError/ListingRewriteError→500, PublishExecutionError→502, ValueError→400)
   - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
+  - `goal_strategy.py`: Goal 기반 전략 상수 및 순수 함수 (`get_pricing_multiplier`·`get_copywriting_tone`·`get_negotiation_policy`·`get_critic_criteria`) — mission_goal(fast_sell/balanced/profit_max)별 행동 변화 SSOT
+  - `node_contracts.py`: 노드별 output contract 정의 (`NODE_OUTPUT_CONTRACTS`·`check_contract()`) — 각 노드가 state에 남겨야 하는 키 계약
 - `app/services/` — 비즈니스 로직
   - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_persist_and_respond()` 내부 헬퍼. 데이터 조작은 3개 순수 함수 모듈에 위임
   - `session_product.py`: product_data 순수 함수 집합 (`attach_image_paths`, `apply_analysis_result`, `confirm_from_candidate`, `confirm_from_user_input`) — SessionService에서 분리
@@ -161,6 +163,7 @@ START
   - `nginx.conf` — SPA routing + `/api/` 백엔드 프록시 + 정적자산 캐시
 - `tests/api/` — API 통합 테스트 (conftest 공유 픽스처 + 4파일 분할: basic·product·listing·publish)
 - `docs/deployment.md` — AWS EC2 배포 가이드 (Docker 설치·환경변수·실행·HTTPS·모니터링)
+- `docs/architecture.md` — 아키텍처 문서 (Mermaid 그래프·Deterministic vs Agentic 구분·에이전틱 근거·레이어 구조·3 Agentic Loop)
 
 ## 코딩 규칙
 
@@ -301,6 +304,9 @@ python -m pytest tests/ -m integration
 | M37: Listing Critic + Rewrite 루프 | ✅ 완료 | Agent 6 listing_critic_node 신설(LLM 품질 비평 + 룰 기반 fallback, score/issues/rewrite_instructions 출력) ✅, SellerCopilotState에 critic 필드 5개 추가(critic_score·critic_feedback·critic_rewrite_instructions·critic_retry_count·max_critic_retries) ✅, route_after_critic 라우터(pass→validation / rewrite→copywriting, max retry 방어) ✅, 그래프에 copywriting→critic→(pass:validation / rewrite:copywriting) 루프 연결 ✅, test_critic_agent.py 15개(룰 기반 6·라우팅 5·통합 4) ✅, 340→355 테스트 통과 ✅ |
 | M38: Mission Planner + Replan 루프 | ✅ 완료 | Agent 0 mission_planner_node 신설(LLM 계획 생성 + 룰 기반 fallback, goal·plan·rationale·missing_information 출력) ✅, SellerCopilotState에 planner 필드 6개 추가(mission_goal·plan·plan_revision_count·max_replans·decision_rationale·missing_information) ✅, route_after_critic에 replan 분기 추가(rewrite 한도 초과→planner 재호출) ✅, 그래프 진입점 START→mission_planner→product_identity 변경 ✅, test_planner_agent.py 13개(룰 기반 7·replan 라우팅 3·통합 3) ✅, 기존 340개 + 신규 29개 테스트 통과 ✅ |
 | M39: Pre-listing Clarification | ✅ 완료 | pre_listing_clarification_node 신설(상품 상태·사용기간·구성품·거래방법 4항목 정보 부족 감지, LLM 질문 생성 + 룰 기반 fallback) ✅, SellerCopilotState에 3필드 추가(pre_listing_questions·pre_listing_answers·pre_listing_done) ✅, route_after_pre_listing_clarification 라우터(부족→END 사용자 대기 / 충분→market) ✅, 그래프에 product_identity→pre_listing_clarification→market 경로 추가 ✅, test_pre_listing_clarification.py 14개(탐지 5·질문 생성 2·라우팅 3·통합 4) ✅, 기존 340개 테스트 통과 ✅ |
+| M40: Goal 기반 행동 변화 | ✅ 완료 | app/domain/goal_strategy.py 신설(PRICING_MULTIPLIER·COPYWRITING_TONE·NEGOTIATION_POLICY·CRITIC_CRITERIA 4개 맵 + 순수 함수 4개) ✅, market_agent.py 하드코딩 goal="fast_sell" 3곳 제거→state["mission_goal"] 참조·goal별 가격 배수(0.88~1.05) ✅, copywriting_agent.py _build_prompts에 goal별 톤 지시 삽입 ✅, critic_agent.py _rule_based_critique goal별 평가 기준(설명 길이·가격 임계·신뢰 감점) ✅, listing_prompt.py build_pricing_strategy goal 파라미터 추가 ✅, schemas.py·listing_llm.py 기본값 balanced 전환 ✅, test_goal_strategy.py 27개 unit ✅, 369→412 테스트 통과 ✅ |
+| M41: 노드별 state contract 테스트 | ✅ 완료 | app/domain/node_contracts.py 신설(NODE_OUTPUT_CONTRACTS 9노드·check_contract() 검증 함수) ✅, test_node_contracts.py 17개(check_contract 유틸 5·노드별 contract 11·커버리지 1) ✅, 412→429 테스트 통과 ✅ |
+| M42: 아키텍처 문서화 | ✅ 완료 | docs/architecture.md 신설(Mermaid 그래프 다이어그램·Deterministic vs Agentic 구분표·"왜 에이전틱인지" 6가지 근거·레이어 구조·3가지 Agentic Loop 상세·Goal-driven 행동 변화 테이블) ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -320,6 +326,7 @@ python -m pytest tests/ -m integration
 | M25~M29 완료 | 89→90/100 (실제) | 1차 89점(supabase import·SessionService 비대·ListingService 혼재·출력 계약 미비), 2차 90점(supabase 해결 but langgraph import 실패 잔존) |
 | M30~M34 완료 | 90/100 (CTO2 실제) | supabase+langgraph lazy import, 출력 계약 봉합, SessionService·ListingService 절개. CTO2 84점 (rewrite 깨짐·legacy 의존·예외 남용 지적) → M35~M36으로 대응 후 CTO1 재평가 90점 |
 | M35~M39 완료 | 95 예상 | rewrite 계약 봉합, 예외 세분화(InvalidUserInputError·SessionUpdateError), health/live·ready 분리, **Critic+Planner+Clarification 3개 에이전트 추가** (7에이전트 체제), rewrite·replan·clarification 3개 agentic loop 완성, 테스트 369개 |
+| M40~M42 완료 | 97 예상 | **Goal-driven 행동 변화** (같은 상품도 goal별 가격·톤·비평 기준 차별화), 노드별 output contract 테스트(9노드 계약 고정), 아키텍처 문서(Mermaid·에이전틱 근거), 테스트 429개 |
 
 ## 에이전틱 점수 이력
 
@@ -329,3 +336,4 @@ python -m pytest tests/ -m integration
 | 1차 개선 | 88/100 | Agent 2 ReAct, publish_node 추가, recovery_node 연결, auto_patch_tool 구현 |
 | 2차 개선 | 100/100 | Agent 3/4 ReAct 전환, lc_ 툴 7개로 확대, Supabase pgvector RAG 연결 |
 | 3차 개선 (M37~M39) | — | Listing Critic(생성→비평→재생성 루프), Mission Planner(계획→실행→재계획 루프), Pre-listing Clarification(정보 부족→질문→재진입 루프). 5→7 에이전트, deterministic shell + agentic core 하이브리드 아키텍처 |
+| 4차 개선 (M40) | — | **Goal-driven 행동 변화**: mission_goal(fast_sell/balanced/profit_max)에 따라 가격 배수·카피 톤·네고 정책·비평 기준이 실제로 달라짐. 같은 상품이라도 전략에 따라 전혀 다른 결과 생성 |

@@ -24,9 +24,10 @@ class ListingService:
 
     async def build_pricing_strategy(
         self, confirmed_product: dict, market_context: dict,
+        goal: str = "balanced",
     ) -> dict:
         median_price = market_context.get("median_price") or 0
-        return build_pricing_strategy(median_price)
+        return build_pricing_strategy(median_price, goal=goal)
 
     async def build_canonical_listing(
         self,
