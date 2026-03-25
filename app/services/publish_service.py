@@ -97,46 +97,88 @@ class PublishService:
     ) -> tuple[dict, bool]:
         """
         플랫폼 목록을 순회하며 게시 실행.
+        각 플랫폼에 타임아웃을 적용하고, 에러를 정규화 분류한다.
 
         Returns:
             (publish_results, any_failure)
         """
+        import asyncio
+        import logging
+
+        from app.domain.publish_policy import (
+            PUBLISH_TIMEOUT_SECONDS,
+            classify_error,
+        )
+
+        logger = logging.getLogger(__name__)
         publish_results: dict = {}
         any_failure = False
 
         for platform in platforms:
             payload = packages.get(platform)
             if not payload:
+                classification = classify_error("missing_platform_package")
                 publish_results[platform] = {
                     "success": False,
                     "platform": platform,
-                    "error_code": "missing_platform_package",
+                    "error_code": classification["error_code"],
                     "error_message": f"{platform} 패키지 없음",
+                    "auto_recoverable": classification["auto_recoverable"],
                 }
                 any_failure = True
                 continue
 
             try:
-                result = await self.publish(platform=platform, payload=payload)
+                result = await asyncio.wait_for(
+                    self.publish(platform=platform, payload=payload),
+                    timeout=PUBLISH_TIMEOUT_SECONDS,
+                )
+                error_code = result.error_code or ""
+                error_message = result.error_message or ""
+                classification = classify_error(error_code, error_message)
+
                 publish_results[platform] = {
                     "success": result.success,
                     "platform": result.platform,
                     "external_listing_id": result.external_listing_id,
                     "external_url": result.external_url,
-                    "error_code": result.error_code,
-                    "error_message": result.error_message,
+                    "error_code": classification["error_code"] if not result.success else None,
+                    "error_message": error_message if not result.success else None,
                     "evidence_path": result.evidence_path,
+                    "auto_recoverable": classification["auto_recoverable"] if not result.success else None,
                 }
                 if not result.success:
                     any_failure = True
-            except Exception as e:
+                    logger.warning(
+                        "publish_failed platform=%s error_code=%s category=%s",
+                        platform, classification["error_code"], classification["category"],
+                    )
+                else:
+                    logger.info("publish_success platform=%s url=%s", platform, result.external_url)
+
+            except asyncio.TimeoutError:
+                classification = classify_error("timeout")
                 publish_results[platform] = {
                     "success": False,
                     "platform": platform,
-                    "error_code": "publish_exception",
-                    "error_message": str(e),
+                    "error_code": "timeout",
+                    "error_message": f"{platform} 게시 {PUBLISH_TIMEOUT_SECONDS}초 타임아웃 초과",
+                    "auto_recoverable": True,
                 }
                 any_failure = True
+                logger.warning("publish_timeout platform=%s timeout=%ds", platform, PUBLISH_TIMEOUT_SECONDS)
+
+            except Exception as e:
+                classification = classify_error("publish_exception", str(e))
+                publish_results[platform] = {
+                    "success": False,
+                    "platform": platform,
+                    "error_code": classification["error_code"],
+                    "error_message": str(e),
+                    "auto_recoverable": classification["auto_recoverable"],
+                }
+                any_failure = True
+                logger.error("publish_exception platform=%s error=%s", platform, e)
 
         return publish_results, any_failure
 

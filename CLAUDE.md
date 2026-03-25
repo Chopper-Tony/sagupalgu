@@ -131,6 +131,7 @@ START
   - `schemas.py`: `CanonicalListingSchema` Pydantic 모델 — LLM 출력 직후 shape 강제, `from_llm_result()`·`from_rewrite_result()` classmethod
   - `goal_strategy.py`: Goal 기반 전략 상수 및 순수 함수 (`get_pricing_multiplier`·`get_copywriting_tone`·`get_negotiation_policy`·`get_critic_criteria`) — mission_goal(fast_sell/balanced/profit_max)별 행동 변화 SSOT
   - `node_contracts.py`: 노드별 output contract 정의 (`NODE_OUTPUT_CONTRACTS`·`check_contract()`) — 각 노드가 state에 남겨야 하는 키 계약
+  - `publish_policy.py`: 게시 신뢰성 정책 (`FAILURE_TAXONOMY` 8개 에러 분류·`classify_error()` 에러 정규화·`get_retry_delay()` 지수 백오프·`PUBLISH_TIMEOUT_SECONDS` 타임아웃)
 - `app/services/` — 비즈니스 로직
   - `session_service.py`: 세션 오케스트레이터. `_ensure_transition()`·`_persist_and_respond()` 내부 헬퍼. 데이터 조작은 3개 순수 함수 모듈에 위임
   - `session_product.py`: product_data 순수 함수 집합 (`attach_image_paths`, `apply_analysis_result`, `confirm_from_candidate`, `confirm_from_user_input`) — SessionService에서 분리
@@ -307,6 +308,9 @@ python -m pytest tests/ -m integration
 | M40: Goal 기반 행동 변화 | ✅ 완료 | app/domain/goal_strategy.py 신설(PRICING_MULTIPLIER·COPYWRITING_TONE·NEGOTIATION_POLICY·CRITIC_CRITERIA 4개 맵 + 순수 함수 4개) ✅, market_agent.py 하드코딩 goal="fast_sell" 3곳 제거→state["mission_goal"] 참조·goal별 가격 배수(0.88~1.05) ✅, copywriting_agent.py _build_prompts에 goal별 톤 지시 삽입 ✅, critic_agent.py _rule_based_critique goal별 평가 기준(설명 길이·가격 임계·신뢰 감점) ✅, listing_prompt.py build_pricing_strategy goal 파라미터 추가 ✅, schemas.py·listing_llm.py 기본값 balanced 전환 ✅, test_goal_strategy.py 27개 unit ✅, 369→412 테스트 통과 ✅ |
 | M41: 노드별 state contract 테스트 | ✅ 완료 | app/domain/node_contracts.py 신설(NODE_OUTPUT_CONTRACTS 9노드·check_contract() 검증 함수) ✅, test_node_contracts.py 17개(check_contract 유틸 5·노드별 contract 11·커버리지 1) ✅, 412→429 테스트 통과 ✅ |
 | M42: 아키텍처 문서화 | ✅ 완료 | docs/architecture.md 신설(Mermaid 그래프 다이어그램·Deterministic vs Agentic 구분표·"왜 에이전틱인지" 6가지 근거·레이어 구조·3가지 Agentic Loop 상세·Goal-driven 행동 변화 테이블) ✅ |
+| M43: E2E 경로 봉합 | ✅ 완료 | session_router.py multipart/form-data 파일 업로드 엔드포인트 전환 ✅, session_ui.py 응답 평탄화(image_urls·product_candidates·canonical_listing·platform_results 등 최상위 필드) ✅, schemas/session.py 평탄화 필드 추가 ✅, api.ts FormData+rewriteListing+platform_targets 계약 수정 ✅, App.tsx useEffect 이동+API 호출 수정 ✅, health/ready provider-aware 판정 ✅, MarketService print()→logger ✅, E2E 응답 shape 테스트 3개 ✅, 429→431 테스트 통과 ✅ |
+| M44: Publish Reliability 강화 | ✅ 완료 | app/domain/publish_policy.py 신설(FAILURE_TAXONOMY 8개 에러 분류·classify_error() 메시지 기반 추론·get_retry_delay() 지수 백오프·PUBLISH_TIMEOUT_SECONDS) ✅, publish_service.py asyncio.wait_for 타임아웃·에러 정규화 분류·auto_recoverable 판정·구조화 로깅 ✅, test_publish_policy.py 23개 unit ✅, 431→454 테스트 통과 ✅ |
+| M45: RAG stub 제거 | ✅ 완료 | rag_price_retrieval.py(3줄 TODO stub) 삭제 ✅, 실제 RAG 구현은 market_tools.py에 이미 완전 구현(pgvector 벡터 검색→키워드 검색→LLM 추정 3단계) ✅, import 전수 검증(참조 0건) ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -327,6 +331,7 @@ python -m pytest tests/ -m integration
 | M30~M34 완료 | 90/100 (CTO2 실제) | supabase+langgraph lazy import, 출력 계약 봉합, SessionService·ListingService 절개. CTO2 84점 (rewrite 깨짐·legacy 의존·예외 남용 지적) → M35~M36으로 대응 후 CTO1 재평가 90점 |
 | M35~M39 완료 | 95 예상 | rewrite 계약 봉합, 예외 세분화(InvalidUserInputError·SessionUpdateError), health/live·ready 분리, **Critic+Planner+Clarification 3개 에이전트 추가** (7에이전트 체제), rewrite·replan·clarification 3개 agentic loop 완성, 테스트 369개 |
 | M40~M42 완료 | 97 예상 | **Goal-driven 행동 변화** (같은 상품도 goal별 가격·톤·비평 기준 차별화), 노드별 output contract 테스트(9노드 계약 고정), 아키텍처 문서(Mermaid·에이전틱 근거), 테스트 429개 |
+| M43~M45 완료 | 90+ 예상 | CTO P0 전수 대응(API 계약 4건·React·health·로깅), 파일 업로드 E2E 봉합, **Publish Reliability**(타임아웃·에러 분류·지수 백오프), RAG stub 제거(이미 완전 구현 확인), 테스트 454개 |
 
 ## 에이전틱 점수 이력
 
