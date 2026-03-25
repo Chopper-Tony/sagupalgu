@@ -26,6 +26,10 @@ htmlcov/
 # =========================
 uploads/
 
+# Playwright 세션 파일
+# =========================
+*_session.json
+
 # Environment variables
 # =========================
 .env

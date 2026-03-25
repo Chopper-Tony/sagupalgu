@@ -12,6 +12,16 @@ import "./App.css";
 let _idCounter = 0;
 const nextId = () => String(++_idCounter);
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("409")) return "이미 처리된 요청입니다. 새 세션을 시작해주세요.";
+  if (msg.includes("429") || msg.includes("quota")) return "AI 서비스 이용량을 초과했습니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("timeout")) return "서버 응답이 느립니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("Network Error")) return "네트워크 연결을 확인해주세요.";
+  if (msg.includes("500")) return "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  return msg;
+}
+
 export default function App() {
   const [sessionIds, setSessionIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -25,7 +35,13 @@ export default function App() {
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {
-    setTimeline((prev) => [...prev, { ...item, id: nextId() } as TimelineItem]);
+    setTimeline((prev) => {
+      // 새 카드나 progress가 들어오면 이전 progress 아이템을 제거
+      const filtered = (item.type === "card" || item.type === "progress")
+        ? prev.filter((p) => p.type !== "progress")
+        : prev;
+      return [...filtered, { ...item, id: nextId() } as TimelineItem];
+    });
   }, []);
 
   // 세션 상태 변화 시 카드 아이템 타임라인에 추가
@@ -59,15 +75,17 @@ export default function App() {
     pushItem({ type: "user_message", text });
     try {
       if (currentStatus === "awaiting_product_confirmation") {
-        const updated = await api.provideProductInfo(activeId, { model: text });
-        setSession(updated);
+        pushItem({ type: "progress", status: "product_confirmed", message: "시세를 분석하고 판매글을 생성하고 있습니다..." });
+        await api.provideProductInfo(activeId, { model: text });
+        const listing = await api.generateListing(activeId);
+        setSession(listing);
       } else if (currentStatus === "draft_generated") {
         pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
         const updated = await api.rewriteListing(activeId, text);
         setSession(updated);
       }
     } catch (e: unknown) {
-      pushItem({ type: "error", code: "action_failed", message: e instanceof Error ? e.message : "요청에 실패했습니다." });
+      pushItem({ type: "error", code: "action_failed", message: friendlyError(e) });
     }
   };
 
@@ -76,8 +94,10 @@ export default function App() {
     pushItem({ type: "user_message", text: `📷 사진 ${files.length}장을 업로드했습니다` });
     pushItem({ type: "progress", status: "images_uploaded", message: "이미지를 분석하고 있습니다..." });
     try {
-      const updated = await api.uploadImages(activeId, files);
-      setSession(updated);
+      await api.uploadImages(activeId, files);
+      // 업로드 후 자동으로 분석 시작
+      const analyzed = await api.analyzeSession(activeId);
+      setSession(analyzed);
     } catch (e: unknown) {
       pushItem({ type: "error", code: "upload_failed", message: e instanceof Error ? e.message : "업로드에 실패했습니다." });
     }
@@ -93,12 +113,15 @@ export default function App() {
         case "confirm_product": {
           const product = payload as ConfirmedProduct;
           pushItem({ type: "assistant_message", text: `${product.brand} ${product.model} (${product.category})로 확정했습니다.` });
-          const updated = await api.provideProductInfo(activeId, {
+          pushItem({ type: "progress", status: "product_confirmed", message: "시세를 분석하고 판매글을 생성하고 있습니다..." });
+          await api.provideProductInfo(activeId, {
             model: product.model,
             brand: product.brand,
             category: product.category,
           });
-          setSession(updated);
+          // 확정 후 자동으로 판매글 생성
+          const listing = await api.generateListing(activeId);
+          setSession(listing);
           break;
         }
         case "prepare_publish": {
@@ -146,7 +169,7 @@ export default function App() {
           break;
       }
     } catch (e: unknown) {
-      pushItem({ type: "error", code: action, message: e instanceof Error ? e.message : "요청에 실패했습니다." });
+      pushItem({ type: "error", code: action, message: friendlyError(e) });
     }
   };
 

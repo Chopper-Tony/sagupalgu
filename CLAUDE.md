@@ -319,6 +319,9 @@ python -m pytest tests/ -m integration
 | M51: create_app() 팩토리 패턴 | ✅ 완료 | main.py를 create_app() 함수로 래핑(import 시점 결합 해소·테스트 환경 분리·부트 안정화) ✅, 462 테스트 통과 ✅ |
 | M52: legacy_spikes 의존 정리 | ✅ 완료 | app/publishers/_legacy_compat.py 신설(legacy_spikes import 단일 진입점·try/except 안전 import) ✅, app/ 내 7곳 legacy_spikes 직접 import → _legacy_compat 경유로 전환 ✅, 462 테스트 통과 ✅ |
 | M53: SessionService 정리 | ✅ 완료 | publish_session에서 _handle_publish_failure 헬퍼 추출(recovery 로직 분리) ✅, SessionService는 이미 도메인 서비스에 위임하는 얇은 오케스트레이터 구조이므로 추가 분리보다 현재 구조 유지 ✅, 462 테스트 통과 ✅ |
+| P2-1: 당근 자동 게시 통합 | ✅ 완료 | VALID_PLATFORMS에 daangn 추가 ✅, DaangnPublisher dependency 체크+에러분류+로깅 ✅, config DAANGN_DEVICE_ID ✅, DraftCard 플랫폼 한글→영문 매핑 ✅, 463 테스트 통과 ✅ |
+| P2-2: 게시 실패 Discord 알림 | ✅ 완료 | DISCORD_ALERT_THRESHOLD=3 ✅, _handle_publish_failure에서 누적 실패 추적→3회 이상 Discord 자동 발송 ✅, 465 테스트 통과 ✅ |
+| E2E 버그 수정 | ✅ 완료 | ProgressCard 스택 버그 수정(새 카드 시 이전 progress 제거) ✅, LLM fallback 순서를 LISTING_LLM_PROVIDER 설정 존중 ✅, Gemini Vision mock→실구현(Google AI API) ✅, 프론트 auto-analyze+auto-generateListing ✅, baseURL /api/v1 ✅, timeout 120초 ✅, 에러 메시지 사용자 친화적 변환 ✅, 백엔드 로그 노이즈 제거(hpack/httpcore WARNING) ✅, 465 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

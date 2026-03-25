@@ -56,28 +56,39 @@ def _run_async(coro_or_factory):
 
 
 def _build_react_llm():
-    """ReAct 에이전트용 LLM 초기화 (bind_tools 지원 모델)"""
+    """ReAct 에이전트용 LLM 초기화 (bind_tools 지원 모델).
+    LISTING_LLM_PROVIDER 설정에 따라 우선순위 결정."""
     from app.core.config import settings
-    try:
-        if settings.gemini_api_key:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            return ChatGoogleGenerativeAI(
-                model=settings.gemini_listing_model,
-                google_api_key=settings.gemini_api_key,
-                temperature=0.0,
-            )
-    except Exception:
-        pass
-    try:
-        if settings.openai_api_key:
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(
-                model=settings.openai_listing_model,
-                api_key=settings.openai_api_key,
-                temperature=0.0,
-            )
-    except Exception:
-        pass
+
+    provider = settings.listing_llm_provider  # "openai" | "gemini" | "solar"
+
+    # 1순위: 설정된 provider
+    if provider == "openai":
+        order = ["openai", "gemini"]
+    elif provider == "solar":
+        # Solar는 LangChain bind_tools 미지원 → OpenAI/Gemini fallback
+        order = ["openai", "gemini"]
+    else:
+        order = ["gemini", "openai"]
+
+    for p in order:
+        try:
+            if p == "gemini" and settings.gemini_api_key:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                return ChatGoogleGenerativeAI(
+                    model=settings.gemini_listing_model,
+                    google_api_key=settings.gemini_api_key,
+                    temperature=0.0,
+                )
+            if p == "openai" and settings.openai_api_key:
+                from langchain_openai import ChatOpenAI
+                return ChatOpenAI(
+                    model=settings.openai_listing_model,
+                    api_key=settings.openai_api_key,
+                    temperature=0.0,
+                )
+        except Exception:
+            continue
     return None
 
 
