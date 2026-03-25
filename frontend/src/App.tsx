@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -29,15 +29,17 @@ export default function App() {
   }, []);
 
   // 세션 상태 변화 시 카드 아이템 타임라인에 추가
-  if (
-    currentStatus &&
-    currentStatus !== lastRenderedStatus &&
-    uiConfig &&
-    !uiConfig.autoProgress
-  ) {
-    setLastRenderedStatus(currentStatus);
-    pushItem({ type: "card", cardType: uiConfig.card, status: currentStatus });
-  }
+  useEffect(() => {
+    if (
+      currentStatus &&
+      currentStatus !== lastRenderedStatus &&
+      uiConfig &&
+      !uiConfig.autoProgress
+    ) {
+      setLastRenderedStatus(currentStatus);
+      pushItem({ type: "card", cardType: uiConfig.card, status: currentStatus });
+    }
+  }, [currentStatus, lastRenderedStatus, uiConfig, pushItem]);
 
   const handleNewSession = async () => {
     try {
@@ -57,11 +59,11 @@ export default function App() {
     pushItem({ type: "user_message", text });
     try {
       if (currentStatus === "awaiting_product_confirmation") {
-        const updated = await api.provideProductInfo(activeId, { user_input: text });
+        const updated = await api.provideProductInfo(activeId, { model: text });
         setSession(updated);
       } else if (currentStatus === "draft_generated") {
         pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
-        const updated = await api.generateListing(activeId, text);
+        const updated = await api.rewriteListing(activeId, text);
         setSession(updated);
       }
     } catch (e: unknown) {
@@ -91,7 +93,11 @@ export default function App() {
         case "confirm_product": {
           const product = payload as ConfirmedProduct;
           pushItem({ type: "assistant_message", text: `${product.brand} ${product.model} (${product.category})로 확정했습니다.` });
-          const updated = await api.provideProductInfo(activeId, product);
+          const updated = await api.provideProductInfo(activeId, {
+            model: product.model,
+            brand: product.brand,
+            category: product.category,
+          });
           setSession(updated);
           break;
         }
@@ -105,7 +111,7 @@ export default function App() {
         case "rewrite": {
           pushItem({ type: "user_message", text: payload as string });
           pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
-          const updated = await api.generateListing(activeId, payload as string);
+          const updated = await api.rewriteListing(activeId, payload as string);
           setSession(updated);
           break;
         }

@@ -1,3 +1,4 @@
+import logging
 from typing import Dict
 
 from app.crawlers.bunjang_crawler import BunjangCrawler
@@ -5,6 +6,8 @@ from app.crawlers.joongna_crawler import JoongnaCrawler
 from app.services.market.price_aggregator import PriceAggregator
 from app.services.market.query_builder import QueryBuilder
 from app.services.market.relevance_scorer import RelevanceScorer
+
+logger = logging.getLogger(__name__)
 
 
 class MarketService:
@@ -23,7 +26,7 @@ class MarketService:
 
     async def analyze_market(self, product: Dict) -> Dict:
         queries = QueryBuilder.build_queries(product)
-        print(f"[MarketService] queries={queries}")
+        logger.info("market_queries=%s", queries)
 
         all_listings = []
 
@@ -31,32 +34,35 @@ class MarketService:
             for query in queries:
                 try:
                     results = await crawler.search(query)
-                    print(
-                        f"[MarketService] crawler={crawler.name} query='{query}' raw_results={len(results)}"
+                    logger.info(
+                        "crawler=%s query='%s' raw_results=%d",
+                        crawler.name, query, len(results),
                     )
                     all_listings.extend(results)
                 except Exception as e:
-                    print(
-                        f"[MarketService] crawler={crawler.name} query='{query}' failed: {e}"
+                    logger.warning(
+                        "crawler=%s query='%s' failed: %s",
+                        crawler.name, query, e,
                     )
                     continue
 
-        print(f"[MarketService] total_raw_listings={len(all_listings)}")
+        logger.info("total_raw_listings=%d", len(all_listings))
 
         filtered = []
 
         for listing in all_listings:
             score = RelevanceScorer.score(product, listing)
-            print(
-                f"[MarketService] score={score:.2f} title={listing.get('title', '')}"
+            logger.debug(
+                "relevance_score=%.2f title=%s",
+                score, listing.get("title", ""),
             )
             if score >= 0.3:
                 filtered.append(listing)
 
-        print(f"[MarketService] filtered_listings={len(filtered)}")
+        logger.info("filtered_listings=%d", len(filtered))
 
         price_context = PriceAggregator.aggregate(filtered)
-        print(f"[MarketService] price_context={price_context}")
+        logger.info("price_context=%s", price_context)
 
         return {
             "crawler_sources": [crawler.name for crawler in self.crawlers],

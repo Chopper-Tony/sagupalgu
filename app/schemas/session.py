@@ -60,8 +60,19 @@ class SessionUIResponse(BaseModel):
     checkpoint: Optional[str] = None
     next_action: Optional[str] = None
     needs_user_input: bool = False
-    user_input_prompt: Optional[str] = None
+    # 평탄화 필드 (프론트엔드 계약)
+    clarification_prompt: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
+    product_candidates: List[Dict[str, Any]] = Field(default_factory=list)
+    confirmed_product: Optional[Dict[str, Any]] = None
+    canonical_listing: Optional[Dict[str, Any]] = None
+    market_context: Optional[Dict[str, Any]] = None
+    platform_results: List[Dict[str, Any]] = Field(default_factory=list)
+    optimization_suggestion: Optional[Dict[str, Any]] = None
+    rewrite_instruction: Optional[str] = None
+    last_error: Optional[str] = None
     selected_platforms: List[str] = Field(default_factory=list)
+    # 중첩 필드 (하위 호환)
     product: ProductInfo = Field(default_factory=ProductInfo)
     listing: ListingInfo = Field(default_factory=ListingInfo)
     publish: PublishInfo = Field(default_factory=PublishInfo)

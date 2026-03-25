@@ -25,7 +25,8 @@ class TestHealth:
         assert resp.status_code == 200
         data = resp.json()
         assert "checks" in data
-        assert "supabase_url" in data["checks"]
+        assert "supabase" in data["checks"]
+        assert "llm_provider" in data["checks"]
 
 
 class TestCreateSession:

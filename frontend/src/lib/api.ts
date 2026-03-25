@@ -14,26 +14,35 @@ export const api = {
     client.get<SessionResponse>(`/sessions/${id}`).then((r) => r.data),
 
   uploadImages: (id: string, files: File[]) => {
-    const form = new FormData();
-    files.forEach((f) => form.append("files", f));
-    return client.post<SessionResponse>(`/sessions/${id}/images`, form).then((r) => r.data);
+    // 백엔드는 image_urls (HTTP(S) URL 목록)을 기대.
+    // 파일 업로드는 별도 스토리지 경유 후 URL을 전달해야 함.
+    // MVP: ObjectURL을 전달 (실제 배포 시 Supabase Storage 경유로 전환)
+    const urls = files.map((f) => URL.createObjectURL(f));
+    return client
+      .post<SessionResponse>(`/sessions/${id}/images`, { image_urls: urls })
+      .then((r) => r.data);
   },
 
-  provideProductInfo: (id: string, productInfo: object) =>
+  provideProductInfo: (id: string, productInfo: { model: string; brand?: string; category?: string }) =>
     client
       .post<SessionResponse>(`/sessions/${id}/provide-product-info`, productInfo)
       .then((r) => r.data),
 
-  generateListing: (id: string, rewriteInstruction?: string) =>
+  generateListing: (id: string) =>
     client
-      .post<SessionResponse>(`/sessions/${id}/generate-listing`, {
-        rewrite_instruction: rewriteInstruction ?? null,
-      })
+      .post<SessionResponse>(`/sessions/${id}/generate-listing`)
+      .then((r) => r.data),
+
+  rewriteListing: (id: string, instruction: string) =>
+    client
+      .post<SessionResponse>(`/sessions/${id}/rewrite-listing`, { instruction })
       .then((r) => r.data),
 
   preparePublish: (id: string, platforms: string[]) =>
     client
-      .post<SessionResponse>(`/sessions/${id}/prepare-publish`, { platforms })
+      .post<SessionResponse>(`/sessions/${id}/prepare-publish`, {
+        platform_targets: platforms,
+      })
       .then((r) => r.data),
 
   publish: (id: string) =>
