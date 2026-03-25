@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 
 if sys.platform == "win32":
@@ -7,9 +8,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.session_router import router as session_router
-from app.core.config import settings
-from app.core.logging import configure_logging
+
 from app.domain.exceptions import (
     InvalidStateTransitionError,
     InvalidUserInputError,
@@ -20,35 +19,8 @@ from app.domain.exceptions import (
     SessionNotFoundError,
     SessionUpdateError,
 )
-from app.middleware.request_id import RequestIdMiddleware
-
-configure_logging(level="DEBUG" if settings.debug else "INFO")
-
-app = FastAPI(
-    title=settings.app_name,
-    debug=settings.debug,
-)
-
-# CORS — ALLOWED_ORIGINS 환경변수로 제어 (prod에서는 실제 도메인으로 제한)
-_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(RequestIdMiddleware)
-
 
 # ── 예외 매핑 정책 (단일 진실 원천) ─────────────────────────────────
-# SessionNotFoundError       → 404
-# InvalidStateTransitionError → 409
-# ListingGenerationError/ListingRewriteError → 500
-# PublishExecutionError      → 502
-# ValueError                 → 400
-
 _DOMAIN_STATUS_MAP: dict[type, tuple[int, str]] = {
     SessionNotFoundError: (404, "session_not_found"),
     InvalidUserInputError: (400, "invalid_user_input"),
@@ -60,88 +32,112 @@ _DOMAIN_STATUS_MAP: dict[type, tuple[int, str]] = {
 }
 
 
-@app.exception_handler(SagupalguError)
-async def sagupalgu_error_handler(request: Request, exc: SagupalguError):
-    status_code, error_key = _DOMAIN_STATUS_MAP.get(type(exc), (500, "domain_error"))
-    return JSONResponse(
-        status_code=status_code,
-        content={"detail": {"error": error_key, "message": str(exc)}},
+def create_app() -> FastAPI:
+    """App factory — 테스트·환경별 앱 생성 분리."""
+    from app.api.session_router import router as session_router
+    from app.core.config import settings
+    from app.core.logging import configure_logging
+    from app.middleware.request_id import RequestIdMiddleware
+
+    configure_logging(level="DEBUG" if settings.debug else "INFO")
+
+    application = FastAPI(
+        title=settings.app_name,
+        debug=settings.debug,
     )
 
-
-@app.exception_handler(ValueError)
-async def value_error_handler(request: Request, exc: ValueError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": {"error": "validation_error", "message": str(exc)}},
+    # CORS
+    _origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
+    application.add_middleware(RequestIdMiddleware)
 
+    # 예외 핸들러
+    @application.exception_handler(SagupalguError)
+    async def sagupalgu_error_handler(request: Request, exc: SagupalguError):
+        status_code, error_key = _DOMAIN_STATUS_MAP.get(type(exc), (500, "domain_error"))
+        return JSONResponse(
+            status_code=status_code,
+            content={"detail": {"error": error_key, "message": str(exc)}},
+        )
 
-@app.get("/health/live")
-def health_live():
-    """Liveness probe — 프로세스 살아있음."""
-    return {"status": "ok"}
+    @application.exception_handler(ValueError)
+    async def value_error_handler(request: Request, exc: ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={"detail": {"error": "validation_error", "message": str(exc)}},
+        )
 
+    # Health endpoints
+    @application.get("/health/live")
+    def health_live():
+        """Liveness probe — 프로세스 살아있음."""
+        return {"status": "ok"}
 
-@app.get("/health/ready")
-def health_ready():
-    """Readiness probe — 현재 선택된 실행 경로의 준비 상태 확인."""
-    # 1. Supabase 연결 (실제 쿼리)
-    supabase_ok = False
-    try:
-        from app.db.client import get_supabase
-        client = get_supabase()
-        if client:
-            client.table("sell_sessions").select("id").limit(1).execute()
-            supabase_ok = True
-    except Exception:
+    @application.get("/health/ready")
+    def health_ready():
+        """Readiness probe — 현재 선택된 실행 경로의 준비 상태 확인."""
         supabase_ok = False
+        try:
+            from app.db.client import get_supabase
+            client = get_supabase()
+            if client:
+                client.table("sell_sessions").select("id").limit(1).execute()
+                supabase_ok = True
+        except Exception:
+            supabase_ok = False
 
-    # 2. 현재 선택된 Vision provider 키 확인
-    vision_provider = settings.vision_provider
-    vision_ok = (
-        (vision_provider == "openai" and bool(settings.openai_api_key))
-        or (vision_provider == "gemini" and bool(settings.gemini_api_key))
-    )
+        vision_provider = settings.vision_provider
+        vision_ok = (
+            (vision_provider == "openai" and bool(settings.openai_api_key))
+            or (vision_provider == "gemini" and bool(settings.gemini_api_key))
+        )
 
-    # 3. LLM provider (최소 1개)
-    has_llm = any([
-        bool(settings.openai_api_key),
-        bool(settings.gemini_api_key),
-        bool(getattr(settings, "upstage_api_key", None)),
-    ])
+        has_llm = any([
+            bool(settings.openai_api_key),
+            bool(settings.gemini_api_key),
+            bool(getattr(settings, "upstage_api_key", None)),
+        ])
 
-    # 4. Publish credentials (선택된 플랫폼)
-    publish_targets = {"bunjang", "joongna"}
-    publish_ok = any([
-        "bunjang" in publish_targets and bool(settings.bunjang_username),
-        "joongna" in publish_targets and bool(settings.joongna_username),
-    ])
+        publish_targets = {"bunjang", "joongna"}
+        publish_ok = any([
+            "bunjang" in publish_targets and bool(settings.bunjang_username),
+            "joongna" in publish_targets and bool(settings.joongna_username),
+        ])
 
-    checks = {
-        "supabase": supabase_ok,
-        "vision_provider": vision_ok,
-        "llm_provider": has_llm,
-        "publish_credentials": publish_ok,
-    }
-    all_ready = all(checks.values())
-    return {
-        "status": "ready" if all_ready else "degraded",
-        "service": settings.app_name,
-        "environment": settings.environment,
-        "checks": checks,
-    }
+        checks = {
+            "supabase": supabase_ok,
+            "vision_provider": vision_ok,
+            "llm_provider": has_llm,
+            "publish_credentials": publish_ok,
+        }
+        all_ready = all(checks.values())
+        return {
+            "status": "ready" if all_ready else "degraded",
+            "service": settings.app_name,
+            "environment": settings.environment,
+            "checks": checks,
+        }
+
+    @application.get("/health")
+    def health():
+        """하위 호환 — /health/ready와 동일."""
+        return health_ready()
+
+    # 라우터
+    application.include_router(session_router, prefix=settings.api_v1_prefix)
+
+    # 업로드 이미지 정적 서빙
+    if os.path.isdir("uploads"):
+        from fastapi.staticfiles import StaticFiles
+        application.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+    return application
 
 
-@app.get("/health")
-def health():
-    """하위 호환 — /health/ready와 동일."""
-    return health_ready()
-
-app.include_router(session_router, prefix=settings.api_v1_prefix)
-
-# 업로드 이미지 정적 서빙
-import os
-if os.path.isdir("uploads"):
-    from fastapi.staticfiles import StaticFiles
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app = create_app()

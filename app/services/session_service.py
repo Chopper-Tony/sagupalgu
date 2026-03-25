@@ -215,19 +215,24 @@ class SessionService:
         publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
         set_publish_complete(workflow_meta, publish_results)
 
+        final_status = "completed"
         if any_failure:
-            product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
-            recovery_result = self.recovery_service.run_recovery(
-                session_id=session_id, product_data=product_data, publish_results=publish_results,
-            )
-            set_publish_diagnostics(
-                workflow_meta, recovery_result["publish_diagnostics"], recovery_result["tool_calls"],
-            )
+            self._handle_publish_failure(session_id, workflow_meta, publish_results)
             final_status = "publishing_failed"
-        else:
-            final_status = "completed"
 
         return self._persist_and_respond(session_id, final_status, workflow_meta=workflow_meta)
+
+    def _handle_publish_failure(
+        self, session_id: str, workflow_meta: Dict, publish_results: Dict,
+    ) -> None:
+        """게시 실패 시 recovery 서비스를 호출하고 진단 결과를 meta에 기록한다."""
+        product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
+        recovery_result = self.recovery_service.run_recovery(
+            session_id=session_id, product_data=product_data, publish_results=publish_results,
+        )
+        set_publish_diagnostics(
+            workflow_meta, recovery_result["publish_diagnostics"], recovery_result["tool_calls"],
+        )
 
     # ── 판매 상태 입력 ─────────────────────────────────────────────
 

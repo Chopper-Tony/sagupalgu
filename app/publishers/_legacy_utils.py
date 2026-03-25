@@ -1,5 +1,6 @@
 from pathlib import Path
-from legacy_spikes.secondhand_publisher.core.models import (
+
+from app.publishers._legacy_compat import (
     ListingPackage as LegacyListingPackage,
     ProductCondition,
     SellStrategy,

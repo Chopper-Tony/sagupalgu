@@ -4,12 +4,10 @@ from pathlib import Path
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
-from legacy_spikes.secondhand_publisher.publishers.bunjang import (
-    BunjangPublisher as LegacyBunjangPublisher,
-)
-from legacy_spikes.secondhand_publisher.core.models import (
+from app.publishers._legacy_compat import (
+    LegacyBunjangPublisher,
     ListingPackage,
-    PublishResult,
+    LegacyPublishResult as PublishResult,
     Platform,
 )
 

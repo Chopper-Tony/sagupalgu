@@ -316,6 +316,9 @@ python -m pytest tests/ -m integration
 | M48: README 발표용 재작성 | ✅ 완료 | README.md 전면 재작성(프로젝트 소개·아키텍처 다이어그램·Goal-driven 테이블·기술 스택·빠른 시작·테스트 구조·API 엔드포인트·프로젝트 구조·환경 변수) ✅ |
 | M49: CI 파이프라인 보강 | ✅ 완료 | ci.yml에 type-sync 잡 추가(generate_api_types.py --check) ✅, 테스트를 unit→integration→full 3단계 분리 ✅, docker-build가 type-sync 의존 추가 ✅ |
 | M50: 프론트엔드 이미지 표시 | ✅ 완료 | DraftCard에 이미지 갤러리 추가(listing.images 렌더링·100px 썸네일·가로 스크롤) ✅, ImageUploadCard에 업로드 프리뷰 추가(File→ObjectURL·80px 썸네일) ✅, 빌드 에러 0 ✅ |
+| M51: create_app() 팩토리 패턴 | ✅ 완료 | main.py를 create_app() 함수로 래핑(import 시점 결합 해소·테스트 환경 분리·부트 안정화) ✅, 462 테스트 통과 ✅ |
+| M52: legacy_spikes 의존 정리 | ✅ 완료 | app/publishers/_legacy_compat.py 신설(legacy_spikes import 단일 진입점·try/except 안전 import) ✅, app/ 내 7곳 legacy_spikes 직접 import → _legacy_compat 경유로 전환 ✅, 462 테스트 통과 ✅ |
+| M53: SessionService 정리 | ✅ 완료 | publish_session에서 _handle_publish_failure 헬퍼 추출(recovery 로직 분리) ✅, SessionService는 이미 도메인 서비스에 위임하는 얇은 오케스트레이터 구조이므로 추가 분리보다 현재 구조 유지 ✅, 462 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
