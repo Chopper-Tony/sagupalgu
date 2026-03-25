@@ -22,6 +22,10 @@ htmlcov/
 .python-version
 
 # =========================
+# Uploads (런타임 이미지)
+# =========================
+uploads/
+
 # Environment variables
 # =========================
 .env

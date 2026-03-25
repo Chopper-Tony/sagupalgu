@@ -71,3 +71,35 @@ class TestGetSession:
         mock_svc.get_session.side_effect = SessionNotFoundError("세션 없음")
         resp = client.get(f"{BASE}/missing")
         assert "detail" in resp.json()
+
+
+class TestResponseShape:
+    """프론트엔드 SessionResponse 계약과 백엔드 응답 shape 일치 검증."""
+
+    FRONTEND_REQUIRED_FIELDS = {
+        "session_id", "status", "next_action", "needs_user_input",
+        "clarification_prompt", "product_candidates", "confirmed_product",
+        "canonical_listing", "market_context", "platform_results",
+        "optimization_suggestion", "rewrite_instruction", "last_error",
+        "image_urls", "selected_platforms",
+    }
+
+    @pytest.mark.integration
+    def test_create_session_has_all_frontend_fields(self, client):
+        data = client.post(BASE).json()
+        missing = self.FRONTEND_REQUIRED_FIELDS - set(data.keys())
+        assert missing == set(), f"응답에 프론트엔드 필수 필드 누락: {missing}"
+
+    @pytest.mark.integration
+    def test_get_session_has_all_frontend_fields(self, client):
+        data = client.get(f"{BASE}/sess-001").json()
+        missing = self.FRONTEND_REQUIRED_FIELDS - set(data.keys())
+        assert missing == set(), f"응답에 프론트엔드 필수 필드 누락: {missing}"
+
+    @pytest.mark.integration
+    def test_flat_fields_types(self, client):
+        data = client.get(f"{BASE}/sess-001").json()
+        assert isinstance(data["image_urls"], list)
+        assert isinstance(data["product_candidates"], list)
+        assert isinstance(data["platform_results"], list)
+        assert isinstance(data["selected_platforms"], list)

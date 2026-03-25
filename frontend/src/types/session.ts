@@ -98,6 +98,5 @@ export interface SessionResponse {
   rewrite_instruction: string | null;
   last_error: string | null;
   image_urls: string[];
-  created_at: string;
-  updated_at: string;
+  selected_platforms: string[];
 }

@@ -11,14 +11,14 @@ class TestUploadImages:
     def test_returns_images_uploaded_status(self, client):
         resp = client.post(
             f"{BASE}/sess-001/images",
-            json={"image_urls": ["https://example.com/img.jpg"]},
+            files=[("files", ("test.jpg", b"fake-image-data", "image/jpeg"))],
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "images_uploaded"
 
     @pytest.mark.integration
-    def test_missing_image_urls_returns_422(self, client):
-        resp = client.post(f"{BASE}/sess-001/images", json={})
+    def test_missing_files_returns_422(self, client):
+        resp = client.post(f"{BASE}/sess-001/images")
         assert resp.status_code == 422
 
     @pytest.mark.integration
@@ -26,7 +26,7 @@ class TestUploadImages:
         mock_svc.attach_images.side_effect = InvalidStateTransitionError("wrong state")
         resp = client.post(
             f"{BASE}/sess-001/images",
-            json={"image_urls": ["https://example.com/img.jpg"]},
+            files=[("files", ("test.jpg", b"fake-image-data", "image/jpeg"))],
         )
         assert resp.status_code == 409
 

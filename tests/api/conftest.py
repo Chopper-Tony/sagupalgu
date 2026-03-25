@@ -15,8 +15,19 @@ SESSION_UI = {
     "checkpoint": None,
     "next_action": "upload_images",
     "needs_user_input": False,
-    "user_input_prompt": None,
+    # 평탄화 필드 (프론트엔드 계약)
+    "clarification_prompt": None,
+    "image_urls": [],
+    "product_candidates": [],
+    "confirmed_product": None,
+    "canonical_listing": None,
+    "market_context": None,
+    "platform_results": [],
+    "optimization_suggestion": None,
+    "rewrite_instruction": None,
+    "last_error": None,
     "selected_platforms": [],
+    # 중첩 필드 (하위 호환)
     "product": {
         "image_paths": [],
         "image_count": 0,
