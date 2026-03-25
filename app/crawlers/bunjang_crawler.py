@@ -1,4 +1,4 @@
-from legacy_spikes.secondhand_publisher.utils.market_crawler import MarketCrawler
+from app.publishers._legacy_compat import MarketCrawler
 
 
 def _build_query(confirmed_product: dict) -> str:

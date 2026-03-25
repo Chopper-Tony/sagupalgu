@@ -1,6 +1,4 @@
-from legacy_spikes.secondhand_publisher.publishers.joongna import (
-    JoongnaPublisher as LegacyJoongnaPublisher,
-)
+from app.publishers._legacy_compat import LegacyJoongnaPublisher
 
 from app.core.config import settings
 from app.publishers.publisher_interface import (

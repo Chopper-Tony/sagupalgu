@@ -1,5 +1,5 @@
 import asyncio
-from legacy_spikes.secondhand_publisher.publishers.daangn import DaangnPublisher as LegacyDaangnPublisher
+from app.publishers._legacy_compat import LegacyDaangnPublisher
 from app.publishers.publisher_interface import PlatformPackage, PublisherAccountContext, PublishResult, PlatformPublisher
 from app.publishers._legacy_utils import to_legacy_listing_package
 
