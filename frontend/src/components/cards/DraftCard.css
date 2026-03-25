@@ -49,6 +49,22 @@
   color: #666;
 }
 
+.draft-card__images {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.draft-card__image {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #2a2a2e;
+  flex-shrink: 0;
+}
+
 .draft-card__content {
   background: #0f0f10;
   border: 1px solid #2a2a2e;

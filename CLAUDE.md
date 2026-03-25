@@ -313,6 +313,9 @@ python -m pytest tests/ -m integration
 | M45: RAG stub 제거 | ✅ 완료 | rag_price_retrieval.py(3줄 TODO stub) 삭제 ✅, 실제 RAG 구현은 market_tools.py에 이미 완전 구현(pgvector 벡터 검색→키워드 검색→LLM 추정 3단계) ✅, import 전수 검증(참조 0건) ✅ |
 | M46: E2E 통합 테스트 | ✅ 완료 | test_e2e_happy_path.py 신설(전체 세션 라이프사이클 8단계 API 체인·상태 전이 순서 검증·모든 단계 프론트 필드 shape 검증) ✅, 454→457 테스트 통과 ✅ |
 | M47: 프론트엔드 타입 자동 동기화 | ✅ 완료 | scripts/generate_api_types.py 신설(OpenAPI→TypeScript 타입 생성·--check CI 모드) ✅, frontend/src/types/api-generated.ts 자동 생성(SessionStatusGenerated 13상태·SessionResponseGenerated 16필드) ✅, test_api_type_sync.py 5개(상태 집합 일치·필드 존재·파일 존재 검증) ✅, 457→462 테스트 통과 ✅ |
+| M48: README 발표용 재작성 | ✅ 완료 | README.md 전면 재작성(프로젝트 소개·아키텍처 다이어그램·Goal-driven 테이블·기술 스택·빠른 시작·테스트 구조·API 엔드포인트·프로젝트 구조·환경 변수) ✅ |
+| M49: CI 파이프라인 보강 | ✅ 완료 | ci.yml에 type-sync 잡 추가(generate_api_types.py --check) ✅, 테스트를 unit→integration→full 3단계 분리 ✅, docker-build가 type-sync 의존 추가 ✅ |
+| M50: 프론트엔드 이미지 표시 | ✅ 완료 | DraftCard에 이미지 갤러리 추가(listing.images 렌더링·100px 썸네일·가로 스크롤) ✅, ImageUploadCard에 업로드 프리뷰 추가(File→ObjectURL·80px 썸네일) ✅, 빌드 에러 0 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
