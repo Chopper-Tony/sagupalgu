@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
-VALID_PLATFORMS: frozenset[str] = frozenset({"bunjang", "joongna"})
+VALID_PLATFORMS: frozenset[str] = frozenset({"bunjang", "joongna", "daangn"})
 
 
 # ── 에러 응답 ──────────────────────────────────────────────────────

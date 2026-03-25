@@ -9,7 +9,12 @@ interface DraftCardProps {
   onRewrite: (instruction: string) => void;
 }
 
-const PLATFORMS = ["번개장터", "중고나라"];
+const PLATFORM_MAP: Record<string, string> = {
+  "번개장터": "bunjang",
+  "중고나라": "joongna",
+  "당근마켓": "daangn",
+};
+const PLATFORMS = Object.keys(PLATFORM_MAP);
 
 export function DraftCard({ listing, marketContext, onApprove, onRewrite }: DraftCardProps) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(PLATFORMS);
@@ -96,7 +101,7 @@ export function DraftCard({ listing, marketContext, onApprove, onRewrite }: Draf
       <div className="draft-card__actions">
         <button
           className="draft-card__approve-btn"
-          onClick={() => onApprove(selectedPlatforms)}
+          onClick={() => onApprove(selectedPlatforms.map((p) => PLATFORM_MAP[p] ?? p))}
           disabled={selectedPlatforms.length === 0}
         >
           게시 준비

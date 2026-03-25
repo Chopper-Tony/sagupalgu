@@ -63,7 +63,14 @@ class PublishService:
             )
 
         if platform == "daangn":
-            raise ValueError("Daangn publisher not implemented yet")
+            return PublisherAccountContext(
+                platform_account_id="env-daangn",
+                platform="daangn",
+                auth_type="device",
+                secret_payload={
+                    "device_id": settings.daangn_device_id or "",
+                },
+            )
 
         raise ValueError(f"Unsupported platform: {platform}")
 

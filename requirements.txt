@@ -37,5 +37,6 @@ pillow>=10.0.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 
-# Android automation (daangn - not implemented)
+# Android automation (daangn — optional, 에뮬레이터 환경에서만 필요)
+# pip install uiautomator2 && python -m uiautomator2 init
 # uiautomator2>=3.0.0
