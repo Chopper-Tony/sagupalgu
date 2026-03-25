@@ -204,7 +204,9 @@ class TestHealthEndpoint:
         assert "checks" in data
         checks = data["checks"]
         assert "supabase" in checks
+        assert "vision_provider" in checks
         assert "llm_provider" in checks
+        assert "publish_credentials" in checks
 
     @pytest.mark.integration
     def test_checks_are_booleans(self, api_client):

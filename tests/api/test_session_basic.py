@@ -26,7 +26,9 @@ class TestHealth:
         data = resp.json()
         assert "checks" in data
         assert "supabase" in data["checks"]
+        assert "vision_provider" in data["checks"]
         assert "llm_provider" in data["checks"]
+        assert "publish_credentials" in data["checks"]
 
 
 class TestCreateSession:
