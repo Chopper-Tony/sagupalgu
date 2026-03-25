@@ -1,4 +1,10 @@
 .image-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-upload-card__dropzone {
   background: #1e1e22;
   border: 2px dashed #3a3a3e;
   border-radius: 12px;
@@ -11,7 +17,7 @@
   transition: border-color 0.15s, background 0.15s;
 }
 
-.image-upload-card:hover {
+.image-upload-card__dropzone:hover {
   border-color: #2563eb;
   background: #16213e;
 }
@@ -43,4 +49,20 @@
   font-size: 13px;
   cursor: pointer;
   pointer-events: none;
+}
+
+.image-upload-card__previews {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.image-upload-card__preview {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #2a2a2e;
+  flex-shrink: 0;
 }

@@ -51,6 +51,20 @@ export function DraftCard({ listing, marketContext, onApprove, onRewrite }: Draf
         </div>
       )}
 
+      {listing.images && listing.images.length > 0 && (
+        <div className="draft-card__images">
+          {listing.images.map((url, i) => (
+            <img
+              key={i}
+              src={url}
+              alt={`상품 이미지 ${i + 1}`}
+              className="draft-card__image"
+              loading="lazy"
+            />
+          ))}
+        </div>
+      )}
+
       <div className="draft-card__content">
         <p className="draft-card__listing-title">{listing.title}</p>
         <p className="draft-card__price">{listing.price.toLocaleString()}원</p>
