@@ -25,7 +25,13 @@ export default function App() {
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {
-    setTimeline((prev) => [...prev, { ...item, id: nextId() } as TimelineItem]);
+    setTimeline((prev) => {
+      // 새 카드나 progress가 들어오면 이전 progress 아이템을 제거
+      const filtered = (item.type === "card" || item.type === "progress")
+        ? prev.filter((p) => p.type !== "progress")
+        : prev;
+      return [...filtered, { ...item, id: nextId() } as TimelineItem];
+    });
   }, []);
 
   // 세션 상태 변화 시 카드 아이템 타임라인에 추가
@@ -59,8 +65,10 @@ export default function App() {
     pushItem({ type: "user_message", text });
     try {
       if (currentStatus === "awaiting_product_confirmation") {
-        const updated = await api.provideProductInfo(activeId, { model: text });
-        setSession(updated);
+        pushItem({ type: "progress", status: "product_confirmed", message: "시세를 분석하고 판매글을 생성하고 있습니다..." });
+        await api.provideProductInfo(activeId, { model: text });
+        const listing = await api.generateListing(activeId);
+        setSession(listing);
       } else if (currentStatus === "draft_generated") {
         pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
         const updated = await api.rewriteListing(activeId, text);
@@ -76,8 +84,10 @@ export default function App() {
     pushItem({ type: "user_message", text: `📷 사진 ${files.length}장을 업로드했습니다` });
     pushItem({ type: "progress", status: "images_uploaded", message: "이미지를 분석하고 있습니다..." });
     try {
-      const updated = await api.uploadImages(activeId, files);
-      setSession(updated);
+      await api.uploadImages(activeId, files);
+      // 업로드 후 자동으로 분석 시작
+      const analyzed = await api.analyzeSession(activeId);
+      setSession(analyzed);
     } catch (e: unknown) {
       pushItem({ type: "error", code: "upload_failed", message: e instanceof Error ? e.message : "업로드에 실패했습니다." });
     }
@@ -93,12 +103,15 @@ export default function App() {
         case "confirm_product": {
           const product = payload as ConfirmedProduct;
           pushItem({ type: "assistant_message", text: `${product.brand} ${product.model} (${product.category})로 확정했습니다.` });
-          const updated = await api.provideProductInfo(activeId, {
+          pushItem({ type: "progress", status: "product_confirmed", message: "시세를 분석하고 판매글을 생성하고 있습니다..." });
+          await api.provideProductInfo(activeId, {
             model: product.model,
             brand: product.brand,
             category: product.category,
           });
-          setSession(updated);
+          // 확정 후 자동으로 판매글 생성
+          const listing = await api.generateListing(activeId);
+          setSession(listing);
           break;
         }
         case "prepare_publish": {

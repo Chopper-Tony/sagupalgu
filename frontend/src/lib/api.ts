@@ -2,8 +2,8 @@ import axios from "axios";
 import type { SessionResponse } from "../types";
 
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
-  timeout: 30000,
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1",
+  timeout: 120000,
 });
 
 export const api = {
@@ -20,6 +20,9 @@ export const api = {
       .post<SessionResponse>(`/sessions/${id}/images`, form)
       .then((r) => r.data);
   },
+
+  analyzeSession: (id: string) =>
+    client.post<SessionResponse>(`/sessions/${id}/analyze`).then((r) => r.data),
 
   provideProductInfo: (id: string, productInfo: { model: string; brand?: string; category?: string }) =>
     client
