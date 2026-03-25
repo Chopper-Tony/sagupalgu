@@ -125,9 +125,14 @@ class TestPreparePublishRequestValidation:
             PreparePublishRequest(platform_targets=[])
 
     @pytest.mark.unit
+    def test_daangn_platform_accepted(self):
+        req = PreparePublishRequest(platform_targets=["daangn"])
+        assert req.platform_targets == ["daangn"]
+
+    @pytest.mark.unit
     def test_unknown_platform_rejected(self):
         with pytest.raises(ValidationError, match="지원하지 않는 플랫폼"):
-            PreparePublishRequest(platform_targets=["daangn"])
+            PreparePublishRequest(platform_targets=["ebay"])
 
     @pytest.mark.unit
     def test_mixed_valid_invalid_rejected(self):
@@ -138,7 +143,7 @@ class TestPreparePublishRequestValidation:
     def test_unknown_platform_returns_422(self, client):
         resp = client.post(
             f"{BASE}/sess-001/prepare-publish",
-            json={"platform_targets": ["daangn"]},
+            json={"platform_targets": ["ebay"]},
         )
         assert resp.status_code == 422
 

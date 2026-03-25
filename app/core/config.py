@@ -99,6 +99,15 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------
+    # Daangn (Android emulator)
+    # ------------------------------
+
+    daangn_device_id: str | None = Field(
+        default=None,
+        alias="DAANGN_DEVICE_ID",
+    )
+
+    # ------------------------------
     # Publish runtime
     # ------------------------------
 
