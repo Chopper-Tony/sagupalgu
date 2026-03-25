@@ -71,12 +71,12 @@ export function DraftCard({ listing, marketContext, onApprove, onRewrite }: Draf
       )}
 
       <div className="draft-card__content">
-        <p className="draft-card__listing-title">{listing.title}</p>
-        <p className="draft-card__price">{listing.price.toLocaleString()}원</p>
-        <p className="draft-card__description">{listing.description}</p>
-        {listing.tags.length > 0 && (
+        <p className="draft-card__listing-title">{listing.title || "제목 없음"}</p>
+        <p className="draft-card__price">{(listing.price ?? 0).toLocaleString()}원</p>
+        <p className="draft-card__description">{listing.description || ""}</p>
+        {(listing.tags ?? []).length > 0 && (
           <div className="draft-card__tags">
-            {listing.tags.map((t) => (
+            {(listing.tags ?? []).map((t) => (
               <span key={t} className="draft-card__tag">#{t}</span>
             ))}
           </div>

@@ -321,7 +321,8 @@ python -m pytest tests/ -m integration
 | M53: SessionService 정리 | ✅ 완료 | publish_session에서 _handle_publish_failure 헬퍼 추출(recovery 로직 분리) ✅, SessionService는 이미 도메인 서비스에 위임하는 얇은 오케스트레이터 구조이므로 추가 분리보다 현재 구조 유지 ✅, 462 테스트 통과 ✅ |
 | P2-1: 당근 자동 게시 통합 | ✅ 완료 | VALID_PLATFORMS에 daangn 추가 ✅, DaangnPublisher dependency 체크+에러분류+로깅 ✅, config DAANGN_DEVICE_ID ✅, DraftCard 플랫폼 한글→영문 매핑 ✅, 463 테스트 통과 ✅ |
 | P2-2: 게시 실패 Discord 알림 | ✅ 완료 | DISCORD_ALERT_THRESHOLD=3 ✅, _handle_publish_failure에서 누적 실패 추적→3회 이상 Discord 자동 발송 ✅, 465 테스트 통과 ✅ |
-| E2E 버그 수정 | ✅ 완료 | ProgressCard 스택 버그 수정(새 카드 시 이전 progress 제거) ✅, LLM fallback 순서를 LISTING_LLM_PROVIDER 설정 존중 ✅, Gemini Vision mock→실구현(Google AI API) ✅, 프론트 auto-analyze+auto-generateListing ✅, baseURL /api/v1 ✅, timeout 120초 ✅, 에러 메시지 사용자 친화적 변환 ✅, 백엔드 로그 노이즈 제거(hpack/httpcore WARNING) ✅, 465 테스트 통과 ✅ |
+| E2E 버그 수정 | ✅ 완료 | ProgressCard 스택 버그 수정(새 카드 시 이전 progress 제거) ✅, LLM fallback 순서를 LISTING_LLM_PROVIDER 설정 존중 ✅, Gemini Vision mock→실구현(Google AI API) ✅, 프론트 auto-analyze+auto-generateListing ✅, baseURL /api/v1 ✅, timeout 120초 ✅, 에러 메시지 사용자 친화적 변환 ✅, 백엔드 로그 노이즈 제거(hpack/httpcore WARNING) ✅, orphan builders 삭제 ✅, readiness 정교화(meta 분리) ✅, daangn_crawler EXPERIMENTAL 명시 ✅, 465→466 테스트 통과 ✅ |
+| E2E 실테스트 + 긴급 수정 | ✅ 완료 | LangGraph _run_async Windows 이벤트루프 문제 발견→fallback 직접 LLM 호출 구현(generate_copy→build_template_copy 2단 fallback) ✅, fallback 가격 0원→strategy.recommended_price 보정 ✅, DraftCard null-safe 렌더링(price·tags·title) ✅, ProductConfirmationCard placeholder 한글화(애플/아이폰 15 프로/스마트폰) ✅, debug_session.py 디버그 스크립트 신설 ✅, **E2E 게시 준비까지 완전 성공**(세션생성→이미지→분석→확정→시세크롤링21개→판매글생성→가격698400원→게시준비→게시시도) ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

@@ -75,19 +75,19 @@ export function ProductConfirmationCard({
         <div className="product-confirm-card__fields">
           <input
             className="product-confirm-card__input"
-            placeholder="브랜드 (예: Apple)"
+            placeholder="브랜드 (예: 애플, 삼성, LG)"
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
           />
           <input
             className="product-confirm-card__input"
-            placeholder="모델명 (예: iPhone 15 Pro)"
+            placeholder="모델명 (예: 아이폰 15 프로, 갤럭시 S24)"
             value={model}
             onChange={(e) => setModel(e.target.value)}
           />
           <input
             className="product-confirm-card__input"
-            placeholder="카테고리 (예: 스마트폰)"
+            placeholder="카테고리 (예: 스마트폰, 노트북, 태블릿)"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           />
