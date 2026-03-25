@@ -111,3 +111,9 @@ def health():
     return health_ready()
 
 app.include_router(session_router, prefix=settings.api_v1_prefix)
+
+# 업로드 이미지 정적 서빙
+import os
+if os.path.isdir("uploads"):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

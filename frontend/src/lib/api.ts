@@ -14,12 +14,10 @@ export const api = {
     client.get<SessionResponse>(`/sessions/${id}`).then((r) => r.data),
 
   uploadImages: (id: string, files: File[]) => {
-    // 백엔드는 image_urls (HTTP(S) URL 목록)을 기대.
-    // 파일 업로드는 별도 스토리지 경유 후 URL을 전달해야 함.
-    // MVP: ObjectURL을 전달 (실제 배포 시 Supabase Storage 경유로 전환)
-    const urls = files.map((f) => URL.createObjectURL(f));
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
     return client
-      .post<SessionResponse>(`/sessions/${id}/images`, { image_urls: urls })
+      .post<SessionResponse>(`/sessions/${id}/images`, form)
       .then((r) => r.data);
   },
 

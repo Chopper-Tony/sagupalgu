@@ -93,19 +93,8 @@ class TestUploadImagesRequestValidation:
         assert req.image_urls[0] == "https://example.com/img.jpg"
 
     @pytest.mark.integration
-    def test_invalid_url_returns_422(self, client):
-        resp = client.post(
-            f"{BASE}/sess-001/images",
-            json={"image_urls": ["not-a-url"]},
-        )
-        assert resp.status_code == 422
-
-    @pytest.mark.integration
-    def test_empty_list_returns_422(self, client):
-        resp = client.post(
-            f"{BASE}/sess-001/images",
-            json={"image_urls": []},
-        )
+    def test_no_files_returns_422(self, client):
+        resp = client.post(f"{BASE}/sess-001/images")
         assert resp.status_code == 422
 
 

@@ -4,7 +4,11 @@
 예외 처리는 main.py 글로벌 핸들러에 위임한다.
 엔드포인트는 순수한 서비스 호출 + 응답 변환만 담당.
 """
-from fastapi import APIRouter, Depends
+import os
+import uuid
+from typing import List
+
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.dependencies import get_session_service
 from app.schemas.session import (
@@ -51,11 +55,24 @@ async def get_session(
 @router.post("/{session_id}/images", response_model=UploadImagesResponse)
 async def upload_images(
     session_id: str,
-    request: UploadImagesRequest,
+    files: List[UploadFile] = File(..., description="업로드할 이미지 파일"),
     session_service: SessionService = Depends(get_session_service),
 ):
+    upload_dir = os.path.join("uploads", session_id)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    image_urls: List[str] = []
+    for f in files:
+        ext = os.path.splitext(f.filename or "img.jpg")[1] or ".jpg"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        content = await f.read()
+        with open(filepath, "wb") as fh:
+            fh.write(content)
+        image_urls.append(f"/uploads/{session_id}/{filename}")
+
     result = await session_service.attach_images(
-        session_id=session_id, image_urls=request.image_urls,
+        session_id=session_id, image_urls=image_urls,
     )
     return UploadImagesResponse(**result)
 
