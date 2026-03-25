@@ -185,6 +185,11 @@ def _build_prompts(
         "3. 툴 호출 결과(JSON)를 그대로 최종 응답으로 출력한다."
     )
 
+    from app.domain.goal_strategy import get_copywriting_tone
+
+    goal = state.get("mission_goal", "balanced")
+    tone_instruction = get_copywriting_tone(goal)
+
     selected_platforms = state.get("selected_platforms") or ["bunjang", "joongna"]
     user_prompt = (
         f"상품 정보:\n"
@@ -194,6 +199,8 @@ def _build_prompts(
         f"- 추천 가격: {_safe_int(strategy.get('recommended_price'), 0)}원\n"
         f"- 이미지 경로: {json.dumps(image_paths, ensure_ascii=False)}\n"
         f"- 플랫폼: {json.dumps(selected_platforms, ensure_ascii=False)}\n"
+        f"- 판매 목표: {goal}\n"
+        f"- 판매 전략 톤: {tone_instruction}\n"
         f"{existing_summary}"
         f"{task_directive}\n"
         + (f"\n이전 툴 호출 기록:\n{prior_tool_calls}" if prior_tool_calls else "")

@@ -123,15 +123,21 @@ def build_rewrite_context(canonical_listing: dict, instruction: str) -> str:
 # ── 가격 전략 ────────────────────────────────────────────────────
 
 
-def build_pricing_strategy(median_price: int | float) -> dict[str, Any]:
-    """시세 기반 가격 전략을 생성한다."""
+def build_pricing_strategy(
+    median_price: int | float,
+    goal: str = "balanced",
+) -> dict[str, Any]:
+    """시세 기반 가격 전략을 생성한다. goal에 따라 배수·정책이 달라진다."""
+    from app.domain.goal_strategy import get_negotiation_policy, get_pricing_multiplier
+
+    multiplier = get_pricing_multiplier(goal, sample_count=3)
     if median_price <= 0:
         recommended_price = 0
     else:
-        recommended_price = int(median_price * 0.97)
+        recommended_price = int(median_price * multiplier)
 
     return {
-        "goal": "fast_sell",
+        "goal": goal,
         "recommended_price": recommended_price,
-        "negotiation_policy": "small negotiation allowed",
+        "negotiation_policy": get_negotiation_policy(goal),
     }

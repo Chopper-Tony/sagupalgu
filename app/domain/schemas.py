@@ -19,7 +19,7 @@ class CanonicalListingSchema(BaseModel):
     price: int
     tags: List[str] = []
     images: List[str] = []
-    strategy: str = "fast_sell"
+    strategy: str = "balanced"
     product: Dict[str, Any] = {}
 
     @field_validator("title")

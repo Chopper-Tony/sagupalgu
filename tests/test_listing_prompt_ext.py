@@ -73,7 +73,21 @@ class TestBuildPricingStrategy:
     def test_positive_median_applies_discount(self):
         result = build_pricing_strategy(100000)
         assert result["recommended_price"] == 97000
+        assert result["goal"] == "balanced"
+
+    @pytest.mark.unit
+    def test_goal_fast_sell_applies_larger_discount(self):
+        result = build_pricing_strategy(100000, goal="fast_sell")
+        assert result["recommended_price"] == 90000
         assert result["goal"] == "fast_sell"
+        assert result["negotiation_policy"] == "negotiation welcome, fast deal priority"
+
+    @pytest.mark.unit
+    def test_goal_profit_max_applies_premium(self):
+        result = build_pricing_strategy(100000, goal="profit_max")
+        assert result["recommended_price"] == 105000
+        assert result["goal"] == "profit_max"
+        assert result["negotiation_policy"] == "firm price, value justified"
 
     @pytest.mark.unit
     def test_zero_median_gives_zero_price(self):

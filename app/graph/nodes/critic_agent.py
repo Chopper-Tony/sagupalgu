@@ -38,6 +38,8 @@ def listing_critic_node(state: SellerCopilotState) -> SellerCopilotState:
     strategy = state.get("strategy") or {}
     market_context = state.get("market_context") or {}
 
+    goal = state.get("mission_goal", "balanced")
+
     # LLM 기반 비평 시도
     critique = _run_llm_critique(state, listing, product, strategy, market_context)
 
@@ -47,7 +49,7 @@ def listing_critic_node(state: SellerCopilotState) -> SellerCopilotState:
         state["critic_rewrite_instructions"] = critique.get("rewrite_instructions", [])
     else:
         # LLM 실패 시 룰 기반 fallback
-        critique = _rule_based_critique(listing, product, market_context)
+        critique = _rule_based_critique(listing, product, market_context, goal=goal)
         state["critic_score"] = critique["score"]
         state["critic_feedback"] = critique["issues"]
         state["critic_rewrite_instructions"] = critique["rewrite_instructions"]
@@ -101,8 +103,17 @@ def _run_llm_critique(
 
 def _build_critic_prompt(listing: Dict, product: Dict, strategy: Dict, market_context: Dict) -> str:
     """비평 프롬프트를 조립한다."""
-    goal = strategy.get("goal", "fast_sell")
+    from app.domain.goal_strategy import get_copywriting_tone
+
+    goal = strategy.get("goal", "balanced")
     median_price = market_context.get("median_price", 0)
+    tone_desc = get_copywriting_tone(goal)
+
+    goal_guidance = {
+        "fast_sell": "빠른 판매가 목표입니다. 간결함과 긴급감을 중시하되, 너무 짧으면 감점하세요.",
+        "balanced": "적정 가격과 신뢰도 균형이 목표입니다. 상태·구성품 정보 충실도를 중시하세요.",
+        "profit_max": "수익 극대화가 목표입니다. 프리미엄 느낌과 상세 스펙 부각을 중시하세요.",
+    }.get(goal, "적정 가격과 신뢰도 균형이 목표입니다.")
 
     return f"""당신은 중고거래 판매글 품질 평가 전문가입니다.
 아래 판매글을 구매자 관점에서 냉정하게 평가하세요.
@@ -116,12 +127,15 @@ def _build_critic_prompt(listing: Dict, product: Dict, strategy: Dict, market_co
   "rewrite_instructions": ["구체적 수정 지시1", "구체적 수정 지시2"]
 }}
 
+판매 목표: {goal}
+{goal_guidance}
+기대 톤: {tone_desc}
+
 평가 기준:
 - 제목: 검색 키워드 포함, 모델명 명확, 클릭 유도
 - 설명: 상태 정보, 구성품, 거래 조건 포함 여부
 - 가격: 시세 대비 적정성 (시세 중앙값: {median_price}원)
 - 신뢰: 구매자가 안심할 수 있는 정보 포함 여부
-- 판매 목표: {goal}
 
 판매글:
 - 제목: {listing.get('title', '')}
@@ -159,8 +173,17 @@ def _parse_critique_response(content: str) -> Dict | None:
     return None
 
 
-def _rule_based_critique(listing: Dict, product: Dict, market_context: Dict) -> Dict:
-    """LLM 없이 룰 기반으로 판매글을 평가한다."""
+def _rule_based_critique(
+    listing: Dict, product: Dict, market_context: Dict, goal: str = "balanced",
+) -> Dict:
+    """LLM 없이 룰 기반으로 판매글을 평가한다. goal에 따라 기준이 달라진다."""
+    from app.domain.goal_strategy import get_critic_criteria
+
+    criteria = get_critic_criteria(goal)
+    price_threshold = criteria["price_threshold"]
+    min_desc_len = criteria["min_desc_len"]
+    trust_penalty = criteria["trust_penalty"]
+
     score = 100
     issues = []
     rewrite_instructions = []
@@ -182,26 +205,27 @@ def _rule_based_critique(listing: Dict, product: Dict, market_context: Dict) -> 
         issues.append({"type": "seo", "impact": "medium", "reason": "제목에 모델명이 없습니다"})
         rewrite_instructions.append(f"제목에 '{model}'을 포함하세요")
 
-    # 설명 검사
-    if len(description) < 50:
+    # 설명 검사 (goal별 최소 길이)
+    if len(description) < min_desc_len:
         score -= 15
-        issues.append({"type": "description", "impact": "high", "reason": "설명이 너무 짧습니다"})
+        issues.append({"type": "description", "impact": "high", "reason": f"설명이 너무 짧습니다 (최소 {min_desc_len}자)"})
         rewrite_instructions.append("설명에 상태, 구성품, 거래 조건을 포함하세요")
 
     trust_keywords = ["상태", "구성품", "사용", "배터리", "보증", "직거래", "택배"]
     if not any(kw in description for kw in trust_keywords):
-        score -= 10
+        score -= trust_penalty
         issues.append({"type": "trust", "impact": "high", "reason": "구매자 신뢰 정보가 부족합니다"})
         rewrite_instructions.append("설명에 상품 상태와 거래 방법 정보를 추가하세요")
 
-    # 가격 검사
+    # 가격 검사 (goal별 임계값)
     if price <= 0:
         score -= 20
         issues.append({"type": "price", "impact": "high", "reason": "가격이 0원입니다"})
 
-    if median_price > 0 and price > median_price * 1.3:
+    if median_price > 0 and price > median_price * price_threshold:
+        over_pct = int((price_threshold - 1) * 100)
         score -= 10
-        issues.append({"type": "price", "impact": "medium", "reason": "시세 대비 30% 이상 높습니다"})
+        issues.append({"type": "price", "impact": "medium", "reason": f"시세 대비 {over_pct}% 이상 높습니다"})
 
     return {
         "score": max(0, score),

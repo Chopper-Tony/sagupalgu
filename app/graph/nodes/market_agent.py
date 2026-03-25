@@ -133,27 +133,25 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
 def pricing_strategy_node(state: SellerCopilotState) -> SellerCopilotState:
     _log(state, "agent2:pricing_strategy:start")
 
+    from app.domain.goal_strategy import get_negotiation_policy, get_pricing_multiplier
+
     market_context = state.get("market_context") or {}
     median_price = _safe_int(market_context.get("median_price"), 0)
     sample_count = _safe_int(market_context.get("sample_count"), 0)
+    goal = state.get("mission_goal", "balanced")
 
-    if median_price > 0 and sample_count >= 3:
-        recommended_price = int(round(median_price * 0.97, -3))
-        goal = "fast_sell"
-        _log(state, f"agent2:pricing:data_based price={recommended_price}")
-    elif median_price > 0:
-        recommended_price = int(round(median_price * 0.95, -3))
-        goal = "fast_sell"
-        _log(state, f"agent2:pricing:low_sample fallback price={recommended_price}")
+    multiplier = get_pricing_multiplier(goal, sample_count)
+    if median_price > 0:
+        recommended_price = int(round(median_price * multiplier, -3))
+        _log(state, f"agent2:pricing:goal={goal} multiplier={multiplier} price={recommended_price}")
     else:
         recommended_price = 0
-        goal = "fast_sell"
-        _log(state, "agent2:pricing:no_market_data price=0")
+        _log(state, f"agent2:pricing:no_market_data goal={goal} price=0")
 
     state["strategy"] = PricingStrategy(
         goal=goal,
         recommended_price=recommended_price,
-        negotiation_policy="small negotiation allowed",
+        negotiation_policy=get_negotiation_policy(goal),
     )
     state["checkpoint"] = "B_strategy_complete"
     return state
