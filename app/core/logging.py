@@ -73,3 +73,7 @@ def configure_logging(level: str = "INFO") -> None:
         lgr = logging.getLogger(name)
         lgr.handlers.clear()
         lgr.propagate = True
+
+    # Supabase/HTTP 클라이언트의 과도한 DEBUG 로그 억제
+    for noisy in ("hpack", "httpcore", "httpx", "h2", "h11"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

@@ -12,6 +12,16 @@ import "./App.css";
 let _idCounter = 0;
 const nextId = () => String(++_idCounter);
 
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("409")) return "이미 처리된 요청입니다. 새 세션을 시작해주세요.";
+  if (msg.includes("429") || msg.includes("quota")) return "AI 서비스 이용량을 초과했습니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("timeout")) return "서버 응답이 느립니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("Network Error")) return "네트워크 연결을 확인해주세요.";
+  if (msg.includes("500")) return "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  return msg;
+}
+
 export default function App() {
   const [sessionIds, setSessionIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -75,7 +85,7 @@ export default function App() {
         setSession(updated);
       }
     } catch (e: unknown) {
-      pushItem({ type: "error", code: "action_failed", message: e instanceof Error ? e.message : "요청에 실패했습니다." });
+      pushItem({ type: "error", code: "action_failed", message: friendlyError(e) });
     }
   };
 
@@ -159,7 +169,7 @@ export default function App() {
           break;
       }
     } catch (e: unknown) {
-      pushItem({ type: "error", code: action, message: e instanceof Error ? e.message : "요청에 실패했습니다." });
+      pushItem({ type: "error", code: action, message: friendlyError(e) });
     }
   };
 
