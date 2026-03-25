@@ -104,17 +104,31 @@ def create_app() -> FastAPI:
             bool(getattr(settings, "upstage_api_key", None)),
         ])
 
-        publish_targets = {"bunjang", "joongna"}
-        publish_ok = any([
-            "bunjang" in publish_targets and bool(settings.bunjang_username),
-            "joongna" in publish_targets and bool(settings.joongna_username),
-        ])
+        # 활성 publish target: credential이 설정된 플랫폼만
+        active_publishers = []
+        if settings.bunjang_username:
+            active_publishers.append("bunjang")
+        if settings.joongna_username:
+            active_publishers.append("joongna")
+        if settings.daangn_device_id:
+            active_publishers.append("daangn")
+        publish_ok = len(active_publishers) >= 1
+
+        # LLM provider 상세
+        listing_provider = settings.listing_llm_provider
+        listing_llm_ok = (
+            (listing_provider == "openai" and bool(settings.openai_api_key))
+            or (listing_provider == "gemini" and bool(settings.gemini_api_key))
+            or (listing_provider == "solar" and bool(getattr(settings, "upstage_api_key", None)))
+        )
 
         checks = {
             "supabase": supabase_ok,
             "vision_provider": vision_ok,
-            "llm_provider": has_llm,
+            "listing_llm": listing_llm_ok,
+            "llm_fallback": has_llm,
             "publish_credentials": publish_ok,
+            "active_publishers": active_publishers,
         }
         all_ready = all(checks.values())
         return {
