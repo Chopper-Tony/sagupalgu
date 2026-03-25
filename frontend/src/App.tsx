@@ -99,7 +99,7 @@ export default function App() {
       const analyzed = await api.analyzeSession(activeId);
       setSession(analyzed);
     } catch (e: unknown) {
-      pushItem({ type: "error", code: "upload_failed", message: e instanceof Error ? e.message : "업로드에 실패했습니다." });
+      pushItem({ type: "error", code: "upload_failed", message: friendlyError(e) });
     }
   };
 

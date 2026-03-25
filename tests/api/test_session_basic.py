@@ -29,7 +29,7 @@ class TestHealth:
         assert "vision_provider" in data["checks"]
         assert "listing_llm" in data["checks"]
         assert "publish_credentials" in data["checks"]
-        assert "active_publishers" in data["checks"]
+        assert "active_publishers" in data.get("meta", {})
 
 
 class TestCreateSession:

@@ -128,7 +128,6 @@ def create_app() -> FastAPI:
             "listing_llm": listing_llm_ok,
             "llm_fallback": has_llm,
             "publish_credentials": publish_ok,
-            "active_publishers": active_publishers,
         }
         all_ready = all(checks.values())
         return {
@@ -136,6 +135,11 @@ def create_app() -> FastAPI:
             "service": settings.app_name,
             "environment": settings.environment,
             "checks": checks,
+            "meta": {
+                "active_publishers": active_publishers,
+                "vision_provider": vision_provider,
+                "listing_provider": listing_provider,
+            },
         }
 
     @application.get("/health")

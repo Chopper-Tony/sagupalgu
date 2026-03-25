@@ -207,14 +207,16 @@ class TestHealthEndpoint:
         assert "vision_provider" in checks
         assert "listing_llm" in checks
         assert "publish_credentials" in checks
-        assert "active_publishers" in checks
 
     @pytest.mark.integration
-    def test_checks_have_expected_types(self, api_client):
+    def test_checks_are_all_booleans(self, api_client):
         resp = api_client.get("/health")
         checks = resp.json()["checks"]
-        # boolean 필드
-        for key in ("supabase", "vision_provider", "listing_llm", "llm_fallback", "publish_credentials"):
-            assert isinstance(checks[key], bool), f"{key} should be bool"
-        # list 필드
-        assert isinstance(checks["active_publishers"], list)
+        for key, val in checks.items():
+            assert isinstance(val, bool), f"{key} should be bool"
+
+    @pytest.mark.integration
+    def test_meta_has_active_publishers(self, api_client):
+        resp = api_client.get("/health")
+        meta = resp.json().get("meta", {})
+        assert isinstance(meta.get("active_publishers"), list)
