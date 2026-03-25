@@ -11,7 +11,7 @@ BASE = "/api/v1/sessions"
 
 SESSION_UI = {
     "session_id": "sess-001",
-    "status": "created",
+    "status": "session_created",
     "checkpoint": None,
     "next_action": "upload_images",
     "needs_user_input": False,

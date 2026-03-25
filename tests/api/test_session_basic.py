@@ -37,7 +37,7 @@ class TestCreateSession:
         assert resp.status_code == 200
         data = resp.json()
         assert data["session_id"] == "sess-001"
-        assert data["status"] == "created"
+        assert data["status"] == "session_created"
 
     @pytest.mark.integration
     def test_domain_error_maps_to_409(self, client, mock_svc):
