@@ -258,7 +258,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (486개)
+# 테스트 전체 (508개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -339,6 +339,8 @@ python -m pytest tests/ -m integration
 | M61: 업로드 validation + Discord alert 안정화 | ✅ 완료 | 업로드 MIME/확장자/크기(10MB)/개수(10개) 제한 추가(CTO3 P1) ✅, Discord alert `asyncio.get_event_loop()`/`ensure_future()`/`asyncio.run()` 혼용 → 단일 async/await 패턴 통일 ✅, `_handle_publish_failure` async 전환 ✅, 486 테스트 통과 ✅ |
 | M62: 타입 힌트 현대화 | ✅ 완료 | session_service.py `Dict`/`List`/`Optional` → `dict`/`list`/`| None` 전환 ✅, seller_copilot_runner.py 동일 전환 ✅, session_ui.py 동일 전환 ✅, 486 테스트 통과 ✅ |
 | M63: except Exception 세분화 | ✅ 완료 | `_common.py` `except Exception` → `except (json.JSONDecodeError, ValueError)` 구체화 ✅, `listing_llm.py` fallback 체인에 logger 추가(침묵 catch 제거) ✅, 외부 경계(LLM/크롤러/Vision) except Exception은 적절하므로 유지 ✅, 486 테스트 통과 ✅ |
+| M64: 테스트 커버리지 확충 | ✅ 완료 | test_service_coverage.py 22개 신설(session_ui 8·publish_service 8·optimization_service 3·recovery_service 2·atomicity 1) ✅, 500+ 목표 달성 ✅, 486→508 테스트 통과 ✅ |
+| M65: 노드별 실행 시간 추적 | ✅ 완료 | helpers.py에 `_start_timer()`·`_record_node_timing()` 헬퍼 추가 ✅, planner·copywriting·critic 3개 핵심 노드에 타이밍 적용 ✅, `execution_metrics` 필드를 workflow_meta에 보존 ✅, debug_logs에도 elapsed 자동 기록 ✅, 508 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

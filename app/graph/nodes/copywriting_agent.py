@@ -21,9 +21,11 @@ from app.graph.nodes.helpers import (
     _build_react_llm,
     _log,
     _record_error,
+    _record_node_timing,
     _record_tool_call,
     _run_async,
     _safe_int,
+    _start_timer,
 )
 
 
@@ -31,6 +33,7 @@ from app.graph.nodes.helpers import (
 
 
 def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
+    _timer = _start_timer()
     _log(state, "agent3:copywriting:start")
 
     product = state.get("confirmed_product")
@@ -55,6 +58,7 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
 
     state["checkpoint"] = "B_draft_complete"
     state["status"] = "draft_generated"
+    _record_node_timing(state, "copywriting", _timer)
     return state
 
 

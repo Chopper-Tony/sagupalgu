@@ -117,6 +117,7 @@ class SellerCopilotService:
         workflow_meta["plan"] = final_state.get("plan")
         workflow_meta["critic_score"] = final_state.get("critic_score")
         workflow_meta["critic_feedback"] = final_state.get("critic_feedback", [])
+        workflow_meta["execution_metrics"] = final_state.get("execution_metrics", [])
         return workflow_meta
 
     def _run_graph(
