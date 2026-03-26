@@ -90,6 +90,11 @@ def _get_dedicated_loop():
 def _run_async(coro_or_factory):
     """동기 컨텍스트에서 async 코드 실행. 전용 이벤트루프 스레드에 submit.
 
+    ⚠️ 사용 범위 제한 원칙 (CTO2 P0):
+    - graph 노드 내부에서만 사용 (app/graph/nodes/ 한정)
+    - service/application layer로의 확산 금지
+    - 추후 LangGraph native async 지원 시 제거 예정
+
     callable(lambda)이 전달되면 호출해서 코루틴을 생성한다.
     이를 통해 테스트에서 _run_async를 mock할 때 코루틴이 미리 생성되지 않아
     'coroutine never awaited' RuntimeWarning을 방지한다.
