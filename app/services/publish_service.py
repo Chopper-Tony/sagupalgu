@@ -74,6 +74,23 @@ class PublishService:
 
         raise ValueError(f"Unsupported platform: {platform}")
 
+    @staticmethod
+    def _resolve_image_paths(images: list) -> list[str]:
+        """URL 경로(/uploads/...)를 파일 시스템 절대 경로로 변환."""
+        import os
+        resolved = []
+        for img in images:
+            if isinstance(img, str) and img.startswith("/uploads/"):
+                # /uploads/session_id/file.jpg → ./uploads/session_id/file.jpg
+                fs_path = os.path.abspath(img.lstrip("/"))
+                if os.path.exists(fs_path):
+                    resolved.append(fs_path)
+                else:
+                    resolved.append(img)  # 존재하지 않으면 원본 유지
+            else:
+                resolved.append(str(img))
+        return resolved
+
     def build_platform_packages(
         self,
         canonical_listing: dict,
@@ -81,6 +98,12 @@ class PublishService:
     ) -> dict:
         """플랫폼별 가격 차등 패키지 생성. prepare_publish 단계에서 호출."""
         base_price = int(canonical_listing.get("price", 0))
+        images = self._resolve_image_paths(canonical_listing.get("images", []))
+        category = ""
+        product = canonical_listing.get("product") or {}
+        if isinstance(product, dict):
+            category = product.get("category", "")
+
         packages: dict = {}
         for platform in platform_targets:
             if platform == "bunjang":
@@ -93,7 +116,8 @@ class PublishService:
                 "title": canonical_listing.get("title", ""),
                 "body": canonical_listing.get("description", ""),
                 "price": price,
-                "images": canonical_listing.get("images", []),
+                "images": images,
+                "category": category,
             }
         return packages
 
@@ -121,20 +145,17 @@ class PublishService:
         publish_results: dict = {}
         any_failure = False
 
-        for platform in platforms:
+        async def _publish_one(platform: str) -> dict:
+            """단일 플랫폼 게시 실행 (타임아웃·에러 분류 포함)."""
             payload = packages.get(platform)
             if not payload:
                 classification = classify_error("missing_platform_package")
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                return {
+                    "success": False, "platform": platform,
                     "error_code": classification["error_code"],
                     "error_message": f"{platform} 패키지 없음",
                     "auto_recoverable": classification["auto_recoverable"],
                 }
-                any_failure = True
-                continue
-
             try:
                 result = await asyncio.wait_for(
                     self.publish(platform=platform, payload=payload),
@@ -144,9 +165,8 @@ class PublishService:
                 error_message = result.error_message or ""
                 classification = classify_error(error_code, error_message)
 
-                publish_results[platform] = {
-                    "success": result.success,
-                    "platform": result.platform,
+                entry = {
+                    "success": result.success, "platform": result.platform,
                     "external_listing_id": result.external_listing_id,
                     "external_url": result.external_url,
                     "error_code": classification["error_code"] if not result.success else None,
@@ -155,54 +175,69 @@ class PublishService:
                     "auto_recoverable": classification["auto_recoverable"] if not result.success else None,
                 }
                 if not result.success:
-                    any_failure = True
                     logger.warning(
                         "publish_failed platform=%s error_code=%s category=%s",
                         platform, classification["error_code"], classification["category"],
                     )
                 else:
                     logger.info("publish_success platform=%s url=%s", platform, result.external_url)
+                return entry
 
             except asyncio.TimeoutError:
-                classification = classify_error("timeout")
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                logger.warning("publish_timeout platform=%s timeout=%ds", platform, PUBLISH_TIMEOUT_SECONDS)
+                return {
+                    "success": False, "platform": platform,
                     "error_code": "timeout",
                     "error_message": f"{platform} 게시 {PUBLISH_TIMEOUT_SECONDS}초 타임아웃 초과",
                     "auto_recoverable": True,
                 }
-                any_failure = True
-                logger.warning("publish_timeout platform=%s timeout=%ds", platform, PUBLISH_TIMEOUT_SECONDS)
-
             except Exception as e:
                 classification = classify_error("publish_exception", str(e))
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                logger.error("publish_exception platform=%s error=%s", platform, e)
+                return {
+                    "success": False, "platform": platform,
                     "error_code": classification["error_code"],
                     "error_message": str(e),
                     "auto_recoverable": classification["auto_recoverable"],
                 }
+
+        # 플랫폼별 병렬 게시
+        results = await asyncio.gather(*[_publish_one(p) for p in platforms])
+        for entry in results:
+            publish_results[entry["platform"]] = entry
+            if not entry["success"]:
                 any_failure = True
-                logger.error("publish_exception platform=%s error=%s", platform, e)
 
         return publish_results, any_failure
 
     async def publish(self, platform: str, payload: dict) -> PublishResult:
+        import sys
 
         publisher = self.get_publisher(platform)
-
         account = self.build_account_context(platform)
+        package = PlatformPackage(platform=platform, payload=payload)
 
-        package = PlatformPackage(
-            platform=platform,
-            payload=payload,
-        )
+        # Windows에서 Playwright는 ProactorEventLoop이 필요하지만
+        # uvicorn은 SelectorEventLoop을 사용한다.
+        # 별도 스레드에서 ProactorEventLoop으로 Playwright를 실행한다.
+        if sys.platform == "win32":
+            import asyncio
+            import concurrent.futures
 
-        result = await publisher.publish(
-            package=package,
-            account=account,
-        )
+            def _run_in_proactor():
+                loop = asyncio.ProactorEventLoop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        publisher.publish(package=package, account=account)
+                    )
+                finally:
+                    loop.close()
 
+            loop = asyncio.get_running_loop()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                result = await loop.run_in_executor(pool, _run_in_proactor)
+            return result
+
+        result = await publisher.publish(package=package, account=account)
         return result

@@ -77,6 +77,9 @@ export interface OptimizationSuggestion {
   suggested_price: number;
   reason: string;
   days_elapsed: number;
+  suggestions?: string[];
+  urgency?: string;
+  recommend_relist?: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -99,4 +102,12 @@ export interface SessionResponse {
   last_error: string | null;
   image_urls: string[];
   selected_platforms: string[];
+  agent_trace?: {
+    tool_calls: Array<{ tool_name: string; success: boolean }>;
+    rewrite_history: unknown[];
+    decision_rationale: string[];
+    plan: { focus: string; steps: string[] } | null;
+    critic_score: number | null;
+    critic_feedback: Array<{ type: string; impact: string; reason: string }>;
+  };
 }

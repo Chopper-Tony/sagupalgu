@@ -104,6 +104,26 @@ def create_app() -> FastAPI:
             bool(getattr(settings, "upstage_api_key", None)),
         ])
 
+        # 실제 LLM provider 연결 검증 (경량 핑)
+        llm_reachable = False
+        try:
+            import httpx
+            if settings.openai_api_key:
+                r = httpx.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                    timeout=5,
+                )
+                llm_reachable = r.status_code == 200
+            elif settings.gemini_api_key:
+                r = httpx.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={settings.gemini_api_key}",
+                    timeout=5,
+                )
+                llm_reachable = r.status_code == 200
+        except Exception:
+            llm_reachable = False
+
         # 활성 publish target: credential이 설정된 플랫폼만
         active_publishers = []
         if settings.bunjang_username:
@@ -127,6 +147,7 @@ def create_app() -> FastAPI:
             "vision_provider": vision_ok,
             "listing_llm": listing_llm_ok,
             "llm_fallback": has_llm,
+            "llm_reachable": llm_reachable,
             "publish_credentials": publish_ok,
         }
         all_ready = all(checks.values())
