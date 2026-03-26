@@ -142,6 +142,10 @@ class SessionService:
         listing_data = dict(result_payload.get("listing_data_jsonb") or {})
         listing_data.pop("platform_packages", None)
 
+        # LangGraph 실패 시 직접 LLM 호출 fallback
+        if not listing_data.get("canonical_listing"):
+            listing_data = await self._fallback_generate_listing(session, listing_data)
+
         workflow_meta = dict(result_payload.get("workflow_meta_jsonb") or {})
         normalize_listing_meta(workflow_meta, result_payload.get("tool_calls") or [])
 
@@ -153,6 +157,55 @@ class SessionService:
             "workflow_meta_jsonb": workflow_meta,
         })
         return build_session_ui_response(updated)
+
+    async def _fallback_generate_listing(self, session: Dict, listing_data: Dict) -> Dict:
+        """LangGraph 파이프라인이 canonical_listing을 생성하지 못했을 때 직접 LLM 호출."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("LangGraph listing 생성 실패 — 직접 LLM fallback")
+
+        product_data = session.get("product_data_jsonb") or {}
+        confirmed = product_data.get("confirmed_product") or {}
+        market_context = listing_data.get("market_context") or {}
+        image_paths = product_data.get("image_paths") or []
+
+        brand = confirmed.get("brand", "")
+        model = confirmed.get("model", "")
+        category = confirmed.get("category", "")
+        median_price = market_context.get("median_price") or 0
+
+        # 가격 전략
+        from app.services.listing_prompt import build_pricing_strategy
+        strategy = build_pricing_strategy(median_price, goal="balanced")
+        listing_data["strategy"] = strategy
+
+        # 직접 LLM 판매글 생성 시도
+        try:
+            from app.services.listing_llm import generate_copy
+            result = await generate_copy(
+                confirmed_product=confirmed,
+                market_context=market_context,
+                strategy=strategy,
+                image_paths=image_paths,
+            )
+            if result and result.get("title"):
+                # 가격이 0이면 strategy 추천가로 보정
+                if not result.get("price") or result["price"] <= 0:
+                    result["price"] = strategy.get("recommended_price", median_price)
+                listing_data["canonical_listing"] = result
+                logger.info("fallback_listing_success title=%s price=%s", result.get("title"), result.get("price"))
+                return listing_data
+        except Exception as e:
+            logger.warning("fallback LLM failed: %s", e)
+
+        # LLM도 실패하면 템플릿 판매글
+        from app.services.listing_llm import build_template_copy
+        template = build_template_copy(confirmed, strategy, image_paths)
+        if not template.get("price") or template["price"] <= 0:
+            template["price"] = strategy.get("recommended_price", median_price)
+        listing_data["canonical_listing"] = template
+        logger.info("fallback_template_used title=%s price=%s", template.get("title"), template.get("price"))
+        return listing_data
 
     async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
         session = self._ensure_transition(session_id, "draft_generated")

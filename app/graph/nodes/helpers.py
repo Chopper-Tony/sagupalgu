@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -34,25 +35,53 @@ def _record_error(state: SellerCopilotState, source: str, error: str) -> None:
     state["last_error"] = error
 
 
+_dedicated_loop = None
+_dedicated_thread = None
+_loop_lock = threading.Lock()
+
+
+def _get_dedicated_loop():
+    """전용 이벤트루프 데몬 스레드. 최초 호출 시 생성, 이후 재사용."""
+    global _dedicated_loop, _dedicated_thread
+    if _dedicated_loop is not None and _dedicated_loop.is_running():
+        return _dedicated_loop
+    with _loop_lock:
+        # double-check locking
+        if _dedicated_loop is not None and _dedicated_loop.is_running():
+            return _dedicated_loop
+        import sys
+        if sys.platform == "win32":
+            loop = asyncio.SelectorEventLoop()
+        else:
+            loop = asyncio.new_event_loop()
+
+        def _run_loop(lp):
+            asyncio.set_event_loop(lp)
+            lp.run_forever()
+
+        thread = threading.Thread(target=_run_loop, args=(loop,), daemon=True)
+        thread.start()
+        _dedicated_loop = loop
+        _dedicated_thread = thread
+        return loop
+
+
 def _run_async(coro_or_factory):
-    """동기 컨텍스트에서 async 도구 실행.
+    """동기 컨텍스트에서 async 코드 실행. 전용 이벤트루프 스레드에 submit.
 
     callable(lambda)이 전달되면 호출해서 코루틴을 생성한다.
     이를 통해 테스트에서 _run_async를 mock할 때 코루틴이 미리 생성되지 않아
     'coroutine never awaited' RuntimeWarning을 방지한다.
     """
     import inspect
-    coro = coro_or_factory() if callable(coro_or_factory) and not inspect.iscoroutine(coro_or_factory) else coro_or_factory
-    try:
-        asyncio.get_running_loop()
-        # 이미 실행 중인 루프가 있으면 별도 스레드에서 실행
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
-    except RuntimeError:
-        # 실행 중인 루프 없음 — 직접 실행
-        return asyncio.run(coro)
+    coro = (
+        coro_or_factory()
+        if callable(coro_or_factory) and not inspect.iscoroutine(coro_or_factory)
+        else coro_or_factory
+    )
+    loop = _get_dedicated_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result(timeout=120)
 
 
 def _build_react_llm():

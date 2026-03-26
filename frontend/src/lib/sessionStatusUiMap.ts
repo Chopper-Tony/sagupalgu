@@ -105,6 +105,21 @@ export function isTerminalStatus(status: SessionStatus): boolean {
 }
 
 // ─────────────────────────────────────────────
+// 플랫폼 영문 → 한글 매핑
+// ─────────────────────────────────────────────
+
+const PLATFORM_LABEL: Record<string, string> = {
+  bunjang: "번개장터",
+  joongna: "중고나라",
+  daangn: "당근마켓",
+};
+
+/** 플랫폼 영문 코드를 한글 이름으로 변환. 매핑 없으면 원본 반환. */
+export function platformLabel(code: string): string {
+  return PLATFORM_LABEL[code] ?? code;
+}
+
+// ─────────────────────────────────────────────
 // ProgressCard 상태별 카피
 // ─────────────────────────────────────────────
 

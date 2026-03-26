@@ -205,12 +205,18 @@ class TestHealthEndpoint:
         checks = data["checks"]
         assert "supabase" in checks
         assert "vision_provider" in checks
-        assert "llm_provider" in checks
+        assert "listing_llm" in checks
         assert "publish_credentials" in checks
 
     @pytest.mark.integration
-    def test_checks_are_booleans(self, api_client):
+    def test_checks_are_all_booleans(self, api_client):
         resp = api_client.get("/health")
         checks = resp.json()["checks"]
-        for val in checks.values():
-            assert isinstance(val, bool)
+        for key, val in checks.items():
+            assert isinstance(val, bool), f"{key} should be bool"
+
+    @pytest.mark.integration
+    def test_meta_has_active_publishers(self, api_client):
+        resp = api_client.get("/health")
+        meta = resp.json().get("meta", {})
+        assert isinstance(meta.get("active_publishers"), list)

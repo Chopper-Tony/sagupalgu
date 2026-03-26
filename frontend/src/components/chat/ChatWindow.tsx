@@ -59,7 +59,7 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
         return (
           <PublishApprovalCard
             listing={session.canonical_listing}
-            platforms={session.platform_results?.map((r) => r.platform) ?? ["번개장터", "중고나라"]}
+            platforms={session.selected_platforms?.length ? session.selected_platforms : session.platform_results?.map((r) => r.platform) ?? ["bunjang", "joongna"]}
             onPublish={() => onAction("publish")}
             onEdit={() => onAction("edit_draft")}
           />
