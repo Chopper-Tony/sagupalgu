@@ -14,7 +14,12 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from app.core.utils import safe_int as _safe_int
-from app.domain.exceptions import InvalidUserInputError, SessionNotFoundError, SessionUpdateError
+from app.domain.exceptions import (
+    InvalidStateTransitionError,
+    InvalidUserInputError,
+    SessionNotFoundError,
+    SessionUpdateError,
+)
 from app.domain.session_status import assert_allowed_transition
 from app.repositories.session_repository import SessionRepository
 from app.services.optimization_service import OptimizationService
@@ -74,7 +79,11 @@ class SessionService:
         session = self._ensure_transition(session_id, "images_uploaded")
         product_data = dict(session.get("product_data_jsonb") or {})
         attach_image_paths(product_data, image_urls)
-        return self._persist_and_respond(session_id, "images_uploaded", product_data=product_data)
+        return self._persist_and_respond(
+            session_id, "images_uploaded",
+            expected_status=session["status"],
+            product_data=product_data,
+        )
 
     # ── 상품 분석 ──────────────────────────────────────────────────
 
@@ -96,6 +105,7 @@ class SessionService:
 
         return self._persist_and_respond(
             session_id, "awaiting_product_confirmation",
+            expected_status=session["status"],
             product_data=product_data, workflow_meta=workflow_meta,
         )
 
@@ -111,6 +121,7 @@ class SessionService:
 
         return self._persist_and_respond(
             session_id, "product_confirmed",
+            expected_status=session["status"],
             product_data=product_data, workflow_meta=workflow_meta,
         )
 
@@ -127,6 +138,7 @@ class SessionService:
 
         return self._persist_and_respond(
             session_id, "product_confirmed",
+            expected_status=session["status"],
             product_data=product_data, workflow_meta=workflow_meta,
         )
 
@@ -134,6 +146,7 @@ class SessionService:
 
     async def generate_listing(self, session_id: str) -> Dict:
         session = self._ensure_transition(session_id, "draft_generated")
+        current_status = session["status"]
 
         result_payload = await self.copilot_service.run_listing_pipeline(
             session_id=session_id, session_record=session,
@@ -155,7 +168,7 @@ class SessionService:
             "product_data_jsonb": result_payload.get("product_data_jsonb") or {},
             "listing_data_jsonb": listing_data,
             "workflow_meta_jsonb": workflow_meta,
-        })
+        }, expected_status=current_status)
         return build_session_ui_response(updated)
 
     async def _fallback_generate_listing(self, session: Dict, listing_data: Dict) -> Dict:
@@ -209,6 +222,7 @@ class SessionService:
 
     async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
         session = self._ensure_transition(session_id, "draft_generated")
+        current_status = session["status"]
         if not instruction or not instruction.strip():
             raise InvalidUserInputError("재작성 지시사항이 필요합니다")
 
@@ -225,6 +239,7 @@ class SessionService:
 
         return self._persist_and_respond(
             session_id, "draft_generated",
+            expected_status=current_status,
             listing_data=listing_data, workflow_meta=workflow_meta,
         )
 
@@ -232,6 +247,7 @@ class SessionService:
 
     async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
         session = self._ensure_transition(session_id, "awaiting_publish_approval")
+        current_status = session["status"]
         if not platform_targets:
             raise InvalidUserInputError("플랫폼을 선택해주세요")
 
@@ -252,18 +268,23 @@ class SessionService:
             "selected_platforms_jsonb": platform_targets,
             "listing_data_jsonb": listing_data,
             "workflow_meta_jsonb": workflow_meta,
-        })
+        }, expected_status=current_status)
         return build_session_ui_response(updated)
 
     async def publish_session(self, session_id: str) -> Dict:
         session = self._ensure_transition(session_id, "publishing")
+        current_status = session["status"]
         selected = session.get("selected_platforms_jsonb") or []
         packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
         if not selected:
             raise InvalidUserInputError("선택된 플랫폼이 없습니다")
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        self._update_or_raise(session_id, {"status": "publishing", "workflow_meta_jsonb": workflow_meta})
+        self._update_or_raise(
+            session_id,
+            {"status": "publishing", "workflow_meta_jsonb": workflow_meta},
+            expected_status=current_status,
+        )
 
         publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
         set_publish_complete(workflow_meta, publish_results)
@@ -359,9 +380,22 @@ class SessionService:
             raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
         return session
 
-    def _update_or_raise(self, session_id: str, payload: Dict) -> Dict:
-        result = self.repo.update(session_id=session_id, payload=payload)
+    def _update_or_raise(
+        self,
+        session_id: str,
+        payload: Dict,
+        expected_status: str | None = None,
+    ) -> Dict:
+        result = self.repo.update(
+            session_id=session_id,
+            payload=payload,
+            expected_status=expected_status,
+        )
         if not result:
+            if expected_status:
+                raise InvalidStateTransitionError(
+                    f"세션 상태가 변경되었습니다 (expected={expected_status}): {session_id}"
+                )
             raise SessionUpdateError(f"세션 업데이트 실패: {session_id}")
         return result
 
@@ -376,6 +410,7 @@ class SessionService:
         session_id: str,
         status: str,
         *,
+        expected_status: str | None = None,
         product_data: Dict | None = None,
         listing_data: Dict | None = None,
         workflow_meta: Dict | None = None,
@@ -388,5 +423,5 @@ class SessionService:
             payload["listing_data_jsonb"] = listing_data
         if workflow_meta is not None:
             payload["workflow_meta_jsonb"] = workflow_meta
-        updated = self._update_or_raise(session_id, payload)
+        updated = self._update_or_raise(session_id, payload, expected_status)
         return build_session_ui_response(updated)
