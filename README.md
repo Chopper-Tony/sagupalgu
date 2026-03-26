@@ -2,7 +2,7 @@
 
 > 사진 한 장으로 상품 분석부터 판매글 작성, 게시까지 자동화하는 LangGraph Agentic Workflow 플랫폼
 
-[![Tests](https://img.shields.io/badge/tests-462%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-474%20passed-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.11-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)]()
 [![React](https://img.shields.io/badge/React-18-61DAFB)]()
