@@ -58,4 +58,13 @@ export const api = {
     client
       .post<SessionResponse>(`/sessions/${id}/sale-status`, { sale_status: saleStatus })
       .then((r) => r.data),
+
+  // 플랫폼 연동
+  getPlatformStatus: () =>
+    client.get<{ platforms: Record<string, { name: string; connected: boolean; session_saved_at: string | null }> }>("/platforms/status")
+      .then((r) => r.data),
+
+  platformLogin: (platform: string) =>
+    client.post<{ success: boolean; platform?: string; name?: string; error?: string }>(`/platforms/${platform}/login`, {}, { timeout: 360000 })
+      .then((r) => r.data),
 };

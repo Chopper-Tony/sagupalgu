@@ -353,6 +353,8 @@ python -m pytest tests/ -m integration
 | M74: readiness 고도화 | ✅ 완료 | /health/ready에 `llm_reachable` 체크 추가(OpenAI models API / Gemini models API 경량 핑, 5초 타임아웃) ✅, checks에 `llm_reachable` 필드 포함 ✅, 508 테스트 통과 ✅ |
 | M75: 판매자 챗봇 고도화 — AI 피드백 표시 | ✅ 완료 | DraftCard에 AI 품질 평가 섹션 추가(critic_score·critic_feedback 표시, 항목별 타입·영향도·이유) ✅, SessionResponse 타입에 `agent_trace` 필드 추가 ✅, ChatWindow→DraftCard로 critic 데이터 전달 ✅, 빌드 에러 0 ✅ |
 | M76: post-sale optimization 강화 | ✅ 완료 | price_optimization_tool에 단계별 제안 추가(14일+: 제목 키워드 변경, 21일+: 재게시+사진 교체+15% 인하) ✅, `suggestions` 목록·`recommend_relist` 필드 추가 ✅, OptimizationSuggestionCard에 suggestions 렌더링 ✅, OptimizationSuggestion 타입 확장 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
+| P-LOGIN: 웹 UI 플랫폼 로그인 | ✅ 완료 | `app/services/platform_auth_service.py` 신설(Playwright headless=False 브라우저 열기→로그인 대기→쿠키 저장, Windows ProactorEventLoop 대응) ✅, `app/api/platform_router.py` 신설(`GET /platforms/status`·`POST /platforms/{platform}/login`) ✅, SessionSidebar 하단 "플랫폼 연동" 섹션(연동 상태 표시·로그인 버튼) ✅, 508 테스트 통과·빌드 에러 0 ✅ |
+
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
