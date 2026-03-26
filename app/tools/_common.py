@@ -32,7 +32,7 @@ def extract_json(text: str) -> dict:
         text = re.sub(r"```$", "", text).strip()
     try:
         return json.loads(text)
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:
             return json.loads(m.group(0))

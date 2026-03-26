@@ -8,7 +8,7 @@ import os
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.dependencies import get_session_service
 from app.schemas.session import (
@@ -52,21 +52,38 @@ async def get_session(
     return SessionDetailResponse(**result)
 
 
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+_MAX_FILE_COUNT = 10
+
+
 @router.post("/{session_id}/images", response_model=UploadImagesResponse)
 async def upload_images(
     session_id: str,
     files: List[UploadFile] = File(..., description="업로드할 이미지 파일"),
     session_service: SessionService = Depends(get_session_service),
 ):
+    if len(files) > _MAX_FILE_COUNT:
+        raise HTTPException(status_code=422, detail=f"최대 {_MAX_FILE_COUNT}개까지 업로드 가능합니다")
+
     upload_dir = os.path.join("uploads", session_id)
     os.makedirs(upload_dir, exist_ok=True)
 
     image_urls: List[str] = []
     for f in files:
-        ext = os.path.splitext(f.filename or "img.jpg")[1] or ".jpg"
+        ext = os.path.splitext(f.filename or "img.jpg")[1].lower() or ".jpg"
+        if ext not in _ALLOWED_EXT:
+            raise HTTPException(status_code=422, detail=f"허용되지 않는 파일 형식입니다: {ext}")
+        if f.content_type and f.content_type not in _ALLOWED_MIME:
+            raise HTTPException(status_code=422, detail=f"허용되지 않는 MIME 타입입니다: {f.content_type}")
+
+        content = await f.read()
+        if len(content) > _MAX_FILE_SIZE:
+            raise HTTPException(status_code=422, detail=f"파일 크기가 10MB를 초과합니다: {f.filename}")
+
         filename = f"{uuid.uuid4().hex}{ext}"
         filepath = os.path.join(upload_dir, filename)
-        content = await f.read()
         with open(filepath, "wb") as fh:
             fh.write(content)
         image_urls.append(f"/uploads/{session_id}/{filename}")

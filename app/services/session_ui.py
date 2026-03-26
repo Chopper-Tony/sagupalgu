@@ -6,12 +6,12 @@ SessionService의 오케스트레이션 책임과 UI 응답 조립 책임을 분
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from app.domain.session_status import resolve_next_action
 
 
-def build_session_ui_response(session: Dict[str, Any]) -> Dict[str, Any]:
+def build_session_ui_response(session: dict[str, Any]) -> dict[str, Any]:
     """DB 레코드 → UI 응답 평탄화. SessionService 외부에서도 재사용 가능."""
     product_data = session.get("product_data_jsonb") or {}
     listing_data = session.get("listing_data_jsonb") or {}

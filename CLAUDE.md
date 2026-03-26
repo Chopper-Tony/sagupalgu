@@ -335,6 +335,10 @@ python -m pytest tests/ -m integration
 | M57: 상태 전이 원자성 확보 | ✅ 완료 | `_update_or_raise()`에 `expected_status` 파라미터 추가(CTO3 P0 TOCTOU 방어) ✅, 불일치 시 `InvalidStateTransitionError`(409) 발생 ✅, `_persist_and_respond()`에 `expected_status` 전달 ✅, 7개 주요 전이 메서드(attach_images·analyze·confirm·provide·generate·prepare·publish)에 적용 ✅, test_trace_and_atomicity.py 6개 unit 테스트 ✅, 486 테스트 통과 ✅ |
 | M58: 사이드바 세션 상태 보정 | ✅ 완료 | App.tsx `sessionIds: string[]` → `sessions: { id, lastKnownStatus }[]` 전환(CTO1 P0) ✅, `statusLabel()` 한글 매핑 유틸 추가(13개 상태 커버) ✅, 활성 세션 상태 변경 시 사이드바 자동 동기화 useEffect ✅, 빌드 에러 0 ✅ |
 | M59: README/문서 정합화 | ✅ 완료 | 테스트 수 486개 반영 ✅, LLM/Vision 기본값 openai로 정합(CTO2 P0 문서-코드 불일치 해소) ✅, README·architecture.md에 production path 한 줄 선언 추가(하이브리드 오케스트레이션 명시) ✅, CLAUDE.md 기술 스택 정합화 ✅ |
+| M60: seller_copilot_service 대형 함수 분할 | ✅ 완료 | `run_product_analysis_and_listing_pipeline()` 135줄 → 3개 메서드 분할(`_resolve_product`·`_run_market_and_graph`·`_assemble_result`) ✅, 메인 함수 30줄로 축소 ✅, 486 테스트 통과 ✅ |
+| M61: 업로드 validation + Discord alert 안정화 | ✅ 완료 | 업로드 MIME/확장자/크기(10MB)/개수(10개) 제한 추가(CTO3 P1) ✅, Discord alert `asyncio.get_event_loop()`/`ensure_future()`/`asyncio.run()` 혼용 → 단일 async/await 패턴 통일 ✅, `_handle_publish_failure` async 전환 ✅, 486 테스트 통과 ✅ |
+| M62: 타입 힌트 현대화 | ✅ 완료 | session_service.py `Dict`/`List`/`Optional` → `dict`/`list`/`| None` 전환 ✅, seller_copilot_runner.py 동일 전환 ✅, session_ui.py 동일 전환 ✅, 486 테스트 통과 ✅ |
+| M63: except Exception 세분화 | ✅ 완료 | `_common.py` `except Exception` → `except (json.JSONDecodeError, ValueError)` 구체화 ✅, `listing_llm.py` fallback 체인에 logger 추가(침묵 catch 제거) ✅, 외부 경계(LLM/크롤러/Vision) except Exception은 적절하므로 유지 ✅, 486 테스트 통과 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

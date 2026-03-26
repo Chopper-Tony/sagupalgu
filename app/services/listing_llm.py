@@ -9,7 +9,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import logging
+
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.services.listing_prompt import build_copy_prompt, extract_json_object
@@ -282,7 +286,8 @@ async def generate_copy(
                     image_paths=image_paths,
                     tool_calls_context=tool_calls_context,
                 )
-        except Exception:
+        except Exception as exc:
+            logger.warning("LLM provider %s failed: %s", provider, exc)
             continue
 
     return build_template_copy(
