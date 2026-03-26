@@ -121,20 +121,17 @@ class PublishService:
         publish_results: dict = {}
         any_failure = False
 
-        for platform in platforms:
+        async def _publish_one(platform: str) -> dict:
+            """단일 플랫폼 게시 실행 (타임아웃·에러 분류 포함)."""
             payload = packages.get(platform)
             if not payload:
                 classification = classify_error("missing_platform_package")
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                return {
+                    "success": False, "platform": platform,
                     "error_code": classification["error_code"],
                     "error_message": f"{platform} 패키지 없음",
                     "auto_recoverable": classification["auto_recoverable"],
                 }
-                any_failure = True
-                continue
-
             try:
                 result = await asyncio.wait_for(
                     self.publish(platform=platform, payload=payload),
@@ -144,9 +141,8 @@ class PublishService:
                 error_message = result.error_message or ""
                 classification = classify_error(error_code, error_message)
 
-                publish_results[platform] = {
-                    "success": result.success,
-                    "platform": result.platform,
+                entry = {
+                    "success": result.success, "platform": result.platform,
                     "external_listing_id": result.external_listing_id,
                     "external_url": result.external_url,
                     "error_code": classification["error_code"] if not result.success else None,
@@ -155,37 +151,38 @@ class PublishService:
                     "auto_recoverable": classification["auto_recoverable"] if not result.success else None,
                 }
                 if not result.success:
-                    any_failure = True
                     logger.warning(
                         "publish_failed platform=%s error_code=%s category=%s",
                         platform, classification["error_code"], classification["category"],
                     )
                 else:
                     logger.info("publish_success platform=%s url=%s", platform, result.external_url)
+                return entry
 
             except asyncio.TimeoutError:
-                classification = classify_error("timeout")
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                logger.warning("publish_timeout platform=%s timeout=%ds", platform, PUBLISH_TIMEOUT_SECONDS)
+                return {
+                    "success": False, "platform": platform,
                     "error_code": "timeout",
                     "error_message": f"{platform} 게시 {PUBLISH_TIMEOUT_SECONDS}초 타임아웃 초과",
                     "auto_recoverable": True,
                 }
-                any_failure = True
-                logger.warning("publish_timeout platform=%s timeout=%ds", platform, PUBLISH_TIMEOUT_SECONDS)
-
             except Exception as e:
                 classification = classify_error("publish_exception", str(e))
-                publish_results[platform] = {
-                    "success": False,
-                    "platform": platform,
+                logger.error("publish_exception platform=%s error=%s", platform, e)
+                return {
+                    "success": False, "platform": platform,
                     "error_code": classification["error_code"],
                     "error_message": str(e),
                     "auto_recoverable": classification["auto_recoverable"],
                 }
+
+        # 플랫폼별 병렬 게시
+        results = await asyncio.gather(*[_publish_one(p) for p in platforms])
+        for entry in results:
+            publish_results[entry["platform"]] = entry
+            if not entry["success"]:
                 any_failure = True
-                logger.error("publish_exception platform=%s error=%s", platform, e)
 
         return publish_results, any_failure
 

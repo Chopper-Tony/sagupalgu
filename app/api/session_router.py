@@ -8,7 +8,11 @@ import os
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+import asyncio
+import json as _json
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_session_service
 from app.schemas.session import (
@@ -50,6 +54,64 @@ async def get_session(
 ):
     result = await session_service.get_session(session_id)
     return SessionDetailResponse(**result)
+
+
+@router.get("/{session_id}/stream")
+async def stream_session(
+    session_id: str,
+    request: Request,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """SSE 스트림으로 세션 상태 변경을 실시간 전송한다.
+
+    폴링 대비 장점: 서버가 상태 변경 시점에만 데이터 전송 → 지연 감소, 트래픽 절약.
+    클라이언트가 연결을 끊으면 자동 종료.
+    """
+    async def event_generator():
+        last_status = None
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                result = await session_service.get_session(session_id)
+                current_status = result.get("status")
+
+                # 상태 변경 시 또는 첫 연결 시 이벤트 전송
+                if current_status != last_status:
+                    data = _json.dumps(result, ensure_ascii=False, default=str)
+                    yield f"event: status_change\ndata: {data}\n\n"
+                    last_status = current_status
+
+                    # 폴링 불필요 상태면 마지막 전송 후 종료
+                    if not _is_sse_active_status(current_status):
+                        yield f"event: stream_end\ndata: {{}}\n\n"
+                        break
+
+                # 하트비트 (연결 유지)
+                yield f": heartbeat\n\n"
+                await asyncio.sleep(1.5)
+            except Exception:
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _is_sse_active_status(status: str) -> bool:
+    """SSE 스트림을 유지해야 하는 상태인지 (처리 중 상태)."""
+    return status in {
+        "images_uploaded",
+        "market_analyzing",
+        "product_confirmed",
+        "publishing",
+    }
 
 
 _ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
