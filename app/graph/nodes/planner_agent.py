@@ -16,11 +16,12 @@ import json
 from typing import Dict, List
 
 from app.graph.seller_copilot_state import SellerCopilotState
-from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _run_async
+from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _record_node_timing, _run_async, _start_timer
 
 
 def mission_planner_node(state: SellerCopilotState) -> SellerCopilotState:
     """세션 상태를 분석하고 실행 계획을 생성/수정한다."""
+    _timer = _start_timer()
     _log(state, "agent0:planner:start")
 
     is_replan = state.get("plan_revision_count", 0) > 0
@@ -44,6 +45,7 @@ def mission_planner_node(state: SellerCopilotState) -> SellerCopilotState:
         state["missing_information"] = plan_result["missing_information"]
 
     _log(state, f"agent0:planner:done goal={state['mission_goal']} steps={len(state['plan'].get('steps', []))}")
+    _record_node_timing(state, "mission_planner", _timer)
     return state
 
 

@@ -18,6 +18,27 @@ def _log(state: SellerCopilotState, msg: str) -> None:
     state["debug_logs"] = logs
 
 
+import time as _time
+
+
+def _start_timer() -> float:
+    """노드 실행 시간 측정 시작."""
+    return _time.monotonic()
+
+
+def _record_node_timing(state: SellerCopilotState, node_name: str, start: float) -> None:
+    """노드 실행 시간을 state에 기록."""
+    elapsed = round(_time.monotonic() - start, 3)
+    metrics = state.get("execution_metrics") or []
+    metrics.append({
+        "node": node_name,
+        "elapsed_seconds": elapsed,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    state["execution_metrics"] = metrics
+    _log(state, f"{node_name}:elapsed={elapsed}s")
+
+
 def _record_tool_call(state: SellerCopilotState, call: Dict[str, Any]) -> None:
     calls = state.get("tool_calls") or []
     calls.append(call)

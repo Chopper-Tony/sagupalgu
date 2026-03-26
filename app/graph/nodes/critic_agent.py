@@ -16,7 +16,7 @@ import json
 from typing import Dict
 
 from app.graph.seller_copilot_state import SellerCopilotState
-from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _run_async, _safe_int
+from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _record_node_timing, _run_async, _safe_int, _start_timer
 
 
 CRITIC_PASS_THRESHOLD = 70
@@ -24,6 +24,7 @@ CRITIC_PASS_THRESHOLD = 70
 
 def listing_critic_node(state: SellerCopilotState) -> SellerCopilotState:
     """판매글 품질을 LLM으로 비평하고 rewrite 여부를 결정한다."""
+    _timer = _start_timer()
     _log(state, "agent6:critic:start")
 
     listing = state.get("canonical_listing")
@@ -32,6 +33,7 @@ def listing_critic_node(state: SellerCopilotState) -> SellerCopilotState:
         state["critic_score"] = 0
         state["critic_feedback"] = [{"type": "missing", "impact": "high", "reason": "판매글이 없습니다"}]
         state["critic_rewrite_instructions"] = []
+        _record_node_timing(state, "listing_critic", _timer)
         return state
 
     product = state.get("confirmed_product") or {}
@@ -71,6 +73,7 @@ def listing_critic_node(state: SellerCopilotState) -> SellerCopilotState:
         _log(state, f"agent6:critic:accept_despite_low_score score={score} max_retries_reached")
 
     _log(state, "agent6:critic:done")
+    _record_node_timing(state, "listing_critic", _timer)
     return state
 
 
