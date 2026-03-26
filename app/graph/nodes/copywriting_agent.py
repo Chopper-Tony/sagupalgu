@@ -113,7 +113,7 @@ def _run_copywriting_agent(
     except Exception as e:
         _record_error(state, "copywriting_node", f"react_agent failed: {e}")
         _log(state, f"agent3:react_agent:failed error={e} → fallback to direct service call")
-        return _fallback_generate(state, product, market_context, strategy, image_paths)
+        return _fallback_generate(state, product, market_context, strategy, image_paths, rewrite_instruction)
 
 
 def _fallback_generate(
@@ -122,11 +122,26 @@ def _fallback_generate(
     market_context: Dict,
     strategy: Dict,
     image_paths: List[str],
+    rewrite_instruction: Optional[str] = None,
 ) -> Optional[Dict]:
     """ReAct 실패 시 ListingService 직접 호출 → 그것도 실패 시 template."""
     try:
         from app.services.listing_service import ListingService
         svc = ListingService()
+
+        # rewrite_instruction + 기존 listing이 있으면 재작성 시도
+        existing = state.get("canonical_listing")
+        if rewrite_instruction and existing:
+            listing = _run_async(lambda: svc.rewrite_listing(
+                canonical_listing=existing,
+                rewrite_instruction=rewrite_instruction,
+                confirmed_product=product,
+                market_context=market_context,
+                strategy=strategy,
+            ))
+            _log(state, "agent3:fallback:rewrite_service_call:success")
+            return listing
+
         listing = _run_async(lambda: svc.build_canonical_listing(
             confirmed_product=product,
             market_context=market_context,
@@ -227,7 +242,7 @@ def _extract_listing_payload(result: Dict, state: SellerCopilotState) -> Optiona
             if isinstance(parsed, dict) and "title" in parsed:
                 _log(state, f"agent3:react_agent:listing_extracted title={parsed.get('title', '')[:40]}")
                 return parsed
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
     # regex fallback
@@ -237,7 +252,7 @@ def _extract_listing_payload(result: Dict, state: SellerCopilotState) -> Optiona
     if m:
         try:
             return json.loads(m.group(0))
-        except Exception:
+        except (json.JSONDecodeError, ValueError):
             pass
 
     return None
@@ -263,7 +278,7 @@ def _normalize_listing(
                 product=listing.get("product") or product,
             )
             return schema.model_dump()
-    except Exception:
+    except (ValueError, TypeError, KeyError):
         pass
     # fallback: 최소 필수 키 보장
     listing.setdefault("title", f"{product.get('model', '상품')} 판매합니다")

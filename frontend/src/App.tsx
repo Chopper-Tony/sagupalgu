@@ -11,6 +11,7 @@ import type { ConfirmedProduct, TimelineItem, TimelineItemInput, SessionStatus }
 interface SidebarSession {
   id: string;
   lastKnownStatus: SessionStatus;
+  updatedAt: string;
 }
 import "./App.css";
 
@@ -73,7 +74,7 @@ export default function App() {
     if (activeId && currentStatus) {
       setSessions((prev) =>
         prev.map((s) =>
-          s.id === activeId ? { ...s, lastKnownStatus: currentStatus } : s
+          s.id === activeId ? { ...s, lastKnownStatus: currentStatus, updatedAt: new Date().toISOString() } : s
         )
       );
     }
@@ -82,7 +83,7 @@ export default function App() {
   const handleNewSession = async () => {
     try {
       const s = await api.createSession();
-      setSessions((prev) => [{ id: s.session_id, lastKnownStatus: s.status as SessionStatus }, ...prev]);
+      setSessions((prev) => [{ id: s.session_id, lastKnownStatus: s.status as SessionStatus, updatedAt: new Date().toISOString() }, ...prev]);
       setActiveId(s.session_id);
       setSession(s);
       setTimeline([]);

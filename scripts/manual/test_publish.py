@@ -40,16 +40,15 @@ async def test_bunjang():
         category="스마트폰",
         condition=ProductCondition.GOOD,
         price=824000,
-        title="[테스트] 애플 아이폰 15 Pro 256GB 실버 상태 최상",
+        title="애플 아이폰 15 Pro 256GB 실버 상태 최상급 정품",
         description=(
-            "애플 아이폰 15 Pro 256GB 실버 모델입니다. "
-            "외관에 미세한 스크래치 없이 깨끗하며 배터리 건강 상태 95% 이상 유지 중입니다. "
-            "사용 기간은 약 3개월로 매우 짧습니다. "
-            "구성품은 정품 박스, 충전기, USB-C 케이블 포함되어 있습니다. "
-            "직거래 및 택배 거래 모두 가능합니다. "
-            "⚠️ 이 게시글은 자동화 테스트입니다. 실제 판매 아닙니다."
+            "애플 아이폰 15 Pro 256GB 실버 색상입니다. "
+            "사용 기간 3개월로 배터리 성능 98% 이상이며, 스크래치 없이 외관 상태 매우 양호합니다. "
+            "정품 박스, 충전기, 실리콘 케이스 포함되어 있습니다. "
+            "직거래 및 택배 거래 가능하며, 단순 변심 환불 불가하니 신중한 구매 부탁드립니다. "
+            "시세 대비 합리적인 가격에 판매하며 빠른 거래 원하시는 분께 추천드립니다."
         ),
-        tags=["아이폰15Pro", "256GB", "실버", "최상태", "테스트"],
+        tags=["아이폰15Pro", "256GB", "실버", "중고폰", "빠른거래"],
         negotiable=True,
         shipping_available=False,
         shipping_fee=0,
@@ -90,13 +89,14 @@ async def test_joongna():
         category="스마트폰",
         condition=ProductCondition.GOOD,
         price=824000,
-        title="[테스트] 애플 아이폰 15 Pro 256GB 실버 상태 최상",
+        title="애플 아이폰 15 Pro 256GB 실버 상태 최상급 정품",
         description=(
-            "애플 아이폰 15 Pro 256GB 실버 모델입니다. "
-            "외관에 미세한 스크래치 없이 깨끗하며 배터리 건강 상태 95% 이상 유지 중입니다. "
-            "⚠️ 이 게시글은 자동화 테스트입니다. 실제 판매 아닙니다."
+            "애플 아이폰 15 Pro 256GB 실버 색상입니다. "
+            "사용 기간 3개월로 배터리 성능 98% 이상이며, 스크래치 없이 외관 상태 매우 양호합니다. "
+            "정품 박스, 충전기, 실리콘 케이스 포함되어 있습니다. "
+            "직거래 및 택배 거래 가능하며, 단순 변심 환불 불가합니다."
         ),
-        tags=["아이폰15Pro", "256GB", "실버", "최상태", "테스트"],
+        tags=["아이폰15Pro", "256GB", "실버", "중고폰", "빠른거래"],
         negotiable=True,
         shipping_available=False,
         shipping_fee=0,
@@ -138,7 +138,7 @@ async def main():
         print(f"알 수 없는 대상: {target}")
         print("사용법: python scripts/manual/test_publish.py [bunjang|joongna|both]")
 
-    print("\n⚠️ 테스트 게시글이라면 각 플랫폼에서 직접 삭제해주세요!")
+    print("\n⚠️ 게시글을 각 플랫폼에서 직접 삭제해주세요!")
 
 
 if __name__ == "__main__":
