@@ -53,6 +53,7 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
             criticFeedback={session.agent_trace?.critic_feedback ?? []}
             onApprove={(platforms) => onAction("prepare_publish", platforms)}
             onRewrite={(instruction) => onAction("rewrite", instruction)}
+            onDirectEdit={(edited) => onAction("direct_edit", edited)}
           />
         );
 

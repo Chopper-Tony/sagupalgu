@@ -135,6 +135,28 @@
   cursor: default;
 }
 
+.session-sidebar__platform-relogin-btn {
+  background: transparent;
+  border: 1px solid var(--border, #2a2a2e);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  margin-left: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.session-sidebar__platform-relogin-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #2a2a2e);
+  color: var(--text-primary, #ececec);
+}
+
+.session-sidebar__platform-relogin-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .session-sidebar__platform-empty {
   font-size: 12px;
   color: var(--text-muted, #666);

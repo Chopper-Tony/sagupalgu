@@ -81,7 +81,16 @@ export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionS
               {info.connected ? "✅" : "⚪"} {info.name}
             </span>
             {info.connected ? (
-              <span className="session-sidebar__platform-status">연동됨</span>
+              <>
+                <span className="session-sidebar__platform-status">연동됨</span>
+                <button
+                  className="session-sidebar__platform-relogin-btn"
+                  onClick={() => handleLogin(key)}
+                  disabled={loginLoading !== null}
+                >
+                  {loginLoading === key ? "로그인 중..." : "재로그인"}
+                </button>
+              </>
             ) : (
               <button
                 className="session-sidebar__platform-login-btn"

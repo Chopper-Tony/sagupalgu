@@ -19,17 +19,17 @@ SESSION_DIR = "sessions"
 PLATFORM_CONFIG = {
     "bunjang": {
         "name": "번개장터",
-        "login_url": "https://m.bunjang.co.kr",
+        "login_url": "https://m.bunjang.co.kr/login",
         "session_file": "bunjang_session.json",
-        "login_check_url": "https://m.bunjang.co.kr/my",
-        "logged_in_selector": "a[href='/my']",
+        "login_page_patterns": ["/login", "/signin"],
+        "home_domain": "bunjang.co.kr",
     },
     "joongna": {
         "name": "중고나라",
         "login_url": "https://web.joongna.com/signin?type=default",
         "session_file": "joongna_session.json",
-        "login_check_url": "https://web.joongna.com",
-        "logged_in_selector": "a[href='/my-store']",
+        "login_page_patterns": ["/signin", "/login"],
+        "home_domain": "joongna.com",
     },
 }
 
@@ -55,12 +55,32 @@ def get_session_status() -> dict[str, Any]:
     return result
 
 
+def _is_still_on_login_page(url: str, config: dict) -> bool:
+    """현재 URL이 로그인 페이지이거나 OAuth 외부 페이지인지 판단한다.
+
+    로그인 완료 = 해당 플랫폼 도메인에 있으면서 로그인 패턴이 URL에 없는 상태.
+    OAuth 페이지(kakao, naver 등)에 있으면 아직 로그인 중.
+    """
+    # 로그인 페이지 패턴이 URL에 있으면 아직 로그인 중
+    for pattern in config["login_page_patterns"]:
+        if pattern in url:
+            return True
+    # 플랫폼 도메인에 있지 않으면 OAuth 외부 페이지 → 아직 로그인 중
+    if config["home_domain"] not in url:
+        return True
+    return False
+
+
 async def open_login_browser(platform: str) -> dict[str, Any]:
     """
     Playwright 브라우저를 headless=False로 열어 로그인 페이지를 표시한다.
     사용자가 로그인을 완료하면 자동으로 쿠키를 저장하고 브라우저를 닫는다.
 
-    Windows에서는 ProactorEventLoop이 필요하므로 별도 스레드에서 실행한다.
+    로그인 감지 방식:
+    - 로그인 페이지 URL에 login_page_patterns이 포함되어 있으면 "아직 로그인 중"
+    - 사용자가 로그인을 완료하면 플랫폼이 다른 페이지로 리다이렉트함
+    - URL에서 패턴이 사라지면 로그인 성공으로 판단
+    - 페이지를 절대 이동시키지 않음 — 사용자의 로그인 흐름을 방해하지 않음
     """
     if platform not in PLATFORM_CONFIG:
         return {"success": False, "error": f"지원하지 않는 플랫폼: {platform}"}
@@ -82,6 +102,7 @@ async def open_login_browser(platform: str) -> dict[str, Any]:
             )
             page = await context.new_page()
 
+            # 로그인 페이지 열기
             await page.goto(config["login_url"], wait_until="domcontentloaded")
             await asyncio.sleep(2)
 
@@ -94,33 +115,34 @@ async def open_login_browser(platform: str) -> dict[str, Any]:
                     await banner.click()
                     await asyncio.sleep(1)
 
-            logger.info("[%s] 로그인 브라우저 열림 — 사용자 로그인 대기 중", config["name"])
+            initial_url = page.url
+            logger.info(
+                "[%s] 로그인 브라우저 열림 — 사용자 로그인 대기 중 (최대 5분), 초기 URL: %s",
+                config["name"], initial_url,
+            )
 
-            # 로그인 완료 대기 (최대 5분, 2초 간격 폴링)
+            # 로그인 완료 대기 (최대 5분, 3초 간격 폴링)
+            # 판단 기준: 현재 URL에서 login_page_patterns이 모두 사라지면 로그인 성공
             logged_in = False
-            for _ in range(150):
-                await asyncio.sleep(2)
+            for i in range(100):  # 100 * 3초 = 5분
+                await asyncio.sleep(3)
                 try:
-                    # URL 변화 또는 로그인 후 요소 존재로 판단
                     current_url = page.url
-                    if platform == "bunjang" and "/login" not in current_url and "/signin" not in current_url:
-                        # 번개장터: my 페이지 접근 가능 여부로 판단
-                        try:
-                            await page.goto("https://m.bunjang.co.kr/my", wait_until="domcontentloaded", timeout=5000)
-                            if "/login" not in page.url and "/signin" not in page.url:
-                                logged_in = True
-                                break
-                        except Exception:
-                            pass
-                    elif platform == "joongna":
-                        # 중고나라: 로그인 페이지에서 벗어나면 성공
-                        if "signin" not in current_url and "joongna.com" in current_url:
-                            logged_in = True
-                            break
+                    if not _is_still_on_login_page(current_url, config):
+                        # URL이 로그인 페이지에서 벗어남 → 로그인 성공
+                        logged_in = True
+                        logger.info(
+                            "[%s] 로그인 감지 (폴링 %d회차), URL: %s",
+                            config["name"], i + 1, current_url,
+                        )
+                        break
                 except Exception:
+                    # 브라우저가 닫혔거나 페이지 접근 불가
                     pass
 
             if logged_in:
+                # 로그인 후 잠시 대기 (쿠키/세션 안정화)
+                await asyncio.sleep(2)
                 os.makedirs(SESSION_DIR, exist_ok=True)
                 session_path = os.path.join(SESSION_DIR, config["session_file"])
                 await context.storage_state(path=session_path)

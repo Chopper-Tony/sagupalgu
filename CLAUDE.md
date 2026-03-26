@@ -388,6 +388,7 @@ python -m pytest tests/ -m integration
 | M65 완료 (CTO v3 리뷰) | CTO1: 92 / CTO2: 87 / CTO3: 88 | 공통: SellerCopilotService 분할·expected_status·trace 보존 호평. CTO3: rewrite fallback 회귀 1건·idempotency·broad exception. CTO2: _run_async 확산 금지 원칙 |
 | M69~M73 완료 | 92+ 예상 | rewrite fallback 회귀 수정·idempotency 확인·_run_async 원칙 명시·except 세분화·updatedAt·전이 로그, 테스트 508개 |
 | M74~M76 + A1~A2 + E2E fix 완료 | — | readiness 고도화·AI 피드백 표시·post-sale 강화·UI ChatGPT화·배포 준비·Playwright Windows 수정·이미지 경로/카테고리 수정, **UI E2E 풀 완주 성공**(번개장터+중고나라 동시 게시) |
+| UI-FIX: 프론트 UX 개선 + 플랫폼 로그인 수정 | ✅ 완료 | rewrite 후 DraftCard 무한 스피너 수정(상태 동일 시 수동 카드 push) ✅, publish 후 스피너 무한 수정(PublishResultCard 수동 push) ✅, DraftCard 플랫폼 선택 디폴트 빈 배열로 변경(사용자 선택 시 색상 변화) ✅, DraftCard "직접 수정" 버튼 추가(제목·설명·가격 인라인 편집) ✅, Vite `/uploads` 프록시 추가(상품 이미지 렌더링) ✅, SessionSidebar 재로그인 버튼 추가(연동됨 상태에서도 재로그인 가능) ✅, platform_auth_service 로그인 감지 재작성(별도 탭 verify 방식·초기 10초 대기·login_url 직접 지정) ✅ |
 
 ## 에이전틱 점수 이력
 
