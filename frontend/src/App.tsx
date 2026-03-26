@@ -15,10 +15,16 @@ const nextId = () => String(++_idCounter);
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   if (msg.includes("409")) return "이미 처리된 요청입니다. 새 세션을 시작해주세요.";
+  if (msg.includes("422")) return "입력값이 올바르지 않습니다. 다시 확인해주세요.";
   if (msg.includes("429") || msg.includes("quota")) return "AI 서비스 이용량을 초과했습니다. 잠시 후 다시 시도해주세요.";
-  if (msg.includes("timeout")) return "서버 응답이 느립니다. 잠시 후 다시 시도해주세요.";
-  if (msg.includes("Network Error")) return "네트워크 연결을 확인해주세요.";
+  if (msg.includes("timeout") || msg.includes("ETIMEDOUT")) return "서버 응답이 느립니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("Network Error") || msg.includes("ECONNREFUSED")) return "네트워크 연결을 확인해주세요.";
+  if (msg.includes("502")) return "게시 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.";
   if (msg.includes("500")) return "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  if (msg.includes("404")) return "세션을 찾을 수 없습니다. 새 세션을 시작해주세요.";
+  // 기술적 메시지는 일반 사용자에게 보여주지 않음
+  if (msg.includes("Traceback") || msg.includes("Error:") || msg.includes("Exception"))
+    return "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
   return msg;
 }
 

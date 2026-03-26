@@ -1,4 +1,5 @@
 import type { PlatformResult } from "../../types";
+import { platformLabel } from "../../lib/sessionStatusUiMap";
 import "./PublishResultCard.css";
 
 interface PublishResultCardProps {
@@ -32,7 +33,7 @@ export function PublishResultCard({ results, onUpdateSaleStatus }: PublishResult
           <div key={r.platform} className="publish-result-card__result">
             <div className="publish-result-card__result-left">
               <span className={`publish-result-card__result-dot${r.success ? " publish-result-card__result-dot--success" : " publish-result-card__result-dot--fail"}`} />
-              <span className="publish-result-card__result-platform">{r.platform}</span>
+              <span className="publish-result-card__result-platform">{platformLabel(r.platform)}</span>
             </div>
             {r.success && r.url ? (
               <a

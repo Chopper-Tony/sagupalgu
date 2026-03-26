@@ -1,4 +1,5 @@
 import type { CanonicalListing } from "../../types";
+import { platformLabel } from "../../lib/sessionStatusUiMap";
 import "./PublishApprovalCard.css";
 
 interface PublishApprovalCardProps {
@@ -28,7 +29,7 @@ export function PublishApprovalCard({ listing, platforms, onPublish, onEdit }: P
 
       <div className="publish-approval-card__platforms">
         {platforms.map((p) => (
-          <span key={p} className="publish-approval-card__platform">{p}</span>
+          <span key={p} className="publish-approval-card__platform">{platformLabel(p)}</span>
         ))}
       </div>
 
