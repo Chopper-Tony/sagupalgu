@@ -1,12 +1,17 @@
 import axios from "axios";
 import type { SessionResponse } from "../types";
 
+const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1",
+  baseURL: BASE_URL,
   timeout: 120000,
 });
 
 export const api = {
+  /** SSE 스트림 URL을 반환한다. EventSource에서 사용. */
+  getSessionStreamUrl: (id: string) => `${BASE_URL}/sessions/${id}/stream`,
+
   createSession: () =>
     client.post<SessionResponse>("/sessions").then((r) => r.data),
 

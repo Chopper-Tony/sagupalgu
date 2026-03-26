@@ -96,3 +96,34 @@ jobs:
 
       - name: Build frontend Docker image
         run: docker build -t sagupalgu-frontend ./frontend
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/sagupalgu
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            echo "Deploy complete: $(date)"
+
+      - name: Notify Discord on deploy
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          EMOJI="✅"
+          [ "$STATUS" != "success" ] && EMOJI="❌"
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"content\": \"$EMOJI 배포 $STATUS — $(git log -1 --pretty=%s)\"}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}" || true

@@ -342,12 +342,14 @@ python -m pytest tests/ -m integration
 | M63: except Exception 세분화 | ✅ 완료 | `_common.py` `except Exception` → `except (json.JSONDecodeError, ValueError)` 구체화 ✅, `listing_llm.py` fallback 체인에 logger 추가(침묵 catch 제거) ✅, 외부 경계(LLM/크롤러/Vision) except Exception은 적절하므로 유지 ✅, 486 테스트 통과 ✅ |
 | M64: 테스트 커버리지 확충 | ✅ 완료 | test_service_coverage.py 22개 신설(session_ui 8·publish_service 8·optimization_service 3·recovery_service 2·atomicity 1) ✅, 500+ 목표 달성 ✅, 486→508 테스트 통과 ✅ |
 | M65: 노드별 실행 시간 추적 | ✅ 완료 | helpers.py에 `_start_timer()`·`_record_node_timing()` 헬퍼 추가 ✅, planner·copywriting·critic 3개 핵심 노드에 타이밍 적용 ✅, `execution_metrics` 필드를 workflow_meta에 보존 ✅, debug_logs에도 elapsed 자동 기록 ✅, 508 테스트 통과 ✅ |
+| M66: SSE 실시간 상태 업데이트 | ✅ 완료 | `GET /sessions/{id}/stream` SSE 엔드포인트 신설(StreamingResponse, 하트비트 1.5초, 상태 변경 시만 이벤트 전송, 처리 완료 시 stream_end 후 종료) ✅, 프론트 useSession EventSource 기반 실시간 수신 + 폴링 fallback 유지 ✅, api.ts `getSessionStreamUrl()` 추가 ✅, 빌드 에러 0·508 테스트 통과 ✅ |
+| M67: 게시 병렬 실행 | ✅ 완료 | publish_service.py `execute_publish` 순차 for 루프 → `asyncio.gather` 병렬 실행 전환 ✅, `_publish_one()` 내부 함수로 플랫폼별 타임아웃·에러분류 캡슐화 ✅, 508 테스트 통과 ✅ |
+| M68: CD 파이프라인 | ✅ 완료 | ci.yml에 `deploy` 잡 추가(main push 시 EC2 SSH 자동 배포, docker compose 재빌드) ✅, 배포 성공/실패 Discord 알림 ✅ |
 | M69: rewrite 경로 회귀 수정 | ✅ 완료 | `_fallback_generate()`에 `rewrite_instruction` 파라미터 추가(CTO3 P0) ✅, ReAct 실패 시 fallback에서도 rewrite_instruction+기존 listing이 있으면 `svc.rewrite_listing()` 호출 ✅, 기존 테스트 508개 통과 ✅ |
 | M70: 상태 전이 idempotency 확인 | ✅ 완료 | `expected_status` 기반 원자적 업데이트가 이미 7개 주요 전이에 적용되어 publish/generate 중복 실행 방어됨 ✅, ALLOWED_TRANSITIONS에서 `publishing→publishing` 자기 전이 미허용으로 이중 방어 ✅ |
 | M71: _run_async 확산 금지 원칙 명시 | ✅ 완료 | helpers.py `_run_async` docstring에 사용 범위 제한 원칙 명시(graph 노드 내부 한정, service layer 확산 금지, 추후 native async 전환 예정) ✅ |
 | M72: except Exception 추가 세분화 | ✅ 완료 | copywriting_agent.py JSON 파싱 3곳 `except Exception` → `except (json.JSONDecodeError, TypeError, ValueError)` 구체화 ✅, Pydantic 검증 `except Exception` → `except (ValueError, TypeError, KeyError)` ✅ |
 | M73: 사이드바 updatedAt + 세션 전이 로그 | ✅ 완료 | SidebarSession에 `updatedAt` 필드 추가 ✅, `_ensure_transition()`에 `session_transition session_id/from/to` 구조화 로그 추가 ✅, 빌드 에러 0·508 테스트 통과 ✅ |
-
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
