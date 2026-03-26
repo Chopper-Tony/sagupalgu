@@ -2,9 +2,17 @@ import { useState } from "react";
 import type { CanonicalListing, MarketContext } from "../../types";
 import "./DraftCard.css";
 
+interface CriticFeedback {
+  type: string;
+  impact: string;
+  reason: string;
+}
+
 interface DraftCardProps {
   listing: CanonicalListing;
   marketContext: MarketContext | null;
+  criticScore: number | null;
+  criticFeedback: CriticFeedback[];
   onApprove: (platforms: string[]) => void;
   onRewrite: (instruction: string) => void;
 }
@@ -16,7 +24,12 @@ const PLATFORM_MAP: Record<string, string> = {
 };
 const PLATFORMS = Object.keys(PLATFORM_MAP);
 
-export function DraftCard({ listing, marketContext, onApprove, onRewrite }: DraftCardProps) {
+const IMPACT_LABEL: Record<string, string> = { high: "높음", medium: "보통", low: "낮음" };
+const TYPE_LABEL: Record<string, string> = {
+  title: "제목", description: "설명", price: "가격", trust: "신뢰도", seo: "검색 최적화", missing: "누락",
+};
+
+export function DraftCard({ listing, marketContext, criticScore, criticFeedback, onApprove, onRewrite }: DraftCardProps) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(PLATFORMS);
   const [rewriteText, setRewriteText] = useState("");
   const [showRewrite, setShowRewrite] = useState(false);
@@ -82,6 +95,27 @@ export function DraftCard({ listing, marketContext, onApprove, onRewrite }: Draf
           </div>
         )}
       </div>
+
+      {criticScore != null && (
+        <div className="draft-card__feedback">
+          <p className="draft-card__feedback-title">
+            AI 품질 평가: <strong>{criticScore}점</strong>
+          </p>
+          {criticFeedback.length > 0 && (
+            <ul className="draft-card__feedback-list">
+              {criticFeedback.map((fb, i) => (
+                <li key={i} className="draft-card__feedback-item">
+                  <span className="draft-card__feedback-type">{TYPE_LABEL[fb.type] ?? fb.type}</span>
+                  <span className={`draft-card__feedback-impact draft-card__feedback-impact--${fb.impact}`}>
+                    {IMPACT_LABEL[fb.impact] ?? fb.impact}
+                  </span>
+                  <span className="draft-card__feedback-reason">{fb.reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="draft-card__platforms">
         <p className="draft-card__platforms-label">게시 플랫폼 선택</p>
