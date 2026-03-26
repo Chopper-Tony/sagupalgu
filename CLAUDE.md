@@ -353,8 +353,16 @@ python -m pytest tests/ -m integration
 | M74: readiness 고도화 | ✅ 완료 | /health/ready에 `llm_reachable` 체크 추가(OpenAI models API / Gemini models API 경량 핑, 5초 타임아웃) ✅, checks에 `llm_reachable` 필드 포함 ✅, 508 테스트 통과 ✅ |
 | M75: 판매자 챗봇 고도화 — AI 피드백 표시 | ✅ 완료 | DraftCard에 AI 품질 평가 섹션 추가(critic_score·critic_feedback 표시, 항목별 타입·영향도·이유) ✅, SessionResponse 타입에 `agent_trace` 필드 추가 ✅, ChatWindow→DraftCard로 critic 데이터 전달 ✅, 빌드 에러 0 ✅ |
 | M76: post-sale optimization 강화 | ✅ 완료 | price_optimization_tool에 단계별 제안 추가(14일+: 제목 키워드 변경, 21일+: 재게시+사진 교체+15% 인하) ✅, `suggestions` 목록·`recommend_relist` 필드 추가 ✅, OptimizationSuggestionCard에 suggestions 렌더링 ✅, OptimizationSuggestion 타입 확장 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
-| P-LOGIN: 웹 UI 플랫폼 로그인 | ✅ 완료 | `app/services/platform_auth_service.py` 신설(Playwright headless=False 브라우저 열기→로그인 대기→쿠키 저장, Windows ProactorEventLoop 대응) ✅, `app/api/platform_router.py` 신설(`GET /platforms/status`·`POST /platforms/{platform}/login`) ✅, SessionSidebar 하단 "플랫폼 연동" 섹션(연동 상태 표시·로그인 버튼) ✅, 508 테스트 통과·빌드 에러 0 ✅ |
-
+| A1: 셀러 코파일럿 UI ChatGPT화 마감 | ✅ 완료 | CSS 변수 체계 통합(index.css 전면 교체, 16개 디자인 토큰) ✅, Noto Sans KR 웹폰트 적용 ✅, 다크테마 일관화(하드코딩 색상→CSS변수) ✅, 메시지 버블 fadeIn 애니메이션 ✅, 스크롤바 커스텀 스타일 ✅, 반응형 모바일 레이아웃(768px 이하 사이드바 숨김) ✅, ChatComposer 포커스 accent 강조 ✅, 빈 상태 랜딩 페이지 개선 ✅, HTML lang=ko·title·description·color-scheme 메타 태그 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
+| A2: 배포 준비 | ✅ 완료 | `scripts/setup_ec2.sh` EC2 초기 세팅 자동화 ✅, ci.yml deploy 잡(M68) ✅ |
+| E2E-fix-1: Windows Playwright 게시 수정 | ✅ 완료 | Windows SelectorEventLoop → 별도 스레드 ProactorEventLoop 전환 ✅ |
+| E2E-fix-2: 이미지 경로 + 카테고리 전달 | ✅ 완료 | URL→파일시스템 절대경로 변환(`_resolve_image_paths`) ✅, `platform_packages`에 category 필드 추가 ✅ |
+| UI E2E 풀 완주 | ✅ 성공 | 프론트 UI에서 사진 업로드→Vision 분석→상품 확정→시세 크롤링→판매글 생성→Critic 비평→재작성→게시 준비→ 번개장터+중고나라 동시 게시 성공(이미지+카테고리 정상) ✅ |
+| AG1: Agent 2 ReAct 활성화 | ✅ 완료 | `_run_market_and_graph()`에서 market_context 서비스 선처리 제거 ✅, 그래프 안 `market_intelligence_node`가 ReAct로 `lc_market_crawl_tool`·`lc_rag_price_tool` 자율 호출 ✅ |
+| AG2: Planner 동적 영향력 | ✅ 완료 | `mission_goal`에 따라 `max_critic_retries` 동적 설정(fast_sell=1·balanced=2·profit_max=3) ✅, Planner 계획이 Critic 정책에 실제 영향 ✅ |
+| B1: 판매자 챗봇 보완 | ✅ 완료 | `POST /sessions/{id}/seller-tips` 신설(가격·사진·제목·Critic 기반 팁) ✅, 판매글 생성 후 프론트 자동 표시 ✅ |
+| B2: 구매자용 챗봇 | ✅ 완료 | `POST /sessions/{id}/buyer-analysis` 신설(시세 대비 적정성 판정·네고 여지·구매 추천) ✅ |
+| P-LOGIN: 웹 UI 플랫폼 로그인 | ✅ 완료 | `platform_auth_service.py` 신설(Playwright headless=False→로그인 대기→쿠키 저장) ✅, `platform_router.py`(`GET /platforms/status`·`POST /platforms/{platform}/login`) ✅, SessionSidebar 하단 "플랫폼 연동" 섹션 ✅ |
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
@@ -379,6 +387,7 @@ python -m pytest tests/ -m integration
 | M56~M59 완료 | 93+ 예상 | CTO 3명 P0 전수 대응: agent trace 봉합·상태 전이 원자성·사이드바 보정·문서 정합화, 테스트 486개 |
 | M65 완료 (CTO v3 리뷰) | CTO1: 92 / CTO2: 87 / CTO3: 88 | 공통: SellerCopilotService 분할·expected_status·trace 보존 호평. CTO3: rewrite fallback 회귀 1건·idempotency·broad exception. CTO2: _run_async 확산 금지 원칙 |
 | M69~M73 완료 | 92+ 예상 | rewrite fallback 회귀 수정·idempotency 확인·_run_async 원칙 명시·except 세분화·updatedAt·전이 로그, 테스트 508개 |
+| M74~M76 + A1~A2 + E2E fix 완료 | — | readiness 고도화·AI 피드백 표시·post-sale 강화·UI ChatGPT화·배포 준비·Playwright Windows 수정·이미지 경로/카테고리 수정, **UI E2E 풀 완주 성공**(번개장터+중고나라 동시 게시) |
 
 ## 에이전틱 점수 이력
 

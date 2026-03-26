@@ -59,6 +59,11 @@ export const api = {
       .post<SessionResponse>(`/sessions/${id}/sale-status`, { sale_status: saleStatus })
       .then((r) => r.data),
 
+  getSellerTips: (id: string) =>
+    client
+      .post<{ session_id: string; tips: Array<{ category: string; message: string; priority: string }> }>(`/sessions/${id}/seller-tips`)
+      .then((r) => r.data),
+
   // 플랫폼 연동
   getPlatformStatus: () =>
     client.get<{ platforms: Record<string, { name: string; connected: boolean; session_saved_at: string | null }> }>("/platforms/status")

@@ -10,27 +10,29 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 16px 12px;
-  border-bottom: 1px solid #2a2a2e;
+  border-bottom: 1px solid var(--border);
 }
 
 .session-sidebar__title {
   font-weight: 700;
   font-size: 15px;
-  color: #ececec;
+  color: var(--text-primary);
 }
 
 .session-sidebar__new-btn {
-  background: #2563eb;
+  background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s;
 }
 
 .session-sidebar__new-btn:hover {
-  background: #1d4ed8;
+  background: var(--accent-hover);
 }
 
 .session-sidebar__list {
@@ -44,24 +46,25 @@
 .session-sidebar__item {
   padding: 10px 16px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius);
   margin: 2px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transition: background 0.12s;
 }
 
 .session-sidebar__item:hover {
-  background: #1e1e22;
+  background: var(--bg-hover);
 }
 
 .session-sidebar__item--active {
-  background: #1e2a3a;
+  background: var(--accent-light);
 }
 
 .session-sidebar__item-label {
   font-size: 13px;
-  color: #ececec;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -69,7 +72,7 @@
 
 .session-sidebar__item-status {
   font-size: 11px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .session-sidebar__empty {
