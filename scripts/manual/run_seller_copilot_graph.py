@@ -20,8 +20,8 @@ from app.graph.seller_copilot_runner import seller_copilot_runner
 
 
 def main():
-    # 그래프가 내부적으로 publish까지 실행함 (publish_node가 graph에 포함됨)
-    result = seller_copilot_runner.run(
+    # 초기 상태 빌드 후 pre_listing_done=True로 질문 단계 건너뛰기
+    initial_state = seller_copilot_runner.build_initial_state(
         session_id="test-session-001",
         image_paths=["C:/Users/bonjo/Desktop/hahaha.jpg"],
         selected_platforms=["bunjang", "joongna"],
@@ -37,6 +37,10 @@ def main():
             "crawler_sources": ["joongna", "bunjang"],
         },
     )
+    initial_state["pre_listing_done"] = True  # pre-listing 질문 건너뛰기
+
+    from app.graph.seller_copilot_graph import seller_copilot_graph
+    result = seller_copilot_graph.invoke(initial_state)
 
     print("\n=== FINAL STATE ===")
     pprint(result)
