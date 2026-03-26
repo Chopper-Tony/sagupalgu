@@ -123,29 +123,30 @@ class SellerCopilotService:
         market_context: dict[str, Any],
         rewrite_instruction: str | None = None,
     ) -> dict[str, Any]:
-        if confirmed_product.get("source") == "user_input":
-            return self.runner.run(
-                session_id=session_id,
-                image_paths=image_paths,
-                selected_platforms=selected_platforms,
-                user_product_input={
-                    "brand": confirmed_product.get("brand"),
-                    "model": confirmed_product.get("model"),
-                    "category": confirmed_product.get("category"),
-                    "storage": confirmed_product.get("storage", ""),
-                },
-                market_context=market_context,
-                rewrite_instruction=rewrite_instruction,
-            )
-
-        return self.runner.run(
+        common = dict(
             session_id=session_id,
             image_paths=image_paths,
             selected_platforms=selected_platforms,
-            product_candidates=[confirmed_product],
             market_context=market_context,
             rewrite_instruction=rewrite_instruction,
         )
+        if confirmed_product.get("source") == "user_input":
+            common["user_product_input"] = {
+                "brand": confirmed_product.get("brand"),
+                "model": confirmed_product.get("model"),
+                "category": confirmed_product.get("category"),
+                "storage": confirmed_product.get("storage", ""),
+            }
+        else:
+            common["product_candidates"] = [confirmed_product]
+
+        state = self.runner.build_initial_state(**common)
+        # 상품이 이미 확정되고 시세 데이터도 준비된 상태이므로
+        # pre-listing 질문 단계를 건너뛴다.
+        state["pre_listing_done"] = True
+
+        from app.graph.seller_copilot_graph import seller_copilot_graph
+        return seller_copilot_graph.invoke(state)
 
     # ── 공개 API ──────────────────────────────────────────────────────
 
