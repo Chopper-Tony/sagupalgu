@@ -243,6 +243,27 @@ class SessionService:
             listing_data=listing_data, workflow_meta=workflow_meta,
         )
 
+    async def update_listing(self, session_id: str, updated_listing: dict[str, Any]) -> dict[str, Any]:
+        """사용자가 직접 수정한 판매글을 DB에 반영한다."""
+        session = self._ensure_transition(session_id, "draft_generated")
+        current_status = session["status"]
+
+        listing_data = dict(session.get("listing_data_jsonb") or {})
+        canonical = listing_data.get("canonical_listing") or {}
+
+        # 사용자가 수정한 필드만 업데이트
+        for key in ("title", "description", "price", "tags"):
+            if key in updated_listing:
+                canonical[key] = updated_listing[key]
+
+        listing_data["canonical_listing"] = canonical
+
+        return self._persist_and_respond(
+            session_id, "draft_generated",
+            expected_status=current_status,
+            listing_data=listing_data,
+        )
+
     # ── 게시 준비 / 게시 ───────────────────────────────────────────
 
     async def prepare_publish(self, session_id: str, platform_targets: list[str]) -> dict[str, Any]:

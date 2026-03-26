@@ -16,6 +16,8 @@
 - **Goal-driven 전략**: 빠른 판매 / 균형 / 수익 극대화 목표에 따라 가격·문구·평가 기준이 달라짐
 - **AI 카피라이팅**: LLM이 매력적인 판매글 자동 생성 + Critic 자기 비평 루프
 - **멀티 플랫폼 게시**: 번개장터·중고나라 동시 게시 (Playwright 웹 자동화)
+- **웹 UI 플랫폼 로그인**: 브라우저에서 직접 로그인 → 쿠키 자동 저장 (스크립트 불필요)
+- **판매글 직접 수정**: AI 생성 초안을 사용자가 제목·설명·가격 인라인 편집 후 게시
 - **장애 진단**: 게시 실패 시 에러 분류(8종) → 자동 복구 가능 여부 판정 → 재시도
 
 ---
@@ -148,10 +150,15 @@ python -m pytest tests/api/test_e2e_happy_path.py -v
 | POST | `/api/v1/sessions/{id}/analyze` | 상품 분석 |
 | POST | `/api/v1/sessions/{id}/provide-product-info` | 상품 정보 입력 |
 | POST | `/api/v1/sessions/{id}/generate-listing` | 판매글 생성 |
-| POST | `/api/v1/sessions/{id}/rewrite-listing` | 판매글 재작성 |
+| POST | `/api/v1/sessions/{id}/rewrite-listing` | 판매글 AI 재작성 |
+| POST | `/api/v1/sessions/{id}/update-listing` | 판매글 직접 수정 (사용자 편집) |
 | POST | `/api/v1/sessions/{id}/prepare-publish` | 게시 준비 |
 | POST | `/api/v1/sessions/{id}/publish` | 게시 실행 |
 | POST | `/api/v1/sessions/{id}/sale-status` | 판매 상태 업데이트 |
+| POST | `/api/v1/sessions/{id}/seller-tips` | 판매 팁 생성 |
+| POST | `/api/v1/sessions/{id}/buyer-analysis` | 구매자 분석 |
+| GET | `/api/v1/platforms/status` | 플랫폼 연동 상태 |
+| POST | `/api/v1/platforms/{platform}/login` | 플랫폼 로그인 (브라우저 열기) |
 | GET | `/health/ready` | 헬스체크 (provider-aware) |
 
 ---

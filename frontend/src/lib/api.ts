@@ -44,6 +44,11 @@ export const api = {
       .post<SessionResponse>(`/sessions/${id}/rewrite-listing`, { instruction })
       .then((r) => r.data),
 
+  updateListing: (id: string, listing: { title: string; description: string; price: number; tags?: string[] }) =>
+    client
+      .post<SessionResponse>(`/sessions/${id}/update-listing`, listing)
+      .then((r) => r.data),
+
   preparePublish: (id: string, platforms: string[]) =>
     client
       .post<SessionResponse>(`/sessions/${id}/prepare-publish`, {
