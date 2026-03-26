@@ -187,19 +187,33 @@ class PublishService:
         return publish_results, any_failure
 
     async def publish(self, platform: str, payload: dict) -> PublishResult:
+        import sys
 
         publisher = self.get_publisher(platform)
-
         account = self.build_account_context(platform)
+        package = PlatformPackage(platform=platform, payload=payload)
 
-        package = PlatformPackage(
-            platform=platform,
-            payload=payload,
-        )
+        # Windows에서 Playwright는 ProactorEventLoop이 필요하지만
+        # uvicorn은 SelectorEventLoop을 사용한다.
+        # 별도 스레드에서 ProactorEventLoop으로 Playwright를 실행한다.
+        if sys.platform == "win32":
+            import asyncio
+            import concurrent.futures
 
-        result = await publisher.publish(
-            package=package,
-            account=account,
-        )
+            def _run_in_proactor():
+                loop = asyncio.ProactorEventLoop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        publisher.publish(package=package, account=account)
+                    )
+                finally:
+                    loop.close()
 
+            loop = asyncio.get_running_loop()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                result = await loop.run_in_executor(pool, _run_in_proactor)
+            return result
+
+        result = await publisher.publish(package=package, account=account)
         return result
