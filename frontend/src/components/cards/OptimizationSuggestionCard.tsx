@@ -27,6 +27,13 @@ export function OptimizationSuggestionCard({ suggestion, onRestart }: Optimizati
           </span>
         </div>
         <p className="optimization-card__reason">{suggestion.reason}</p>
+        {suggestion.suggestions && suggestion.suggestions.length > 0 && (
+          <ul className="optimization-card__suggestions">
+            {suggestion.suggestions.map((s: string, i: number) => (
+              <li key={i} className="optimization-card__suggestion-item">{s}</li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="optimization-card__actions">

@@ -341,6 +341,9 @@ python -m pytest tests/ -m integration
 | M63: except Exception 세분화 | ✅ 완료 | `_common.py` `except Exception` → `except (json.JSONDecodeError, ValueError)` 구체화 ✅, `listing_llm.py` fallback 체인에 logger 추가(침묵 catch 제거) ✅, 외부 경계(LLM/크롤러/Vision) except Exception은 적절하므로 유지 ✅, 486 테스트 통과 ✅ |
 | M64: 테스트 커버리지 확충 | ✅ 완료 | test_service_coverage.py 22개 신설(session_ui 8·publish_service 8·optimization_service 3·recovery_service 2·atomicity 1) ✅, 500+ 목표 달성 ✅, 486→508 테스트 통과 ✅ |
 | M65: 노드별 실행 시간 추적 | ✅ 완료 | helpers.py에 `_start_timer()`·`_record_node_timing()` 헬퍼 추가 ✅, planner·copywriting·critic 3개 핵심 노드에 타이밍 적용 ✅, `execution_metrics` 필드를 workflow_meta에 보존 ✅, debug_logs에도 elapsed 자동 기록 ✅, 508 테스트 통과 ✅ |
+| M74: readiness 고도화 | ✅ 완료 | /health/ready에 `llm_reachable` 체크 추가(OpenAI models API / Gemini models API 경량 핑, 5초 타임아웃) ✅, checks에 `llm_reachable` 필드 포함 ✅, 508 테스트 통과 ✅ |
+| M75: 판매자 챗봇 고도화 — AI 피드백 표시 | ✅ 완료 | DraftCard에 AI 품질 평가 섹션 추가(critic_score·critic_feedback 표시, 항목별 타입·영향도·이유) ✅, SessionResponse 타입에 `agent_trace` 필드 추가 ✅, ChatWindow→DraftCard로 critic 데이터 전달 ✅, 빌드 에러 0 ✅ |
+| M76: post-sale optimization 강화 | ✅ 완료 | price_optimization_tool에 단계별 제안 추가(14일+: 제목 키워드 변경, 21일+: 재게시+사진 교체+15% 인하) ✅, `suggestions` 목록·`recommend_relist` 필드 추가 ✅, OptimizationSuggestionCard에 suggestions 렌더링 ✅, OptimizationSuggestion 타입 확장 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 

@@ -49,6 +49,8 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
           <DraftCard
             listing={session.canonical_listing}
             marketContext={session.market_context ?? null}
+            criticScore={session.agent_trace?.critic_score ?? null}
+            criticFeedback={session.agent_trace?.critic_feedback ?? []}
             onApprove={(platforms) => onAction("prepare_publish", platforms)}
             onRewrite={(instruction) => onAction("rewrite", instruction)}
           />
