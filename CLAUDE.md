@@ -353,6 +353,7 @@ python -m pytest tests/ -m integration
 | M74: readiness 고도화 | ✅ 완료 | /health/ready에 `llm_reachable` 체크 추가(OpenAI models API / Gemini models API 경량 핑, 5초 타임아웃) ✅, checks에 `llm_reachable` 필드 포함 ✅, 508 테스트 통과 ✅ |
 | M75: 판매자 챗봇 고도화 — AI 피드백 표시 | ✅ 완료 | DraftCard에 AI 품질 평가 섹션 추가(critic_score·critic_feedback 표시, 항목별 타입·영향도·이유) ✅, SessionResponse 타입에 `agent_trace` 필드 추가 ✅, ChatWindow→DraftCard로 critic 데이터 전달 ✅, 빌드 에러 0 ✅ |
 | M76: post-sale optimization 강화 | ✅ 완료 | price_optimization_tool에 단계별 제안 추가(14일+: 제목 키워드 변경, 21일+: 재게시+사진 교체+15% 인하) ✅, `suggestions` 목록·`recommend_relist` 필드 추가 ✅, OptimizationSuggestionCard에 suggestions 렌더링 ✅, OptimizationSuggestion 타입 확장 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
+| A1: 셀러 코파일럿 UI ChatGPT화 마감 | ✅ 완료 | CSS 변수 체계 통합(index.css 전면 교체, 16개 디자인 토큰) ✅, Noto Sans KR 웹폰트 적용 ✅, 다크테마 일관화(하드코딩 색상→CSS변수) ✅, 메시지 버블 fadeIn 애니메이션 ✅, 스크롤바 커스텀 스타일 ✅, 반응형 모바일 레이아웃(768px 이하 사이드바 숨김) ✅, ChatComposer 포커스 accent 강조 ✅, 빈 상태 랜딩 페이지 개선 ✅, HTML lang=ko·title·description·color-scheme 메타 태그 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
