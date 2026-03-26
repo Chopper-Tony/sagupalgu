@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.graph.seller_copilot_state import (
     SellerCopilotState,
@@ -29,12 +29,12 @@ class SellerCopilotRunner:
     def build_initial_state(
         self,
         session_id: str,
-        image_paths: List[str],
-        selected_platforms: Optional[List[str]] = None,
-        user_product_input: Optional[Dict[str, Any]] = None,
-        product_candidates: Optional[List[Dict[str, Any]]] = None,
-        market_context: Optional[Dict[str, Any]] = None,
-        rewrite_instruction: Optional[str] = None,
+        image_paths: list[str],
+        selected_platforms: list[str] | None = None,
+        user_product_input: dict[str, Any] | None = None,
+        product_candidates: Optional[list[dict[str, Any]]] = None,
+        market_context: dict[str, Any] | None = None,
+        rewrite_instruction: str | None = None,
     ) -> SellerCopilotState:
         state = create_initial_state(
             session_id=session_id,
@@ -57,12 +57,12 @@ class SellerCopilotRunner:
     def run(
         self,
         session_id: str,
-        image_paths: List[str],
-        selected_platforms: Optional[List[str]] = None,
-        user_product_input: Optional[Dict[str, Any]] = None,
-        product_candidates: Optional[List[Dict[str, Any]]] = None,
-        market_context: Optional[Dict[str, Any]] = None,
-        rewrite_instruction: Optional[str] = None,
+        image_paths: list[str],
+        selected_platforms: list[str] | None = None,
+        user_product_input: dict[str, Any] | None = None,
+        product_candidates: Optional[list[dict[str, Any]]] = None,
+        market_context: dict[str, Any] | None = None,
+        rewrite_instruction: str | None = None,
     ) -> SellerCopilotState:
         initial_state = self.build_initial_state(
             session_id=session_id,

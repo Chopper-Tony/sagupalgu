@@ -11,7 +11,7 @@ SessionService — 세션 라이프사이클 오케스트레이터.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any
 
 from app.core.utils import safe_int as _safe_int
 from app.domain.exceptions import (
@@ -66,16 +66,16 @@ class SessionService:
 
     # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
-    async def create_session(self, user_id: str) -> Dict:
+    async def create_session(self, user_id: str) -> dict[str, Any]:
         session = self.repo.create(user_id=user_id)
         return build_session_ui_response(session.to_record())
 
-    async def get_session(self, session_id: str) -> Dict:
+    async def get_session(self, session_id: str) -> dict[str, Any]:
         return build_session_ui_response(self._get_or_raise(session_id))
 
     # ── 이미지 업로드 ──────────────────────────────────────────────
 
-    async def attach_images(self, session_id: str, image_urls: List[str]) -> Dict:
+    async def attach_images(self, session_id: str, image_urls: list[str]) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "images_uploaded")
         product_data = dict(session.get("product_data_jsonb") or {})
         attach_image_paths(product_data, image_urls)
@@ -87,7 +87,7 @@ class SessionService:
 
     # ── 상품 분석 ──────────────────────────────────────────────────
 
-    async def analyze_session(self, session_id: str) -> Dict:
+    async def analyze_session(self, session_id: str) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "awaiting_product_confirmation")
 
         product_data = dict(session.get("product_data_jsonb") or {})
@@ -111,7 +111,7 @@ class SessionService:
 
     # ── 상품 확정 ──────────────────────────────────────────────────
 
-    async def confirm_product(self, session_id: str, candidate_index: int) -> Dict:
+    async def confirm_product(self, session_id: str, candidate_index: int) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "product_confirmed")
         product_data = dict(session.get("product_data_jsonb") or {})
         confirm_from_candidate(product_data, candidate_index)
@@ -127,8 +127,8 @@ class SessionService:
 
     async def provide_product_info(
         self, session_id: str, model: str,
-        brand: Optional[str] = None, category: Optional[str] = None,
-    ) -> Dict:
+        brand: str | None = None, category: str | None = None,
+    ) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "product_confirmed")
         product_data = dict(session.get("product_data_jsonb") or {})
         confirm_from_user_input(product_data, model, brand, category)
@@ -144,7 +144,7 @@ class SessionService:
 
     # ── 판매글 생성 / 재작성 ────────────────────────────────────────
 
-    async def generate_listing(self, session_id: str) -> Dict:
+    async def generate_listing(self, session_id: str) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "draft_generated")
         current_status = session["status"]
 
@@ -171,7 +171,7 @@ class SessionService:
         }, expected_status=current_status)
         return build_session_ui_response(updated)
 
-    async def _fallback_generate_listing(self, session: Dict, listing_data: Dict) -> Dict:
+    async def _fallback_generate_listing(self, session: dict[str, Any], listing_data: dict[str, Any]) -> dict[str, Any]:
         """LangGraph 파이프라인이 canonical_listing을 생성하지 못했을 때 직접 LLM 호출."""
         import logging
         logger = logging.getLogger(__name__)
@@ -220,7 +220,7 @@ class SessionService:
         logger.info("fallback_template_used title=%s price=%s", template.get("title"), template.get("price"))
         return listing_data
 
-    async def rewrite_listing(self, session_id: str, instruction: str) -> Dict:
+    async def rewrite_listing(self, session_id: str, instruction: str) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "draft_generated")
         current_status = session["status"]
         if not instruction or not instruction.strip():
@@ -245,7 +245,7 @@ class SessionService:
 
     # ── 게시 준비 / 게시 ───────────────────────────────────────────
 
-    async def prepare_publish(self, session_id: str, platform_targets: List[str]) -> Dict:
+    async def prepare_publish(self, session_id: str, platform_targets: list[str]) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "awaiting_publish_approval")
         current_status = session["status"]
         if not platform_targets:
@@ -271,7 +271,7 @@ class SessionService:
         }, expected_status=current_status)
         return build_session_ui_response(updated)
 
-    async def publish_session(self, session_id: str) -> Dict:
+    async def publish_session(self, session_id: str) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "publishing")
         current_status = session["status"]
         selected = session.get("selected_platforms_jsonb") or []
@@ -291,13 +291,13 @@ class SessionService:
 
         final_status = "completed"
         if any_failure:
-            self._handle_publish_failure(session_id, workflow_meta, publish_results)
+            await self._handle_publish_failure(session_id, workflow_meta, publish_results)
             final_status = "publishing_failed"
 
         return self._persist_and_respond(session_id, final_status, workflow_meta=workflow_meta)
 
-    def _handle_publish_failure(
-        self, session_id: str, workflow_meta: Dict, publish_results: Dict,
+    async def _handle_publish_failure(
+        self, session_id: str, workflow_meta: dict[str, Any], publish_results: dict[str, Any],
     ) -> None:
         """게시 실패 시 recovery 서비스를 호출하고 진단 결과를 meta에 기록한다.
         누적 실패 횟수가 임계값 이상이면 Discord 알림을 발송한다."""
@@ -316,7 +316,7 @@ class SessionService:
 
         if retry_count >= DISCORD_ALERT_THRESHOLD:
             failed_platforms = [p for p, r in publish_results.items() if not r.get("success")]
-            self._send_discord_alert(
+            await self._send_discord_alert(
                 session_id=session_id,
                 message=(
                     f"게시 {retry_count}회 연속 실패\n"
@@ -325,26 +325,20 @@ class SessionService:
                 ),
             )
 
-    def _send_discord_alert(self, session_id: str, message: str) -> None:
-        """Discord 알림을 비동기로 발송한다. 실패해도 예외를 던지지 않는다."""
+    async def _send_discord_alert(self, session_id: str, message: str) -> None:
+        """Discord 알림을 발송한다. 실패해도 예외를 던지지 않는다."""
         import logging
         logger = logging.getLogger(__name__)
         try:
-            import asyncio
             from app.tools.agentic_tools import discord_alert_tool
-
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(discord_alert_tool(message=message, session_id=session_id))
-            else:
-                asyncio.run(discord_alert_tool(message=message, session_id=session_id))
+            await discord_alert_tool(message=message, session_id=session_id)
             logger.info("discord_alert_sent session=%s", session_id)
         except Exception as e:
             logger.warning("discord_alert_failed session=%s error=%s", session_id, e)
 
     # ── 판매 상태 입력 ─────────────────────────────────────────────
 
-    async def update_sale_status(self, session_id: str, sale_status: str) -> Dict:
+    async def update_sale_status(self, session_id: str, sale_status: str) -> dict[str, Any]:
         if sale_status not in ("sold", "unsold", "in_progress"):
             raise InvalidUserInputError("sale_status는 sold / unsold / in_progress 중 하나여야 합니다")
 
@@ -374,7 +368,7 @@ class SessionService:
 
     # ── 내부 헬퍼 ────────────────────────────────────────────────
 
-    def _get_or_raise(self, session_id: str) -> Dict:
+    def _get_or_raise(self, session_id: str) -> dict[str, Any]:
         session = self.repo.get_by_id(session_id)
         if not session:
             raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
@@ -383,9 +377,9 @@ class SessionService:
     def _update_or_raise(
         self,
         session_id: str,
-        payload: Dict,
+        payload: dict[str, Any],
         expected_status: str | None = None,
-    ) -> Dict:
+    ) -> dict[str, Any]:
         result = self.repo.update(
             session_id=session_id,
             payload=payload,
@@ -399,7 +393,7 @@ class SessionService:
             raise SessionUpdateError(f"세션 업데이트 실패: {session_id}")
         return result
 
-    def _ensure_transition(self, session_id: str, next_status: str) -> Dict:
+    def _ensure_transition(self, session_id: str, next_status: str) -> dict[str, Any]:
         """세션 조회 + 상태 전이 유효성 검증을 한 번에 수행한다."""
         session = self._get_or_raise(session_id)
         assert_allowed_transition(session["status"], next_status)
@@ -411,12 +405,12 @@ class SessionService:
         status: str,
         *,
         expected_status: str | None = None,
-        product_data: Dict | None = None,
-        listing_data: Dict | None = None,
-        workflow_meta: Dict | None = None,
-    ) -> Dict:
+        product_data: dict[str, Any] | None = None,
+        listing_data: dict[str, Any] | None = None,
+        workflow_meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """상태 업데이트 + UI 응답 반환 공통 패턴."""
-        payload: Dict = {"status": status}
+        payload: dict[str, Any] = {"status": status}
         if product_data is not None:
             payload["product_data_jsonb"] = product_data
         if listing_data is not None:
