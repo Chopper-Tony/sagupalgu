@@ -182,6 +182,7 @@ START
 ### 에이전트 노드
 - 반드시 `state: SellerCopilotState` 인자를 받는 동기 함수로 구현
 - async 도구 호출은 `_run_async(lambda: coro())` 헬퍼 경유 (lambda 패턴 — RuntimeWarning 방지)
+- **`_run_async` 사용 범위 제한**: graph 노드 내부(`app/graph/nodes/`)에서만 사용. service/application layer 확산 금지. 추후 LangGraph native async 전환 시 제거 예정
 - ReAct 에이전트는 `langchain.agents.create_agent(llm, tools, system_prompt=...)` 패턴 사용
 
 ### 툴
@@ -344,7 +345,11 @@ python -m pytest tests/ -m integration
 | M66: SSE 실시간 상태 업데이트 | ✅ 완료 | `GET /sessions/{id}/stream` SSE 엔드포인트 신설(StreamingResponse, 하트비트 1.5초, 상태 변경 시만 이벤트 전송, 처리 완료 시 stream_end 후 종료) ✅, 프론트 useSession EventSource 기반 실시간 수신 + 폴링 fallback 유지 ✅, api.ts `getSessionStreamUrl()` 추가 ✅, 빌드 에러 0·508 테스트 통과 ✅ |
 | M67: 게시 병렬 실행 | ✅ 완료 | publish_service.py `execute_publish` 순차 for 루프 → `asyncio.gather` 병렬 실행 전환 ✅, `_publish_one()` 내부 함수로 플랫폼별 타임아웃·에러분류 캡슐화 ✅, 508 테스트 통과 ✅ |
 | M68: CD 파이프라인 | ✅ 완료 | ci.yml에 `deploy` 잡 추가(main push 시 EC2 SSH 자동 배포, docker compose 재빌드) ✅, 배포 성공/실패 Discord 알림 ✅ |
-
+| M69: rewrite 경로 회귀 수정 | ✅ 완료 | `_fallback_generate()`에 `rewrite_instruction` 파라미터 추가(CTO3 P0) ✅, ReAct 실패 시 fallback에서도 rewrite_instruction+기존 listing이 있으면 `svc.rewrite_listing()` 호출 ✅, 기존 테스트 508개 통과 ✅ |
+| M70: 상태 전이 idempotency 확인 | ✅ 완료 | `expected_status` 기반 원자적 업데이트가 이미 7개 주요 전이에 적용되어 publish/generate 중복 실행 방어됨 ✅, ALLOWED_TRANSITIONS에서 `publishing→publishing` 자기 전이 미허용으로 이중 방어 ✅ |
+| M71: _run_async 확산 금지 원칙 명시 | ✅ 완료 | helpers.py `_run_async` docstring에 사용 범위 제한 원칙 명시(graph 노드 내부 한정, service layer 확산 금지, 추후 native async 전환 예정) ✅ |
+| M72: except Exception 추가 세분화 | ✅ 완료 | copywriting_agent.py JSON 파싱 3곳 `except Exception` → `except (json.JSONDecodeError, TypeError, ValueError)` 구체화 ✅, Pydantic 검증 `except Exception` → `except (ValueError, TypeError, KeyError)` ✅ |
+| M73: 사이드바 updatedAt + 세션 전이 로그 | ✅ 완료 | SidebarSession에 `updatedAt` 필드 추가 ✅, `_ensure_transition()`에 `session_transition session_id/from/to` 구조화 로그 추가 ✅, 빌드 에러 0·508 테스트 통과 ✅ |
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
@@ -367,6 +372,8 @@ python -m pytest tests/ -m integration
 | M43~M45 완료 | 90+ 예상 | CTO P0 전수 대응(API 계약 4건·React·health·로깅), 파일 업로드 E2E 봉합, **Publish Reliability**(타임아웃·에러 분류·지수 백오프), RAG stub 제거(이미 완전 구현 확인), 테스트 454개 |
 | M55 완료 (CTO 리뷰) | CTO1: 91 / CTO2: 85 / CTO3: 84 | 공통: 스파게티 아님·구조 보임·과제 목표 부합. CTO1: 제품 마감·사이드바 상태. CTO2: 문서-코드 불일치·production path 선언. CTO3: tool_calls trace 소실·TOCTOU·업로드 validation |
 | M56~M59 완료 | 93+ 예상 | CTO 3명 P0 전수 대응: agent trace 봉합·상태 전이 원자성·사이드바 보정·문서 정합화, 테스트 486개 |
+| M65 완료 (CTO v3 리뷰) | CTO1: 92 / CTO2: 87 / CTO3: 88 | 공통: SellerCopilotService 분할·expected_status·trace 보존 호평. CTO3: rewrite fallback 회귀 1건·idempotency·broad exception. CTO2: _run_async 확산 금지 원칙 |
+| M69~M73 완료 | 92+ 예상 | rewrite fallback 회귀 수정·idempotency 확인·_run_async 원칙 명시·except 세분화·updatedAt·전이 로그, 테스트 508개 |
 
 ## 에이전틱 점수 이력
 

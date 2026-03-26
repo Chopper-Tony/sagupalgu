@@ -395,8 +395,15 @@ class SessionService:
 
     def _ensure_transition(self, session_id: str, next_status: str) -> dict[str, Any]:
         """세션 조회 + 상태 전이 유효성 검증을 한 번에 수행한다."""
+        import logging
+        logger = logging.getLogger(__name__)
         session = self._get_or_raise(session_id)
-        assert_allowed_transition(session["status"], next_status)
+        from_status = session["status"]
+        assert_allowed_transition(from_status, next_status)
+        logger.info(
+            "session_transition session_id=%s from=%s to=%s",
+            session_id, from_status, next_status,
+        )
         return session
 
     def _persist_and_respond(
