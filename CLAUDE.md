@@ -11,8 +11,8 @@ LangGraph Agentic Workflow로 구현.
 - **백엔드**: FastAPI + Pydantic v2
 - **워크플로우**: LangGraph 1.1.3 (`app/graph/`)
 - **에이전틱**: `langchain.agents.create_agent` + LangChain bind_tools (langchain-google-genai, langchain-openai)
-- **Vision AI**: OpenAI / Gemini (graceful fallback)
-- **Listing LLM**: Gemini 2.5 Flash (primary) → OpenAI → Solar (fallback 체인)
+- **Vision AI**: OpenAI gpt-4.1-mini (기본) / Gemini 2.5 Flash (설정 전환, graceful fallback)
+- **Listing LLM**: OpenAI gpt-4.1-mini (기본) → Gemini → Solar (LISTING_LLM_PROVIDER 설정 존중, fallback 체인)
 - **DB**: Supabase (PostgreSQL + pgvector) — `migrations/001_pgvector_setup.sql` 적용 후 활성화
 - **크롤러/게시**: Playwright (웹 자동화), uiautomator2 (Android — 미구현)
 
@@ -172,6 +172,12 @@ START
 - SessionStatus 정의는 반드시 `app/domain/session_status.py` 단 한 곳에서만 — 다른 파일은 import만
 - 상태 전이 유효성은 `ALLOWED_TRANSITIONS` 기준
 - next_action 해석은 `resolve_next_action()` 함수 사용
+- **상태 전이 원자성**: 주요 전이 메서드는 `_update_or_raise(session_id, payload, expected_status=current_status)` 패턴 사용. DB 업데이트 시 `expected_status` 불일치면 `InvalidStateTransitionError`(409) 발생 — TOCTOU race condition 방어
+
+### Agent Trace 보존
+- `_build_workflow_payload()`는 반드시 `tool_calls`·`decision_rationale`·`plan`·`critic_score`·`critic_feedback`를 workflow_meta에 병합
+- `session_ui.py`의 `agent_trace` 섹션에서 이 필드들이 프론트엔드에 노출됨
+- 에이전트가 뭘 했는지 추적하는 약속이 그래프→서비스→DB→UI까지 끊기지 않아야 함
 
 ### 에이전트 노드
 - 반드시 `state: SellerCopilotState` 인자를 받는 동기 함수로 구현
@@ -252,7 +258,7 @@ docker compose up -d --build
 # 로그 확인
 docker compose logs -f
 
-# 테스트 전체 (369개)
+# 테스트 전체 (486개)
 python -m pytest tests/
 
 # unit 테스트만 (langchain 불필요, 0.56s)
@@ -325,6 +331,10 @@ python -m pytest tests/ -m integration
 | E2E 실테스트 + 긴급 수정 | ✅ 완료 | LangGraph _run_async Windows 이벤트루프 문제 발견→fallback 직접 LLM 호출 구현(generate_copy→build_template_copy 2단 fallback) ✅, fallback 가격 0원→strategy.recommended_price 보정 ✅, DraftCard null-safe 렌더링(price·tags·title) ✅, ProductConfirmationCard placeholder 한글화(애플/아이폰 15 프로/스마트폰) ✅, debug_session.py 디버그 스크립트 신설 ✅, **E2E 게시 준비까지 완전 성공**(세션생성→이미지→분석→확정→시세크롤링21개→판매글생성→가격698400원→게시준비→게시시도) ✅ |
 | M54: _run_async Windows 근본 수정 | ✅ 완료 | _run_async를 전용 이벤트루프 스레드 패턴으로 교체(ThreadPoolExecutor+asyncio.run→asyncio.run_coroutine_threadsafe+전용 데몬 스레드) ✅, Windows SelectorEventLoop 강제(ProactorEventLoop 불안정성 제거) ✅, _get_dedicated_loop double-check locking 싱글턴 ✅, 120초 타임아웃 ✅, test_run_async.py 8개(기본동작·싱글턴·running loop·concurrent) ✅, 466→474 테스트 통과 ✅ |
 | M55: 프론트엔드 한글화 + ErrorCard 개선 | ✅ 완료 | sessionStatusUiMap.ts에 platformLabel() 유틸 추가(bunjang→번개장터·joongna→중고나라·daangn→당근마켓) ✅, PublishApprovalCard·PublishResultCard 플랫폼 한글 표시 ✅, ChatWindow PublishApprovalCard platforms를 selected_platforms 우선 사용 ✅, App.tsx friendlyError 강화(422·502·404·기술 메시지 필터링 추가) ✅, 빌드 에러 0·474 테스트 통과 ✅ |
+| M56: tool_calls trace 봉합 | ✅ 완료 | `_build_workflow_payload()`에 `tool_calls`·`decision_rationale`·`plan`·`critic_score`·`critic_feedback` 보존 추가(CTO3 P0 agent trace 소실 방지) ✅, `session_ui.py` agent_trace에 확장 필드 포함 ✅, test_trace_and_atomicity.py 6개 unit 테스트 ✅, 474→486 테스트 통과 ✅ |
+| M57: 상태 전이 원자성 확보 | ✅ 완료 | `_update_or_raise()`에 `expected_status` 파라미터 추가(CTO3 P0 TOCTOU 방어) ✅, 불일치 시 `InvalidStateTransitionError`(409) 발생 ✅, `_persist_and_respond()`에 `expected_status` 전달 ✅, 7개 주요 전이 메서드(attach_images·analyze·confirm·provide·generate·prepare·publish)에 적용 ✅, test_trace_and_atomicity.py 6개 unit 테스트 ✅, 486 테스트 통과 ✅ |
+| M58: 사이드바 세션 상태 보정 | ✅ 완료 | App.tsx `sessionIds: string[]` → `sessions: { id, lastKnownStatus }[]` 전환(CTO1 P0) ✅, `statusLabel()` 한글 매핑 유틸 추가(13개 상태 커버) ✅, 활성 세션 상태 변경 시 사이드바 자동 동기화 useEffect ✅, 빌드 에러 0 ✅ |
+| M59: README/문서 정합화 | ✅ 완료 | 테스트 수 486개 반영 ✅, LLM/Vision 기본값 openai로 정합(CTO2 P0 문서-코드 불일치 해소) ✅, README·architecture.md에 production path 한 줄 선언 추가(하이브리드 오케스트레이션 명시) ✅, CLAUDE.md 기술 스택 정합화 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
@@ -346,6 +356,8 @@ python -m pytest tests/ -m integration
 | M35~M39 완료 | 95 예상 | rewrite 계약 봉합, 예외 세분화(InvalidUserInputError·SessionUpdateError), health/live·ready 분리, **Critic+Planner+Clarification 3개 에이전트 추가** (7에이전트 체제), rewrite·replan·clarification 3개 agentic loop 완성, 테스트 369개 |
 | M40~M42 완료 | 97 예상 | **Goal-driven 행동 변화** (같은 상품도 goal별 가격·톤·비평 기준 차별화), 노드별 output contract 테스트(9노드 계약 고정), 아키텍처 문서(Mermaid·에이전틱 근거), 테스트 429개 |
 | M43~M45 완료 | 90+ 예상 | CTO P0 전수 대응(API 계약 4건·React·health·로깅), 파일 업로드 E2E 봉합, **Publish Reliability**(타임아웃·에러 분류·지수 백오프), RAG stub 제거(이미 완전 구현 확인), 테스트 454개 |
+| M55 완료 (CTO 리뷰) | CTO1: 91 / CTO2: 85 / CTO3: 84 | 공통: 스파게티 아님·구조 보임·과제 목표 부합. CTO1: 제품 마감·사이드바 상태. CTO2: 문서-코드 불일치·production path 선언. CTO3: tool_calls trace 소실·TOCTOU·업로드 validation |
+| M56~M59 완료 | 93+ 예상 | CTO 3명 P0 전수 대응: agent trace 봉합·상태 전이 원자성·사이드바 보정·문서 정합화, 테스트 486개 |
 
 ## 에이전틱 점수 이력
 

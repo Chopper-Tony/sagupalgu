@@ -123,6 +123,31 @@ export function platformLabel(code: string): string {
 // ProgressCard 상태별 카피
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// 상태 → 사이드바 한글 라벨
+// ─────────────────────────────────────────────
+
+const STATUS_LABEL: Record<string, string> = {
+  session_created: "생성됨",
+  images_uploaded: "이미지 업로드",
+  awaiting_product_confirmation: "상품 확인 대기",
+  product_confirmed: "상품 확정",
+  market_analyzing: "시세 분석 중",
+  draft_generated: "판매글 생성됨",
+  awaiting_publish_approval: "게시 승인 대기",
+  publishing: "게시 중",
+  completed: "게시 완료",
+  awaiting_sale_status_update: "판매 상태 대기",
+  optimization_suggested: "최적화 제안",
+  publishing_failed: "게시 실패",
+  failed: "실패",
+};
+
+/** 상태 코드를 사이드바용 한글 라벨로 변환. */
+export function statusLabel(status: string): string {
+  return STATUS_LABEL[status] ?? status;
+}
+
 export const PROGRESS_COPY: Partial<Record<SessionStatus, { title: string; subtitle: string }>> = {
   images_uploaded: {
     title: "상품을 분석하고 있습니다",

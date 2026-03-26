@@ -111,6 +111,12 @@ class SellerCopilotService:
         workflow_meta["graph_debug_logs"] = final_state.get("debug_logs", [])
         workflow_meta["validation_result"] = final_state.get("validation_result")
         workflow_meta["last_error"] = final_state.get("last_error")
+        # ── agent trace 보존 (CTO3 P0: tool_calls 소실 방지) ──
+        workflow_meta["tool_calls"] = final_state.get("tool_calls", [])
+        workflow_meta["decision_rationale"] = final_state.get("decision_rationale", [])
+        workflow_meta["plan"] = final_state.get("plan")
+        workflow_meta["critic_score"] = final_state.get("critic_score")
+        workflow_meta["critic_feedback"] = final_state.get("critic_feedback", [])
         return workflow_meta
 
     def _run_graph(

@@ -5,8 +5,13 @@ import { ChatWindow } from "./components/chat/ChatWindow";
 import { ChatComposer } from "./components/chat/ChatComposer";
 import { useSession } from "./hooks/useSession";
 import { api } from "./lib/api";
-import { getStatusUiConfig } from "./lib/sessionStatusUiMap";
+import { getStatusUiConfig, statusLabel } from "./lib/sessionStatusUiMap";
 import type { ConfirmedProduct, TimelineItem, TimelineItemInput, SessionStatus } from "./types";
+
+interface SidebarSession {
+  id: string;
+  lastKnownStatus: SessionStatus;
+}
 import "./App.css";
 
 let _idCounter = 0;
@@ -29,7 +34,7 @@ function friendlyError(e: unknown): string {
 }
 
 export default function App() {
-  const [sessionIds, setSessionIds] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<SidebarSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [lastRenderedStatus, setLastRenderedStatus] = useState<SessionStatus | null>(null);
@@ -63,10 +68,21 @@ export default function App() {
     }
   }, [currentStatus, lastRenderedStatus, uiConfig, pushItem]);
 
+  // 활성 세션 상태 변경 시 사이드바 동기화
+  useEffect(() => {
+    if (activeId && currentStatus) {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeId ? { ...s, lastKnownStatus: currentStatus } : s
+        )
+      );
+    }
+  }, [activeId, currentStatus]);
+
   const handleNewSession = async () => {
     try {
       const s = await api.createSession();
-      setSessionIds((prev) => [s.session_id, ...prev]);
+      setSessions((prev) => [{ id: s.session_id, lastKnownStatus: s.status as SessionStatus }, ...prev]);
       setActiveId(s.session_id);
       setSession(s);
       setTimeline([]);
@@ -179,10 +195,10 @@ export default function App() {
     }
   };
 
-  const sidebarSessions = sessionIds.map((id) => ({
-    id,
-    label: `판매 세션 ${id.slice(0, 8)}`,
-    status: id === activeId ? (currentStatus ?? "생성됨") : "완료",
+  const sidebarSessions = sessions.map((s) => ({
+    id: s.id,
+    label: `판매 세션 ${s.id.slice(0, 8)}`,
+    status: statusLabel(s.lastKnownStatus),
   }));
 
   return (

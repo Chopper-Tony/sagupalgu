@@ -71,6 +71,10 @@ def build_session_ui_response(session: Dict[str, Any]) -> Dict[str, Any]:
         "agent_trace": {
             "tool_calls": workflow_meta.get("tool_calls") or [],
             "rewrite_history": workflow_meta.get("rewrite_history") or [],
+            "decision_rationale": workflow_meta.get("decision_rationale") or [],
+            "plan": workflow_meta.get("plan"),
+            "critic_score": workflow_meta.get("critic_score"),
+            "critic_feedback": workflow_meta.get("critic_feedback") or [],
         },
         "debug": {
             "last_error": workflow_meta.get("last_error"),

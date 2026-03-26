@@ -10,6 +10,14 @@ LangGraph Agentic Workflow로 구현한다.
 - Deterministic Shell + Agentic Core 하이브리드 아키텍처
 - Goal-driven 행동 변화 (fast_sell / balanced / profit_max)
 
+### Production Path
+
+현재 production path는 **SessionService/SellerCopilotService 하이브리드 오케스트레이션**이다.
+상품 식별·시세 분석은 서비스 레이어(SellerCopilotService)에서 선처리하고,
+LangGraph는 `confirmed_product`와 `market_context`가 준비된 이후
+**가격 전략 → 카피라이팅 → 비평 → 검증 → 패키징** 구간을 담당한다.
+게시(publish)·복구(recovery)·판매 후 최적화(post_sale)는 SessionService가 노드 함수를 직접 호출하며 graph.invoke를 경유하지 않는다.
+
 ---
 
 ## 2. 그래프 플로우

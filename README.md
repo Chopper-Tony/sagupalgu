@@ -2,7 +2,7 @@
 
 > 사진 한 장으로 상품 분석부터 판매글 작성, 게시까지 자동화하는 LangGraph Agentic Workflow 플랫폼
 
-[![Tests](https://img.shields.io/badge/tests-474%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-486%20passed-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.11-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)]()
 [![React](https://img.shields.io/badge/React-18-61DAFB)]()
@@ -56,6 +56,11 @@ START
 | 톤 | 간결·긴급 | 실용·신뢰 | 프리미엄·가치 |
 | 비평 | 관용적 | 표준 | 엄격 |
 
+### Production Path
+
+현재 production path는 **SessionService/SellerCopilotService 하이브리드 오케스트레이션**입니다.
+상품 식별·시세 분석은 서비스 레이어에서 선처리하고, LangGraph는 `confirmed_product`와 `market_context`가 준비된 이후 **가격 전략 → 카피라이팅 → 비평 → 검증 → 패키징** 구간을 담당합니다.
+
 > 상세 아키텍처 문서: [docs/architecture.md](docs/architecture.md)
 
 ---
@@ -67,8 +72,8 @@ START
 | **백엔드** | FastAPI + Pydantic v2 |
 | **워크플로우** | LangGraph 1.1 (StateGraph) |
 | **에이전틱** | LangChain create_agent + bind_tools |
-| **LLM** | Gemini 2.5 Flash (primary) → OpenAI → Solar (fallback) |
-| **Vision** | OpenAI (실동작) · Gemini (mock — 향후 연동 예정) |
+| **LLM** | OpenAI gpt-4.1-mini (기본) · Gemini 2.5 Flash · Solar (설정에 따라 전환, fallback 체인) |
+| **Vision** | OpenAI gpt-4.1-mini (기본) · Gemini 2.5 Flash (설정에 따라 전환) |
 | **DB** | Supabase (PostgreSQL + pgvector) |
 | **크롤러** | Playwright (웹 자동화) |
 | **프론트엔드** | React 18 + TypeScript + Vite |
@@ -110,7 +115,7 @@ cd frontend && npm install && npm run dev
 ## 테스트
 
 ```bash
-# 전체 테스트 (462개)
+# 전체 테스트 (486개)
 python -m pytest tests/
 
 # unit 테스트만 (0.5초)
@@ -169,7 +174,7 @@ frontend/
 ├── src/hooks/      # 스마트 폴링 (useSession)
 ├── src/lib/        # API 클라이언트, 상태 매핑
 └── src/types/      # TypeScript 타입 (자동 동기화)
-tests/              # 462개 테스트 (unit + integration + E2E)
+tests/              # 486개 테스트 (unit + integration + E2E)
 docs/               # 아키텍처 문서, 배포 가이드
 ```
 
@@ -184,7 +189,7 @@ docs/               # 아키텍처 문서, 배포 가이드
 | `SUPABASE_URL` | O | Supabase 프로젝트 URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | O | Supabase 서비스 키 |
 | `OPENAI_API_KEY` | △ | OpenAI API 키 (LLM fallback + 임베딩) |
-| `GEMINI_API_KEY` | △ | Gemini API 키 (primary LLM) |
+| `GEMINI_API_KEY` | △ | Gemini API 키 (대체 LLM) |
 | `BUNJANG_USERNAME` / `PASSWORD` | △ | 번개장터 계정 (게시 시) |
 | `JOONGNA_USERNAME` / `PASSWORD` | △ | 중고나라 계정 (게시 시) |
 
