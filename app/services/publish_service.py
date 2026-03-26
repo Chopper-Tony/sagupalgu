@@ -74,6 +74,23 @@ class PublishService:
 
         raise ValueError(f"Unsupported platform: {platform}")
 
+    @staticmethod
+    def _resolve_image_paths(images: list) -> list[str]:
+        """URL 경로(/uploads/...)를 파일 시스템 절대 경로로 변환."""
+        import os
+        resolved = []
+        for img in images:
+            if isinstance(img, str) and img.startswith("/uploads/"):
+                # /uploads/session_id/file.jpg → ./uploads/session_id/file.jpg
+                fs_path = os.path.abspath(img.lstrip("/"))
+                if os.path.exists(fs_path):
+                    resolved.append(fs_path)
+                else:
+                    resolved.append(img)  # 존재하지 않으면 원본 유지
+            else:
+                resolved.append(str(img))
+        return resolved
+
     def build_platform_packages(
         self,
         canonical_listing: dict,
@@ -81,6 +98,12 @@ class PublishService:
     ) -> dict:
         """플랫폼별 가격 차등 패키지 생성. prepare_publish 단계에서 호출."""
         base_price = int(canonical_listing.get("price", 0))
+        images = self._resolve_image_paths(canonical_listing.get("images", []))
+        category = ""
+        product = canonical_listing.get("product") or {}
+        if isinstance(product, dict):
+            category = product.get("category", "")
+
         packages: dict = {}
         for platform in platform_targets:
             if platform == "bunjang":
@@ -93,7 +116,8 @@ class PublishService:
                 "title": canonical_listing.get("title", ""),
                 "body": canonical_listing.get("description", ""),
                 "price": price,
-                "images": canonical_listing.get("images", []),
+                "images": images,
+                "category": category,
             }
         return packages
 
