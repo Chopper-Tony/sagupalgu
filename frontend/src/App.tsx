@@ -106,6 +106,7 @@ export default function App() {
         pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
         const updated = await api.rewriteListing(activeId, text);
         setSession(updated);
+        pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
       }
     } catch (e: unknown) {
       pushItem({ type: "error", code: "action_failed", message: friendlyError(e) });
@@ -172,12 +173,27 @@ export default function App() {
           pushItem({ type: "progress", status: "draft_generated", message: "판매글을 재작성하고 있습니다..." });
           const updated = await api.rewriteListing(activeId, payload as string);
           setSession(updated);
+          // 상태가 동일(draft_generated)하므로 useEffect가 카드를 추가하지 않음 → 수동 push
+          pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
           break;
         }
         case "publish": {
           pushItem({ type: "progress", status: "publishing", message: "플랫폼에 게시 중입니다..." });
           const updated = await api.publish(activeId);
           setSession(updated);
+          // 게시 결과 카드 수동 push (상태 변화 감지가 안 될 수 있음)
+          const resultStatus = (updated.status ?? "published") as SessionStatus;
+          pushItem({ type: "card", cardType: "PublishResultCard", status: resultStatus });
+          break;
+        }
+        case "direct_edit": {
+          const edited = payload as import("./types").CanonicalListing;
+          pushItem({ type: "assistant_message", text: `판매글을 직접 수정했습니다: ${edited.title}` });
+          // 세션의 canonical_listing을 직접 업데이트
+          if (session) {
+            setSession({ ...session, canonical_listing: edited });
+          }
+          pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
           break;
         }
         case "edit_draft":

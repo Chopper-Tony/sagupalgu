@@ -19,17 +19,17 @@ SESSION_DIR = "sessions"
 PLATFORM_CONFIG = {
     "bunjang": {
         "name": "번개장터",
-        "login_url": "https://m.bunjang.co.kr",
+        "login_url": "https://m.bunjang.co.kr/login",
         "session_file": "bunjang_session.json",
-        "login_check_url": "https://m.bunjang.co.kr/my",
-        "logged_in_selector": "a[href='/my']",
+        "verify_url": "https://m.bunjang.co.kr/my",
+        "verify_fail_patterns": ["/login", "/signin"],
     },
     "joongna": {
         "name": "중고나라",
         "login_url": "https://web.joongna.com/signin?type=default",
         "session_file": "joongna_session.json",
-        "login_check_url": "https://web.joongna.com",
-        "logged_in_selector": "a[href='/my-store']",
+        "verify_url": "https://web.joongna.com/my-store",
+        "verify_fail_patterns": ["/signin", "/login"],
     },
 }
 
@@ -55,12 +55,34 @@ def get_session_status() -> dict[str, Any]:
     return result
 
 
+async def _verify_login(context, config: dict) -> bool:
+    """별도 탭을 열어 보호된 페이지 접근으로 로그인 상태를 확인한다.
+
+    로그인 페이지로 리다이렉트되면 미로그인, 아니면 로그인 성공.
+    확인 후 탭은 즉시 닫는다.
+    """
+    check_page = await context.new_page()
+    try:
+        await check_page.goto(config["verify_url"], wait_until="domcontentloaded", timeout=8000)
+        await asyncio.sleep(1)  # 리다이렉트 대기
+        final_url = check_page.url
+        for pattern in config["verify_fail_patterns"]:
+            if pattern in final_url:
+                return False
+        return True
+    except Exception:
+        return False
+    finally:
+        await check_page.close()
+
+
 async def open_login_browser(platform: str) -> dict[str, Any]:
     """
     Playwright 브라우저를 headless=False로 열어 로그인 페이지를 표시한다.
     사용자가 로그인을 완료하면 자동으로 쿠키를 저장하고 브라우저를 닫는다.
 
-    Windows에서는 ProactorEventLoop이 필요하므로 별도 스레드에서 실행한다.
+    로그인 감지: 사용자의 로그인 페이지는 건드리지 않고,
+    별도 탭에서 보호 페이지 접근을 시도해 리다이렉트 여부로 판단한다.
     """
     if platform not in PLATFORM_CONFIG:
         return {"success": False, "error": f"지원하지 않는 플랫폼: {platform}"}
@@ -82,6 +104,7 @@ async def open_login_browser(platform: str) -> dict[str, Any]:
             )
             page = await context.new_page()
 
+            # 로그인 페이지 열기
             await page.goto(config["login_url"], wait_until="domcontentloaded")
             await asyncio.sleep(2)
 
@@ -94,31 +117,23 @@ async def open_login_browser(platform: str) -> dict[str, Any]:
                     await banner.click()
                     await asyncio.sleep(1)
 
-            logger.info("[%s] 로그인 브라우저 열림 — 사용자 로그인 대기 중", config["name"])
+            logger.info("[%s] 로그인 브라우저 열림 — 사용자 로그인 대기 중 (최대 5분)", config["name"])
 
-            # 로그인 완료 대기 (최대 5분, 2초 간격 폴링)
+            # 첫 10초는 대기 (사용자가 로그인 폼을 보고 입력할 시간)
+            await asyncio.sleep(10)
+
+            # 로그인 완료 대기 (최대 5분, 5초 간격 폴링)
+            # 별도 탭에서 보호 페이지 접근 → 리다이렉트 여부로 판단
             logged_in = False
-            for _ in range(150):
-                await asyncio.sleep(2)
+            for i in range(55):  # 10초 초기 대기 + 55*5초 = ~5분
                 try:
-                    # URL 변화 또는 로그인 후 요소 존재로 판단
-                    current_url = page.url
-                    if platform == "bunjang" and "/login" not in current_url and "/signin" not in current_url:
-                        # 번개장터: my 페이지 접근 가능 여부로 판단
-                        try:
-                            await page.goto("https://m.bunjang.co.kr/my", wait_until="domcontentloaded", timeout=5000)
-                            if "/login" not in page.url and "/signin" not in page.url:
-                                logged_in = True
-                                break
-                        except Exception:
-                            pass
-                    elif platform == "joongna":
-                        # 중고나라: 로그인 페이지에서 벗어나면 성공
-                        if "signin" not in current_url and "joongna.com" in current_url:
-                            logged_in = True
-                            break
+                    if await _verify_login(context, config):
+                        logged_in = True
+                        logger.info("[%s] 로그인 감지 성공 (폴링 %d회차)", config["name"], i + 1)
+                        break
                 except Exception:
                     pass
+                await asyncio.sleep(5)
 
             if logged_in:
                 os.makedirs(SESSION_DIR, exist_ok=True)

@@ -15,6 +15,7 @@ interface DraftCardProps {
   criticFeedback: CriticFeedback[];
   onApprove: (platforms: string[]) => void;
   onRewrite: (instruction: string) => void;
+  onDirectEdit: (listing: CanonicalListing) => void;
 }
 
 const PLATFORM_MAP: Record<string, string> = {
@@ -29,10 +30,14 @@ const TYPE_LABEL: Record<string, string> = {
   title: "제목", description: "설명", price: "가격", trust: "신뢰도", seo: "검색 최적화", missing: "누락",
 };
 
-export function DraftCard({ listing, marketContext, criticScore, criticFeedback, onApprove, onRewrite }: DraftCardProps) {
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(PLATFORMS);
+export function DraftCard({ listing, marketContext, criticScore, criticFeedback, onApprove, onRewrite, onDirectEdit }: DraftCardProps) {
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [rewriteText, setRewriteText] = useState("");
   const [showRewrite, setShowRewrite] = useState(false);
+  const [showDirectEdit, setShowDirectEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState(listing.title || "");
+  const [editDescription, setEditDescription] = useState(listing.description || "");
+  const [editPrice, setEditPrice] = useState(String(listing.price ?? 0));
 
   const togglePlatform = (p: string) => {
     setSelectedPlatforms((prev) =>
@@ -45,6 +50,18 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
     onRewrite(rewriteText.trim());
     setRewriteText("");
     setShowRewrite(false);
+  };
+
+  const handleDirectEdit = () => {
+    const price = parseInt(editPrice, 10);
+    if (!editTitle.trim() || isNaN(price)) return;
+    onDirectEdit({
+      ...listing,
+      title: editTitle.trim(),
+      description: editDescription.trim(),
+      price,
+    });
+    setShowDirectEdit(false);
   };
 
   return (
@@ -142,9 +159,15 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
         </button>
         <button
           className="draft-card__rewrite-btn"
-          onClick={() => setShowRewrite((v) => !v)}
+          onClick={() => { setShowRewrite((v) => !v); setShowDirectEdit(false); }}
         >
           수정 요청
+        </button>
+        <button
+          className="draft-card__rewrite-btn"
+          onClick={() => { setShowDirectEdit((v) => !v); setShowRewrite(false); }}
+        >
+          직접 수정
         </button>
       </div>
 
@@ -163,6 +186,38 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
             disabled={!rewriteText.trim()}
           >
             재작성
+          </button>
+        </div>
+      )}
+
+      {showDirectEdit && (
+        <div className="draft-card__rewrite">
+          <label className="draft-card__edit-label">제목</label>
+          <input
+            className="draft-card__rewrite-input"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+          />
+          <label className="draft-card__edit-label">설명</label>
+          <textarea
+            className="draft-card__rewrite-input"
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+            rows={5}
+          />
+          <label className="draft-card__edit-label">가격 (원)</label>
+          <input
+            className="draft-card__rewrite-input"
+            type="number"
+            value={editPrice}
+            onChange={(e) => setEditPrice(e.target.value)}
+          />
+          <button
+            className="draft-card__rewrite-submit"
+            onClick={handleDirectEdit}
+            disabled={!editTitle.trim()}
+          >
+            수정 완료
           </button>
         </div>
       )}
