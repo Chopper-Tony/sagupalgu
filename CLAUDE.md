@@ -362,6 +362,7 @@ python -m pytest tests/ -m integration
 | AG2: Planner 동적 영향력 | ✅ 완료 | `mission_goal`에 따라 `max_critic_retries` 동적 설정(fast_sell=1·balanced=2·profit_max=3) ✅, Planner 계획이 Critic 정책에 실제 영향 ✅ |
 | B1: 판매자 챗봇 보완 | ✅ 완료 | `POST /sessions/{id}/seller-tips` 신설(가격·사진·제목·Critic 기반 팁) ✅, 판매글 생성 후 프론트 자동 표시 ✅ |
 | B2: 구매자용 챗봇 | ✅ 완료 | `POST /sessions/{id}/buyer-analysis` 신설(시세 대비 적정성 판정·네고 여지·구매 추천) ✅ |
+| P-LOGIN: 웹 UI 플랫폼 로그인 | ✅ 완료 | `platform_auth_service.py` 신설(Playwright headless=False→로그인 대기→쿠키 저장) ✅, `platform_router.py`(`GET /platforms/status`·`POST /platforms/{platform}/login`) ✅, SessionSidebar 하단 "플랫폼 연동" 섹션 ✅ |
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |

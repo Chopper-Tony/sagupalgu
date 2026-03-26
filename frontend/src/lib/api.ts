@@ -63,4 +63,13 @@ export const api = {
     client
       .post<{ session_id: string; tips: Array<{ category: string; message: string; priority: string }> }>(`/sessions/${id}/seller-tips`)
       .then((r) => r.data),
+
+  // 플랫폼 연동
+  getPlatformStatus: () =>
+    client.get<{ platforms: Record<string, { name: string; connected: boolean; session_saved_at: string | null }> }>("/platforms/status")
+      .then((r) => r.data),
+
+  platformLogin: (platform: string) =>
+    client.post<{ success: boolean; platform?: string; name?: string; error?: string }>(`/platforms/${platform}/login`, {}, { timeout: 360000 })
+      .then((r) => r.data),
 };
