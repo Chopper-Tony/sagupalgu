@@ -235,18 +235,14 @@ class SellerCopilotService:
         market_context: dict[str, Any] | None = None,
         rewrite_instruction: str | None = None,
     ) -> dict[str, Any]:
-        """시세 분석 + LangGraph 실행."""
-        if market_context is None:
-            try:
-                market_context = await self.market_service.analyze_market(confirmed_product)
-            except Exception as exc:
-                raise ValueError(f"Market analysis failed: {exc}") from exc
-
+        """LangGraph 실행. 시세 분석은 그래프 안의 Agent 2가 ReAct로 자율 수행."""
+        # market_context를 주입하지 않으면 그래프 안 market_intelligence_node가
+        # ReAct로 lc_market_crawl_tool / lc_rag_price_tool을 자율 호출한다.
         return self._run_graph(
             session_id=session_id, image_paths=image_paths,
             selected_platforms=target_platforms,
             confirmed_product=confirmed_product,
-            market_context=market_context,
+            market_context=market_context or {},
             rewrite_instruction=rewrite_instruction,
         )
 

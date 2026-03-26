@@ -358,6 +358,10 @@ python -m pytest tests/ -m integration
 | E2E-fix-1: Windows Playwright 게시 수정 | ✅ 완료 | Windows SelectorEventLoop → 별도 스레드 ProactorEventLoop 전환 ✅ |
 | E2E-fix-2: 이미지 경로 + 카테고리 전달 | ✅ 완료 | URL→파일시스템 절대경로 변환(`_resolve_image_paths`) ✅, `platform_packages`에 category 필드 추가 ✅ |
 | UI E2E 풀 완주 | ✅ 성공 | 프론트 UI에서 사진 업로드→Vision 분석→상품 확정→시세 크롤링→판매글 생성→Critic 비평→재작성→게시 준비→ 번개장터+중고나라 동시 게시 성공(이미지+카테고리 정상) ✅ |
+| AG1: Agent 2 ReAct 활성화 | ✅ 완료 | `_run_market_and_graph()`에서 market_context 서비스 선처리 제거 ✅, 그래프 안 `market_intelligence_node`가 ReAct로 `lc_market_crawl_tool`·`lc_rag_price_tool` 자율 호출 ✅ |
+| AG2: Planner 동적 영향력 | ✅ 완료 | `mission_goal`에 따라 `max_critic_retries` 동적 설정(fast_sell=1·balanced=2·profit_max=3) ✅, Planner 계획이 Critic 정책에 실제 영향 ✅ |
+| B1: 판매자 챗봇 보완 | ✅ 완료 | `POST /sessions/{id}/seller-tips` 신설(가격·사진·제목·Critic 기반 팁) ✅, 판매글 생성 후 프론트 자동 표시 ✅ |
+| B2: 구매자용 챗봇 | ✅ 완료 | `POST /sessions/{id}/buyer-analysis` 신설(시세 대비 적정성 판정·네고 여지·구매 추천) ✅ |
 ## CTO 코드리뷰 점수 이력
 
 | 시점 | 점수 | 주요 변경 |

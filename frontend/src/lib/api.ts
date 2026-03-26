@@ -58,4 +58,9 @@ export const api = {
     client
       .post<SessionResponse>(`/sessions/${id}/sale-status`, { sale_status: saleStatus })
       .then((r) => r.data),
+
+  getSellerTips: (id: string) =>
+    client
+      .post<{ session_id: string; tips: Array<{ category: string; message: string; priority: string }> }>(`/sessions/${id}/seller-tips`)
+      .then((r) => r.data),
 };
