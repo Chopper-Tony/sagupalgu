@@ -232,6 +232,132 @@ async def rewrite_listing(
     return RewriteListingResponse(**result)
 
 
+@router.post("/{session_id}/seller-tips")
+async def get_seller_tips(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """판매 팁 생성 — AI가 현재 판매글을 분석하여 가격·사진·제목 개선 팁을 제공한다."""
+    session = await session_service.get_session(session_id)
+    listing = session.get("canonical_listing") or {}
+    market = session.get("market_context") or {}
+    trace = session.get("agent_trace") or {}
+
+    tips = []
+    price = listing.get("price", 0)
+    median = market.get("median_price", 0)
+
+    # 가격 적절성 피드백
+    if median > 0 and price > 0:
+        ratio = price / median
+        if ratio > 1.1:
+            tips.append({
+                "category": "price",
+                "message": f"현재 가격({price:,}원)이 시세 중앙값({median:,}원)보다 {int((ratio-1)*100)}% 높습니다. 가격을 낮추면 판매 속도가 빨라질 수 있습니다.",
+                "priority": "high",
+            })
+        elif ratio < 0.85:
+            tips.append({
+                "category": "price",
+                "message": f"현재 가격({price:,}원)이 시세 대비 매우 저렴합니다. 가격을 올려도 충분히 팔릴 수 있습니다.",
+                "priority": "medium",
+            })
+        else:
+            tips.append({
+                "category": "price",
+                "message": f"가격({price:,}원)이 시세({median:,}원) 대비 적절합니다.",
+                "priority": "low",
+            })
+
+    # 사진 가이드
+    images = listing.get("images") or []
+    if len(images) < 3:
+        tips.append({
+            "category": "photo",
+            "message": "사진을 3장 이상 올리면 구매자 신뢰도가 크게 높아집니다. 정면·후면·측면 각도를 추천합니다.",
+            "priority": "high",
+        })
+
+    # 제목 길이
+    title = listing.get("title", "")
+    if len(title) < 15:
+        tips.append({
+            "category": "title",
+            "message": "제목이 짧습니다. 브랜드·모델·상태·용량 등 키워드를 추가하면 검색 노출이 늘어납니다.",
+            "priority": "medium",
+        })
+
+    # Critic 점수 기반 팁
+    critic_score = trace.get("critic_score")
+    if critic_score and critic_score < 80:
+        tips.append({
+            "category": "quality",
+            "message": f"AI 품질 평가 {critic_score}점입니다. '수정 요청'으로 설명을 보완하면 점수가 올라갑니다.",
+            "priority": "medium",
+        })
+
+    return {"session_id": session.get("session_id"), "tips": tips}
+
+
+@router.post("/{session_id}/buyer-analysis")
+async def buyer_price_analysis(
+    session_id: str,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """구매자 관점 가격 분석 — 이 가격이 적정한지, 협상 여지가 있는지 AI가 분석한다."""
+    session = await session_service.get_session(session_id)
+    listing = session.get("canonical_listing") or {}
+    market = session.get("market_context") or {}
+
+    price = listing.get("price", 0)
+    median = market.get("median_price", 0)
+    price_band = market.get("price_band") or []
+    low = price_band[0] if len(price_band) >= 2 else 0
+    high = price_band[1] if len(price_band) >= 2 else 0
+
+    analysis = {
+        "price": price,
+        "market_median": median,
+        "price_band": {"low": low, "high": high},
+        "verdict": "unknown",
+        "negotiation_room": 0,
+        "recommendations": [],
+    }
+
+    if median > 0 and price > 0:
+        ratio = price / median
+        if ratio > 1.15:
+            analysis["verdict"] = "overpriced"
+            analysis["negotiation_room"] = int(price - median)
+            analysis["recommendations"] = [
+                f"시세({median:,}원) 대비 {int((ratio-1)*100)}% 비쌉니다",
+                f"{median:,}원 근처로 네고 시도를 추천합니다",
+                "비슷한 조건의 다른 매물도 비교해보세요",
+            ]
+        elif ratio > 1.0:
+            analysis["verdict"] = "slightly_high"
+            analysis["negotiation_room"] = int(price - median)
+            analysis["recommendations"] = [
+                f"시세보다 약간 높지만 상태가 좋다면 합리적입니다",
+                f"5~10% 정도 네고 여지가 있을 수 있습니다",
+            ]
+        elif ratio > 0.85:
+            analysis["verdict"] = "fair"
+            analysis["recommendations"] = [
+                "시세 대비 적정 가격입니다",
+                "상태·구성품을 꼼꼼히 확인 후 구매하세요",
+            ]
+        else:
+            analysis["verdict"] = "good_deal"
+            analysis["recommendations"] = [
+                f"시세({median:,}원)보다 {int((1-ratio)*100)}% 저렴합니다",
+                "빠르게 결정하는 것을 추천합니다",
+                "너무 싸면 상태를 꼼꼼히 확인하세요",
+            ]
+
+    return {"session_id": session.get("session_id"), "analysis": analysis}
+
+
 @router.post("/{session_id}/sale-status", response_model=SaleStatusResponse)
 async def update_sale_status(
     session_id: str,

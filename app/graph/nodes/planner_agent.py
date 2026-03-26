@@ -44,7 +44,16 @@ def mission_planner_node(state: SellerCopilotState) -> SellerCopilotState:
         state["decision_rationale"] = state.get("decision_rationale", []) + plan_result["rationale"]
         state["missing_information"] = plan_result["missing_information"]
 
-    _log(state, f"agent0:planner:done goal={state['mission_goal']} steps={len(state['plan'].get('steps', []))}")
+    # Planner의 goal이 critic/rewrite 정책에 동적 영향
+    goal = state["mission_goal"]
+    if goal == "fast_sell":
+        state["max_critic_retries"] = 1  # 관대: 1회만 재시도
+    elif goal == "profit_max":
+        state["max_critic_retries"] = 3  # 엄격: 3회까지 재시도
+    else:
+        state["max_critic_retries"] = 2  # balanced: 기본
+
+    _log(state, f"agent0:planner:done goal={goal} steps={len(state['plan'].get('steps', []))} max_critic_retries={state['max_critic_retries']}")
     _record_node_timing(state, "mission_planner", _timer)
     return state
 

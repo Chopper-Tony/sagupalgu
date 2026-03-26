@@ -145,6 +145,19 @@ export default function App() {
           // 확정 후 자동으로 판매글 생성
           const listing = await api.generateListing(activeId);
           setSession(listing);
+          // 판매 팁 자동 로드
+          try {
+            const tipsResult = await api.getSellerTips(activeId);
+            if (tipsResult.tips.length > 0) {
+              const tipMessages = tipsResult.tips
+                .filter((t) => t.priority !== "low")
+                .map((t) => `${t.category === "price" ? "💰" : t.category === "photo" ? "📷" : t.category === "title" ? "✏️" : "💡"} ${t.message}`)
+                .join("\n");
+              if (tipMessages) {
+                pushItem({ type: "assistant_message", text: `판매 팁:\n${tipMessages}` });
+              }
+            }
+          } catch { /* 팁 로드 실패해도 무시 */ }
           break;
         }
         case "prepare_publish": {
