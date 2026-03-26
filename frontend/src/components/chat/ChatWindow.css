@@ -5,7 +5,7 @@
 }
 
 .chat-window__inner {
-  max-width: 720px;
+  max-width: var(--chat-max-width);
   margin: 0 auto;
   padding: 0 24px;
   display: flex;
@@ -13,55 +13,76 @@
   gap: 16px;
 }
 
+/* ── 빈 상태 (랜딩) ──────────────────────────────────── */
 .chat-window__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 0;
-  gap: 8px;
+  padding: 120px 24px 80px;
+  gap: 12px;
+  animation: fadeIn 0.4s ease;
 }
 
 .chat-window__empty-title {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  color: #ececec;
+  color: var(--text-primary);
 }
 
 .chat-window__empty-sub {
-  font-size: 14px;
-  color: #888;
+  font-size: 15px;
+  color: var(--text-secondary);
   text-align: center;
+  max-width: 400px;
+  line-height: 1.6;
 }
 
+/* ── 메시지 버블 ─────────────────────────────────────── */
 .chat-window__bubble {
   max-width: 80%;
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
+  animation: fadeIn 0.25s ease;
 }
 
 .chat-window__bubble--user {
   align-self: flex-end;
-  background: #2563eb;
+  background: var(--accent);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
 
 .chat-window__bubble--assistant {
   align-self: flex-start;
-  background: #1e1e22;
-  color: #ececec;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   border-bottom-left-radius: 4px;
 }
 
+/* ── 카드 ────────────────────────────────────────────── */
 .chat-window__card-placeholder {
-  background: #1e1e22;
-  border: 1px dashed #3a3a3e;
-  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
   padding: 16px;
   font-size: 13px;
-  color: #666;
+  color: var(--text-muted);
+  animation: fadeIn 0.3s ease;
+}
+
+/* ── 반응형 ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .chat-window__inner {
+    padding: 0 16px;
+  }
+  .chat-window__bubble {
+    max-width: 90%;
+  }
+  .chat-window__empty {
+    padding: 80px 16px 40px;
+  }
 }

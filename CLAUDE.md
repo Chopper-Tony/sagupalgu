@@ -341,6 +341,7 @@ python -m pytest tests/ -m integration
 | M63: except Exception 세분화 | ✅ 완료 | `_common.py` `except Exception` → `except (json.JSONDecodeError, ValueError)` 구체화 ✅, `listing_llm.py` fallback 체인에 logger 추가(침묵 catch 제거) ✅, 외부 경계(LLM/크롤러/Vision) except Exception은 적절하므로 유지 ✅, 486 테스트 통과 ✅ |
 | M64: 테스트 커버리지 확충 | ✅ 완료 | test_service_coverage.py 22개 신설(session_ui 8·publish_service 8·optimization_service 3·recovery_service 2·atomicity 1) ✅, 500+ 목표 달성 ✅, 486→508 테스트 통과 ✅ |
 | M65: 노드별 실행 시간 추적 | ✅ 완료 | helpers.py에 `_start_timer()`·`_record_node_timing()` 헬퍼 추가 ✅, planner·copywriting·critic 3개 핵심 노드에 타이밍 적용 ✅, `execution_metrics` 필드를 workflow_meta에 보존 ✅, debug_logs에도 elapsed 자동 기록 ✅, 508 테스트 통과 ✅ |
+| A1: 셀러 코파일럿 UI ChatGPT화 마감 | ✅ 완료 | CSS 변수 체계 통합(index.css 전면 교체, 16개 디자인 토큰) ✅, Noto Sans KR 웹폰트 적용 ✅, 다크테마 일관화(하드코딩 색상→CSS변수) ✅, 메시지 버블 fadeIn 애니메이션 ✅, 스크롤바 커스텀 스타일 ✅, 반응형 모바일 레이아웃(768px 이하 사이드바 숨김) ✅, ChatComposer 포커스 accent 강조 ✅, 빈 상태 랜딩 페이지 개선 ✅, HTML lang=ko·title·description·color-scheme 메타 태그 ✅, 508 테스트 통과·빌드 에러 0 ✅ |
 
 ## CTO 코드리뷰 점수 이력
 
