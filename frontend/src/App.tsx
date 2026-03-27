@@ -181,9 +181,7 @@ export default function App() {
           pushItem({ type: "progress", status: "publishing", message: "플랫폼에 게시 중입니다..." });
           const updated = await api.publish(activeId);
           setSession(updated);
-          // 게시 결과 카드 수동 push (상태 변화 감지가 안 될 수 있음)
-          const resultStatus = (updated.status ?? "published") as SessionStatus;
-          pushItem({ type: "card", cardType: "PublishResultCard", status: resultStatus });
+          // useEffect가 상태 변화(publishing→published) 감지해서 자동으로 카드 추가
           break;
         }
         case "direct_edit": {

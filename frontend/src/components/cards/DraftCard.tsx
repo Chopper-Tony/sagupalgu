@@ -119,17 +119,28 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
             AI 품질 평가: <strong>{criticScore}점</strong>
           </p>
           {criticFeedback.length > 0 && (
-            <ul className="draft-card__feedback-list">
-              {criticFeedback.map((fb, i) => (
-                <li key={i} className="draft-card__feedback-item">
-                  <span className="draft-card__feedback-type">{TYPE_LABEL[fb.type] ?? fb.type}</span>
-                  <span className={`draft-card__feedback-impact draft-card__feedback-impact--${fb.impact}`}>
-                    {IMPACT_LABEL[fb.impact] ?? fb.impact}
-                  </span>
-                  <span className="draft-card__feedback-reason">{fb.reason}</span>
-                </li>
-              ))}
-            </ul>
+            <table className="draft-card__feedback-table">
+              <thead>
+                <tr>
+                  <th>항목</th>
+                  <th>영향도</th>
+                  <th>평가</th>
+                </tr>
+              </thead>
+              <tbody>
+                {criticFeedback.map((fb, i) => (
+                  <tr key={i}>
+                    <td className="draft-card__feedback-type">{TYPE_LABEL[fb.type] ?? fb.type}</td>
+                    <td>
+                      <span className={`draft-card__feedback-impact draft-card__feedback-impact--${fb.impact}`}>
+                        {IMPACT_LABEL[fb.impact] ?? fb.impact}
+                      </span>
+                    </td>
+                    <td className="draft-card__feedback-reason">{fb.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       )}

@@ -179,7 +179,7 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
             listing_id = match.group(1)
             shot = await self.screenshot(page, "publish_success")
 
-            await page.wait_for_timeout(30000)
+            await page.wait_for_timeout(5000)
 
             return PublishResult(
                 platform=self.platform,
@@ -192,7 +192,7 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
         except Exception as e:
             logger.error(f"[번개장터] publish 실패: {e}")
             shot = await self.screenshot(page, "publish_error")
-            await page.wait_for_timeout(30000)
+            await page.wait_for_timeout(5000)
             return PublishResult(
                 platform=self.platform,
                 success=False,

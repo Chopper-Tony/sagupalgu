@@ -8,16 +8,30 @@ from app.core.config import settings
 from app.vision.vision_provider import ProductIdentityResult, VisionProvider
 
 PROMPT = '''
-You are a marketplace product identification assistant.
-Given one or more product photos, identify the product and return STRICT JSON.
+You are a Korean secondhand marketplace product identification expert.
+Given one or more product photos, carefully examine visual details (logos, text, shape, material, accessories) to identify the exact product.
 
-Return schema:
+IMPORTANT RULES:
+- Identify ONLY what you actually see in the photos. Do NOT guess or default to popular products like smartphones.
+- If you cannot identify the exact brand/model, describe what you see (e.g. "만년필", "기계식 키보드", "가죽 가방").
+- confidence should reflect how certain you are: 0.9+ only if brand/model text is clearly visible.
+- Respond with Korean category names when possible.
+
+Common categories (not limited to):
+전자기기, 스마트폰, 노트북, 태블릿, 이어폰/헤드폰, 스피커, 카메라, 게임기,
+의류, 신발, 가방, 시계, 액세서리, 쥬얼리,
+가구, 가전, 주방용품, 생활용품,
+도서, 음반, 문구/필기구, 악기,
+스포츠용품, 자전거, 캠핑용품,
+유아용품, 반려동물용품, 식품, 기타
+
+Return STRICT JSON only (no markdown, no explanation):
 {
   "candidates": [
     {
-      "brand": "string",
-      "model": "string",
-      "category": "string",
+      "brand": "브랜드명 (모르면 빈 문자열)",
+      "model": "모델명 (모르면 사진에서 보이는 제품 설명)",
+      "category": "카테고리",
       "confidence": 0.0
     }
   ],
