@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 # ── 타임아웃 (초) ────────────────────────────────────────────────
 
-PUBLISH_TIMEOUT_SECONDS: int = 120  # 플랫폼별 게시 최대 대기
+PUBLISH_TIMEOUT_SECONDS: int = 180  # 플랫폼별 게시 최대 대기 (이미지 업로드+폼 입력 포함)
 
 # ── 재시도 정책 ──────────────────────────────────────────────────
 
@@ -56,6 +56,21 @@ FAILURE_TAXONOMY: Dict[str, Dict[str, Any]] = {
         "auto_recoverable": True,
         "description": "플랫폼 서버 점검 또는 일시 장애",
     },
+    "image_upload_failed": {
+        "category": "content",
+        "auto_recoverable": True,
+        "description": "이미지 업로드 실패",
+    },
+    "category_selection_failed": {
+        "category": "ui",
+        "auto_recoverable": True,
+        "description": "카테고리 선택 실패 — 재시도 권장",
+    },
+    "form_validation_failed": {
+        "category": "content",
+        "auto_recoverable": True,
+        "description": "폼 필수값 검증 오류",
+    },
     "publish_exception": {
         "category": "unknown",
         "auto_recoverable": False,
@@ -82,6 +97,12 @@ def classify_error(error_code: str, error_message: str = "") -> Dict[str, Any]:
         return {**FAILURE_TAXONOMY["content_policy"], "error_code": "content_policy"}
     if "503" in msg or "502" in msg or "maintenance" in msg:
         return {**FAILURE_TAXONOMY["platform_unavailable"], "error_code": "platform_unavailable"}
+    if "이미지" in msg and ("업로드" in msg or "필수" in msg or "찾지 못" in msg):
+        return {**FAILURE_TAXONOMY["image_upload_failed"], "error_code": "image_upload_failed"}
+    if "카테고리" in msg and ("선택" in msg or "실패" in msg):
+        return {**FAILURE_TAXONOMY["category_selection_failed"], "error_code": "category_selection_failed"}
+    if "검증" in msg or ("글쓰기 페이지" in msg and "머뭄" in msg):
+        return {**FAILURE_TAXONOMY["form_validation_failed"], "error_code": "form_validation_failed"}
 
     return {**FAILURE_TAXONOMY["publish_exception"], "error_code": "publish_exception"}
 

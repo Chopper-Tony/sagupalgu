@@ -59,23 +59,44 @@ _DONE_PAGE_HTML = """
 """
 
 
+def _check_session_freshness(session_path: str) -> bool:
+    """저장된 세션 파일의 쿠키 만료 여부를 확인한다."""
+    try:
+        import json
+        import time
+        with open(session_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cookies = data.get("cookies", [])
+        if not cookies:
+            return False
+        now = time.time()
+        # 만료된 쿠키가 전체의 절반 이상이면 세션 만료로 판정
+        expired = sum(1 for c in cookies if c.get("expires", float("inf")) < now)
+        return expired < len(cookies) / 2
+    except (json.JSONDecodeError, OSError, TypeError):
+        return False
+
+
 def get_session_status() -> dict[str, Any]:
-    """각 플랫폼의 세션 저장 상태를 확인한다."""
+    """각 플랫폼의 세션 저장 상태를 확인한다. 쿠키 만료도 검사."""
     result = {}
     for platform, config in PLATFORM_CONFIG.items():
         path = os.path.join(SESSION_DIR, config["session_file"])
         exists = os.path.exists(path)
         mtime = None
+        fresh = False
         if exists:
             import datetime
             mtime = datetime.datetime.fromtimestamp(
                 os.path.getmtime(path),
                 tz=datetime.timezone.utc,
             ).isoformat()
+            fresh = _check_session_freshness(path)
         result[platform] = {
             "name": config["name"],
-            "connected": exists,
+            "connected": exists and fresh,
             "session_saved_at": mtime,
+            "session_expired": exists and not fresh,
         }
     return result
 
