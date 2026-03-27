@@ -291,3 +291,98 @@
 .draft-card__feedback-reason {
   color: #999;
 }
+
+/* Agent Decision Visualization */
+.draft-card__agent-trace {
+  background: #161b22;
+  border: 1px solid #2a2a2e;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.draft-card__agent-trace[open] {
+  padding: 0 14px 14px;
+}
+
+.draft-card__agent-trace-title {
+  font-size: 13px;
+  color: #ececec;
+  font-weight: 600;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.draft-card__agent-trace-title::before {
+  content: "▸";
+  font-size: 10px;
+  color: #58a6ff;
+}
+
+.draft-card__agent-trace[open] > .draft-card__agent-trace-title::before {
+  content: "▾";
+}
+
+.draft-card__agent-section {
+  margin-top: 12px;
+}
+
+.draft-card__agent-section-label {
+  font-size: 11px;
+  color: #58a6ff;
+  font-weight: 600;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.draft-card__agent-plan-focus {
+  font-size: 13px;
+  color: #ececec;
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+
+.draft-card__agent-plan-steps {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+}
+
+.draft-card__agent-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.draft-card__agent-tool {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.draft-card__agent-tool--ok {
+  background: rgba(126, 231, 135, 0.12);
+  color: #7ee787;
+  border: 1px solid rgba(126, 231, 135, 0.2);
+}
+
+.draft-card__agent-tool--fail {
+  background: rgba(248, 81, 73, 0.12);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.2);
+}
+
+.draft-card__agent-rationale {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #999;
+  line-height: 1.6;
+}

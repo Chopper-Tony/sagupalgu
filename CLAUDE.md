@@ -97,15 +97,18 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 ## 최근 변경 (이번 세션)
 
-- **M77**: rewrite 회귀 봉합 — ReAct 실패 시 fallback rewrite 재시도 추가, 회귀 방지 테스트
+- **M77**: rewrite 회귀 봉합 — ReAct 실패 시 fallback rewrite 재시도 + 회귀 방지 테스트
+- **M78**: Vision 프롬프트 품질 검증 15개 테스트 + 수동 실테스트 스크립트
+- **M81**: 게시 성공률 안정화 — 카테고리 실패 예외, 타임아웃 180초, 에러 3종 추가, 세션 만료 감지
+- **M82**: 데모 리허설 스크립트 (`scripts/manual/demo_rehearsal.py`) + golden session 백업
+- **M83**: Agent Decision Visualization — DraftCard에 도구 호출 이력·실행 전략·의사결정 근거 시각화
 - Vision AI 프롬프트 개선 — 30종 카테고리 예시, 오인식 방지 지시, 한국어 대응
 - 번개장터 수수료: +10,000원 고정 → ×1.035 (실 수수료율 3.5%)
-- 게시 후 대기: 30초 → 5초 (자동 게시에 불필요한 대기 제거)
+- 게시 후 대기: 30초 → 5초
 - DraftCard AI 품질 평가: 표(table) 형식으로 개선
 - 게시 완료 카드 중복 표시 버그 수정
 - CLAUDE.md: 공식 가이드 기반 재구성 (1300줄 → 100줄, `.claude/rules/` 분할)
-- 발표 자료 (presentation.html, reveal.js 18 슬라이드)
 
 ## 마일스톤 이력
 
-77+ 마일스톤 완료. 상세: @docs/milestones.md
+82+ 마일스톤 완료. 상세: @docs/milestones.md
