@@ -107,7 +107,8 @@ class PublishService:
         packages: dict = {}
         for platform in platform_targets:
             if platform == "bunjang":
-                price = base_price + 10000
+                # 번개장터 수수료(3.5%) 보전, 천 단위 반올림
+                price = int(round(base_price * 1.035, -3))
             elif platform == "daangn":
                 price = max(base_price - 4000, 0)
             else:

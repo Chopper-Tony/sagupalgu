@@ -181,18 +181,20 @@ export default function App() {
           pushItem({ type: "progress", status: "publishing", message: "플랫폼에 게시 중입니다..." });
           const updated = await api.publish(activeId);
           setSession(updated);
-          // 게시 결과 카드 수동 push (상태 변화 감지가 안 될 수 있음)
-          const resultStatus = (updated.status ?? "published") as SessionStatus;
-          pushItem({ type: "card", cardType: "PublishResultCard", status: resultStatus });
+          // useEffect가 상태 변화(publishing→published) 감지해서 자동으로 카드 추가
           break;
         }
         case "direct_edit": {
           const edited = payload as import("./types").CanonicalListing;
-          pushItem({ type: "assistant_message", text: `판매글을 직접 수정했습니다: ${edited.title}` });
-          // 세션의 canonical_listing을 직접 업데이트
-          if (session) {
-            setSession({ ...session, canonical_listing: edited });
-          }
+          pushItem({ type: "progress", status: "draft_generated", message: "판매글을 저장하고 있습니다..." });
+          const saved = await api.updateListing(activeId, {
+            title: edited.title,
+            description: edited.description,
+            price: edited.price,
+            tags: edited.tags,
+          });
+          setSession(saved);
+          pushItem({ type: "assistant_message", text: `판매글을 직접 수정했습니다.` });
           pushItem({ type: "card", cardType: "DraftCard", status: "draft_generated" });
           break;
         }

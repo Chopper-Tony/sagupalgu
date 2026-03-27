@@ -108,4 +108,5 @@ tmp_processed/
 *.tmp
 *.bak
 test_image.*
-.claude/
+.claude/*
+!.claude/rules/

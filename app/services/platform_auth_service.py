@@ -19,19 +19,44 @@ SESSION_DIR = "sessions"
 PLATFORM_CONFIG = {
     "bunjang": {
         "name": "번개장터",
-        "login_url": "https://m.bunjang.co.kr/login",
+        "login_url": "https://m.bunjang.co.kr",
         "session_file": "bunjang_session.json",
-        "login_page_patterns": ["/login", "/signin"],
-        "home_domain": "bunjang.co.kr",
     },
     "joongna": {
         "name": "중고나라",
         "login_url": "https://web.joongna.com/signin?type=default",
         "session_file": "joongna_session.json",
-        "login_page_patterns": ["/signin", "/login"],
-        "home_domain": "joongna.com",
     },
 }
+
+# 중고나라 로그인 완료 확인용 HTML (별도 탭에서 표시)
+_DONE_PAGE_HTML = """
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>로그인 완료 확인</title></head>
+<body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;
+             background:#1a1a2e;color:#fff;font-family:'Noto Sans KR',sans-serif;">
+  <div style="text-align:center;">
+    <h1 style="font-size:28px;margin-bottom:16px;">🔐 {platform_name}</h1>
+    <p style="font-size:16px;color:#aaa;margin-bottom:32px;">
+      왼쪽 탭에서 로그인을 완료한 후<br>아래 버튼을 눌러주세요.
+    </p>
+    <button id="done-btn" style="background:#2563eb;color:#fff;border:none;border-radius:12px;
+            padding:16px 48px;font-size:18px;font-weight:700;cursor:pointer;">
+      ✅ 로그인 완료
+    </button>
+    <p id="status" style="margin-top:16px;font-size:14px;color:#666;"></p>
+  </div>
+  <script>
+    document.getElementById('done-btn').addEventListener('click', function() {{
+      document.getElementById('status').textContent = '쿠키 저장 중...';
+      this.disabled = true;
+      window.__LOGIN_DONE__ = true;
+    }});
+  </script>
+</body>
+</html>
+"""
 
 
 def get_session_status() -> dict[str, Any]:
@@ -55,119 +80,159 @@ def get_session_status() -> dict[str, Any]:
     return result
 
 
-def _is_still_on_login_page(url: str, config: dict) -> bool:
-    """현재 URL이 로그인 페이지이거나 OAuth 외부 페이지인지 판단한다.
+async def _bunjang_login(config: dict) -> dict[str, Any]:
+    """번개장터: 로그인 페이지 + '로그인 완료' 버튼 탭 방식. 2분 대기."""
+    from playwright.async_api import async_playwright
 
-    로그인 완료 = 해당 플랫폼 도메인에 있으면서 로그인 패턴이 URL에 없는 상태.
-    OAuth 페이지(kakao, naver 등)에 있으면 아직 로그인 중.
-    """
-    # 로그인 페이지 패턴이 URL에 있으면 아직 로그인 중
-    for pattern in config["login_page_patterns"]:
-        if pattern in url:
-            return True
-    # 플랫폼 도메인에 있지 않으면 OAuth 외부 페이지 → 아직 로그인 중
-    if config["home_domain"] not in url:
-        return True
-    return False
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False, slow_mo=100)
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+
+        # 탭 1: 로그인 페이지
+        login_page = await context.new_page()
+        await login_page.goto(config["login_url"], wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # 앱 배너 닫기
+        banner = login_page.locator(
+            "a:has-text('괜찮아요'), a:has-text('웹에서 볼게요')"
+        ).first
+        if await banner.count() > 0:
+            await banner.click()
+            await asyncio.sleep(1)
+
+        # 탭 2: "로그인 완료" 버튼 페이지
+        done_page = await context.new_page()
+        html = _DONE_PAGE_HTML.format(platform_name=config["name"])
+        await done_page.set_content(html)
+
+        # 로그인 탭을 앞으로
+        await login_page.bring_to_front()
+
+        logger.info("[번개장터] 로그인 브라우저 열림 — 사용자 로그인 대기 중 (최대 2분)")
+
+        # "로그인 완료" 버튼 클릭 대기 (최대 2분)
+        clicked = False
+        for _ in range(120):
+            await asyncio.sleep(1)
+            try:
+                result = await done_page.evaluate("() => window.__LOGIN_DONE__ === true")
+                if result:
+                    clicked = True
+                    break
+            except Exception:
+                break
+
+        if clicked:
+            os.makedirs(SESSION_DIR, exist_ok=True)
+            session_path = os.path.join(SESSION_DIR, config["session_file"])
+            await context.storage_state(path=session_path)
+            logger.info("[번개장터] 로그인 성공 — 세션 저장 완료: %s", session_path)
+            await browser.close()
+            return {"success": True, "platform": "bunjang", "name": config["name"]}
+        else:
+            logger.warning("[번개장터] 로그인 타임아웃 (2분) 또는 브라우저 닫힘")
+            try:
+                await browser.close()
+            except Exception:
+                pass
+            return {"success": False, "error": "번개장터 로그인 시간 초과 (2분)"}
+
+
+async def _joongna_login(config: dict) -> dict[str, Any]:
+    """중고나라: 로그인 페이지 + '로그인 완료' 버튼 탭 방식. 2분 대기."""
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False, slow_mo=100)
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        )
+
+        # 탭 1: 로그인 페이지
+        login_page = await context.new_page()
+        await login_page.goto(config["login_url"], wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        # 탭 2: "로그인 완료" 버튼 페이지
+        done_page = await context.new_page()
+        html = _DONE_PAGE_HTML.format(platform_name=config["name"])
+        await done_page.set_content(html)
+
+        # 로그인 탭을 앞으로
+        await login_page.bring_to_front()
+
+        logger.info("[중고나라] 로그인 브라우저 열림 — 사용자 로그인 대기 중 (최대 2분)")
+
+        # "로그인 완료" 버튼 클릭 대기 (최대 2분)
+        clicked = False
+        for _ in range(120):  # 120 * 1초 = 2분
+            await asyncio.sleep(1)
+            try:
+                result = await done_page.evaluate("() => window.__LOGIN_DONE__ === true")
+                if result:
+                    clicked = True
+                    break
+            except Exception:
+                break
+
+        if clicked:
+            os.makedirs(SESSION_DIR, exist_ok=True)
+            session_path = os.path.join(SESSION_DIR, config["session_file"])
+            await context.storage_state(path=session_path)
+            logger.info("[중고나라] 로그인 성공 — 세션 저장 완료: %s", session_path)
+            await browser.close()
+            return {"success": True, "platform": "joongna", "name": config["name"]}
+        else:
+            logger.warning("[중고나라] 로그인 타임아웃 (2분) 또는 브라우저 닫힘")
+            try:
+                await browser.close()
+            except Exception:
+                pass
+            return {"success": False, "error": "중고나라 로그인 시간 초과 (2분)"}
 
 
 async def open_login_browser(platform: str) -> dict[str, Any]:
-    """
-    Playwright 브라우저를 headless=False로 열어 로그인 페이지를 표시한다.
-    사용자가 로그인을 완료하면 자동으로 쿠키를 저장하고 브라우저를 닫는다.
-
-    로그인 감지 방식:
-    - 로그인 페이지 URL에 login_page_patterns이 포함되어 있으면 "아직 로그인 중"
-    - 사용자가 로그인을 완료하면 플랫폼이 다른 페이지로 리다이렉트함
-    - URL에서 패턴이 사라지면 로그인 성공으로 판단
-    - 페이지를 절대 이동시키지 않음 — 사용자의 로그인 흐름을 방해하지 않음
-    """
+    """플랫폼별 로그인 브라우저를 연다."""
     if platform not in PLATFORM_CONFIG:
         return {"success": False, "error": f"지원하지 않는 플랫폼: {platform}"}
 
     config = PLATFORM_CONFIG[platform]
 
-    async def _do_login():
-        from playwright.async_api import async_playwright
-
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False, slow_mo=100)
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 900},
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-            )
-            page = await context.new_page()
-
-            # 로그인 페이지 열기
-            await page.goto(config["login_url"], wait_until="domcontentloaded")
-            await asyncio.sleep(2)
-
-            # 번개장터: 앱 배너 닫기
-            if platform == "bunjang":
-                banner = page.locator(
-                    "a:has-text('괜찮아요'), a:has-text('웹에서 볼게요')"
-                ).first
-                if await banner.count() > 0:
-                    await banner.click()
-                    await asyncio.sleep(1)
-
-            initial_url = page.url
-            logger.info(
-                "[%s] 로그인 브라우저 열림 — 사용자 로그인 대기 중 (최대 5분), 초기 URL: %s",
-                config["name"], initial_url,
-            )
-
-            # 로그인 완료 대기 (최대 5분, 3초 간격 폴링)
-            # 판단 기준: 현재 URL에서 login_page_patterns이 모두 사라지면 로그인 성공
-            logged_in = False
-            for i in range(100):  # 100 * 3초 = 5분
-                await asyncio.sleep(3)
-                try:
-                    current_url = page.url
-                    if not _is_still_on_login_page(current_url, config):
-                        # URL이 로그인 페이지에서 벗어남 → 로그인 성공
-                        logged_in = True
-                        logger.info(
-                            "[%s] 로그인 감지 (폴링 %d회차), URL: %s",
-                            config["name"], i + 1, current_url,
-                        )
-                        break
-                except Exception:
-                    # 브라우저가 닫혔거나 페이지 접근 불가
-                    pass
-
-            if logged_in:
-                # 로그인 후 잠시 대기 (쿠키/세션 안정화)
-                await asyncio.sleep(2)
-                os.makedirs(SESSION_DIR, exist_ok=True)
-                session_path = os.path.join(SESSION_DIR, config["session_file"])
-                await context.storage_state(path=session_path)
-                logger.info("[%s] 로그인 성공 — 세션 저장 완료: %s", config["name"], session_path)
-                await browser.close()
-                return {"success": True, "platform": platform, "name": config["name"]}
-            else:
-                logger.warning("[%s] 로그인 타임아웃 (5분)", config["name"])
-                await browser.close()
-                return {"success": False, "error": f"{config['name']} 로그인 시간 초과 (5분)"}
+    if platform == "bunjang":
+        coro = _bunjang_login(config)
+    else:
+        coro = _joongna_login(config)
 
     # Windows에서는 별도 스레드 + ProactorEventLoop 필요
     if sys.platform == "win32":
         import concurrent.futures
 
+        async def _target():
+            return await coro
+
         def _run_in_proactor():
             loop = asyncio.ProactorEventLoop()
             asyncio.set_event_loop(loop)
             try:
-                return loop.run_until_complete(_do_login())
+                return loop.run_until_complete(_target())
             finally:
                 loop.close()
 
-        loop = asyncio.get_running_loop()
+        running_loop = asyncio.get_running_loop()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return await loop.run_in_executor(pool, _run_in_proactor)
+            return await running_loop.run_in_executor(pool, _run_in_proactor)
 
-    return await _do_login()
+    return await coro

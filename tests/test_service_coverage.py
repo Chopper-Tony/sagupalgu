@@ -151,7 +151,8 @@ class TestBuildPlatformPackages:
         svc = self._make_service()
         canonical = {"title": "t", "description": "d", "price": 100000, "images": []}
         result = svc.build_platform_packages(canonical, ["bunjang"])
-        assert result["bunjang"]["price"] == 110000
+        # 수수료 3.5% 보전: 100000 * 1.035 = 103500 → 천 단위 반올림 → 103000
+        assert result["bunjang"]["price"] == 103000
 
     @pytest.mark.unit
     def test_joongna_price_same(self):
@@ -182,7 +183,7 @@ class TestBuildPlatformPackages:
         result = svc.build_platform_packages(canonical, ["bunjang", "joongna"])
         assert "bunjang" in result
         assert "joongna" in result
-        assert result["bunjang"]["price"] == 60000
+        assert result["bunjang"]["price"] == 52000  # 3.5% 수수료 보전
         assert result["joongna"]["price"] == 50000
 
     @pytest.mark.unit

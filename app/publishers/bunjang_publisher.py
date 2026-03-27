@@ -22,35 +22,6 @@ from app.publishers._legacy_utils import to_legacy_listing_package
 
 logger = logging.getLogger(__name__)
 
-# legacy CATEGORY_MAP에 없는 카테고리 확장 매핑
-# legacy_spikes 직접 수정 금지 → 여기서 오버라이드
-EXTENDED_CATEGORY_MAP = {
-    # 필기구
-    "만년필": ["생활/문구", "문구/오피스", "필기도구"],
-    "볼펜": ["생활/문구", "문구/오피스", "필기도구"],
-    "펜": ["생활/문구", "문구/오피스", "필기도구"],
-    "필기구": ["생활/문구", "문구/오피스", "필기도구"],
-    # 도서
-    "도서": ["도서/음반/문구", "도서"],
-    "책": ["도서/음반/문구", "도서"],
-    # 음반
-    "음반": ["도서/음반/문구", "음반/CD/DVD"],
-    "앨범": ["도서/음반/문구", "음반/CD/DVD"],
-    # 시계
-    "시계": ["패션잡화", "시계"],
-    "손목시계": ["패션잡화", "시계"],
-    # 가방
-    "가방": ["패션잡화", "가방"],
-    "백팩": ["패션잡화", "가방"],
-    # 악기
-    "기타": ["취미/수집", "악기"],
-    "피아노": ["취미/수집", "악기"],
-    "악기": ["취미/수집", "악기"],
-    # 생활/주방
-    "주방용품": ["생활/문구", "주방용품"],
-    "가구": ["생활/문구", "가구/인테리어"],
-}
-
 
 class PatchedBunjangPublisher(LegacyBunjangPublisher):
     """
@@ -60,15 +31,22 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
     """
 
     async def _select_category(self, page: Page, category_str: str):
-        """확장 카테고리 매핑을 우선 참조한 뒤 부모 메서드 호출."""
+        """legacy 매핑 우선 시도, 실패 시 대분류 '기타' 직접 클릭."""
+        from legacy_spikes.secondhand_publisher.publishers.bunjang import CATEGORY_MAP
+
         category_str = (category_str or "").strip()
-        if category_str in EXTENDED_CATEGORY_MAP:
-            # 확장 매핑이 있으면 "대분류 > 중분류 > 소분류" 형식으로 변환
-            parts = EXTENDED_CATEGORY_MAP[category_str]
-            converted = " > ".join(parts)
-            logger.info("[번개장터] 확장 카테고리 매핑: %s → %s", category_str, converted)
-            return await super()._select_category(page, converted)
-        return await super()._select_category(page, category_str)
+
+        # legacy 매핑에 있으면 기존 로직 사용
+        if category_str in CATEGORY_MAP:
+            return await super()._select_category(page, category_str)
+
+        # 매핑에 없는 카테고리 → 대분류 첫 번째 열에서 '기타' 직접 클릭
+        logger.info("[번개장터] 카테고리 '%s' 매핑 없음 → 대분류 '기타' 선택", category_str)
+        ok = await self._find_and_click_category_in_column(page, "기타", 0)
+        if ok:
+            logger.info("[번개장터] 대분류 '기타' 선택 성공")
+            return
+        logger.warning("[번개장터] 대분류 '기타' 선택 실패, 카테고리 선택 건너뜀")
 
     async def publish(self, package: ListingPackage) -> PublishResult:
         page = await self.new_page()
@@ -201,7 +179,7 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
             listing_id = match.group(1)
             shot = await self.screenshot(page, "publish_success")
 
-            await page.wait_for_timeout(30000)
+            await page.wait_for_timeout(5000)
 
             return PublishResult(
                 platform=self.platform,
@@ -214,7 +192,7 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
         except Exception as e:
             logger.error(f"[번개장터] publish 실패: {e}")
             shot = await self.screenshot(page, "publish_error")
-            await page.wait_for_timeout(30000)
+            await page.wait_for_timeout(5000)
             return PublishResult(
                 platform=self.platform,
                 success=False,

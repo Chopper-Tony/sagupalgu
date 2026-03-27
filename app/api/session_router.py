@@ -232,6 +232,20 @@ async def rewrite_listing(
     return RewriteListingResponse(**result)
 
 
+@router.post("/{session_id}/update-listing")
+async def update_listing(
+    session_id: str,
+    request: Request,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """사용자가 직접 수정한 판매글을 DB에 반영한다."""
+    body = await request.json()
+    result = await session_service.update_listing(
+        session_id=session_id, updated_listing=body,
+    )
+    return result
+
+
 @router.post("/{session_id}/seller-tips")
 async def get_seller_tips(
     session_id: str,

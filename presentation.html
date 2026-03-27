@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사구팔구 - AI 중고거래 자동 게시 플랫폼</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+  :root {
+    --r-main-font: 'Noto Sans KR', sans-serif;
+    --r-heading-font: 'Noto Sans KR', sans-serif;
+    --r-main-font-size: 32px;
+    --r-heading-color: #fff;
+    --r-main-color: #e0e0e0;
+    --r-link-color: #58a6ff;
+    --r-background-color: #0d1117;
+  }
+  .reveal { font-family: 'Noto Sans KR', sans-serif; }
+  .reveal h1, .reveal h2, .reveal h3 { font-family: 'Noto Sans KR', sans-serif; font-weight: 700; }
+  .reveal h1 { font-size: 2.2em; }
+  .reveal h2 { font-size: 1.5em; color: #58a6ff; }
+  .reveal h3 { font-size: 1.1em; color: #7ee787; }
+
+  .reveal table { font-size: 0.65em; margin: 0 auto; border-collapse: collapse; }
+  .reveal table th { background: #161b22; color: #58a6ff; padding: 8px 16px; border-bottom: 2px solid #30363d; }
+  .reveal table td { padding: 8px 16px; border-bottom: 1px solid #21262d; }
+  .reveal table tr:hover td { background: rgba(88,166,255,0.05); }
+
+  .reveal ul, .reveal ol { font-size: 0.85em; }
+  .reveal li { margin-bottom: 0.4em; }
+
+  .accent { color: #58a6ff; }
+  .green { color: #7ee787; }
+  .orange { color: #f0883e; }
+  .red { color: #f85149; }
+  .purple { color: #bc8cff; }
+  .dim { color: #8b949e; }
+
+  .badge {
+    display: inline-block; padding: 4px 14px; border-radius: 20px;
+    font-size: 0.55em; font-weight: 500; margin: 2px 4px;
+  }
+  .badge-blue { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+  .badge-green { background: rgba(126,231,135,0.15); color: #7ee787; border: 1px solid rgba(126,231,135,0.3); }
+  .badge-orange { background: rgba(240,136,62,0.15); color: #f0883e; border: 1px solid rgba(240,136,62,0.3); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: #bc8cff; border: 1px solid rgba(188,140,255,0.3); }
+
+  .flow-box {
+    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    padding: 14px 20px; margin: 6px; display: inline-block;
+    font-size: 0.7em; text-align: center;
+  }
+  .flow-arrow { color: #58a6ff; font-size: 1.2em; margin: 0 4px; }
+
+  .stat-grid { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 20px; }
+  .stat-card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 16px;
+    padding: 24px 32px; text-align: center; min-width: 140px;
+  }
+  .stat-number { font-size: 2.2em; font-weight: 900; line-height: 1; }
+  .stat-label { font-size: 0.55em; color: #8b949e; margin-top: 6px; }
+
+  .two-col { display: flex; gap: 30px; align-items: flex-start; }
+  .two-col > div { flex: 1; }
+
+  .code-block {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px 20px; text-align: left; font-family: 'Consolas', monospace;
+    font-size: 0.6em; line-height: 1.6; color: #e6edf3;
+  }
+
+  .pipeline-step {
+    display: flex; align-items: center; gap: 12px;
+    background: #161b22; border-left: 3px solid #58a6ff;
+    padding: 10px 16px; margin: 6px 0; border-radius: 0 8px 8px 0;
+    font-size: 0.7em;
+  }
+  .pipeline-step .step-num {
+    background: #58a6ff; color: #0d1117; width: 28px; height: 28px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85em; flex-shrink: 0;
+  }
+
+  .title-sub { font-size: 0.5em; color: #8b949e; font-weight: 300; margin-top: 10px; }
+  .highlight-box {
+    background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 12px; padding: 16px 24px; margin: 12px 0;
+    font-size: 0.75em;
+  }
+
+  .loop-diagram {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; margin: 16px 0; flex-wrap: wrap;
+  }
+  .loop-node {
+    background: #161b22; border: 2px solid #30363d; border-radius: 10px;
+    padding: 10px 16px; font-size: 0.6em; font-weight: 500;
+  }
+  .loop-node.active { border-color: #58a6ff; color: #58a6ff; }
+  .loop-node.critic { border-color: #f0883e; color: #f0883e; }
+  .loop-node.planner { border-color: #bc8cff; color: #bc8cff; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ========== SLIDE 1: TITLE ========== -->
+<section>
+  <h1 style="font-size:2.8em; margin-bottom:0;">사구팔구</h1>
+  <p style="font-size:1.1em; color:#8b949e; margin-top:10px;">
+    AI 중고거래 자동 게시 플랫폼
+  </p>
+  <p style="font-size:0.65em; color:#58a6ff; margin-top:30px;">
+    사진 한 장으로 상품 분석부터 판매글 작성, 게시까지 자동화하는<br>
+    <strong>LangGraph Agentic Workflow</strong> 플랫폼
+  </p>
+  <div style="margin-top:40px;">
+    <span class="badge badge-blue">FastAPI</span>
+    <span class="badge badge-green">LangGraph</span>
+    <span class="badge badge-orange">React</span>
+    <span class="badge badge-purple">7 Agents · 10 Tools</span>
+  </div>
+</section>
+
+<!-- ========== SLIDE 2: PROBLEM ========== -->
+<section>
+  <h2>문제 정의</h2>
+  <div class="two-col" style="margin-top:30px;">
+    <div>
+      <h3 class="red" style="font-size:0.9em;">기존 중고거래 판매 과정</h3>
+      <ul style="font-size:0.7em; color:#8b949e;">
+        <li>상품 사진 촬영</li>
+        <li>시세 <strong>직접</strong> 조사 (여러 플랫폼 검색)</li>
+        <li>적정 가격 <strong>감으로</strong> 설정</li>
+        <li>판매글 <strong>직접</strong> 작성</li>
+        <li>각 플랫폼에 <strong>하나씩</strong> 등록</li>
+        <li>안 팔리면 <strong>처음부터</strong> 반복</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="green" style="font-size:0.9em;">사구팔구</h3>
+      <ul style="font-size:0.7em;">
+        <li>사진 업로드 <span class="dim">→ AI가 상품 인식</span></li>
+        <li>시세 <span class="accent">자동 크롤링 + RAG 검색</span></li>
+        <li>목표 기반 <span class="accent">전략적 가격 산정</span></li>
+        <li>LLM <span class="accent">자동 카피라이팅</span></li>
+        <li>번개장터 + 중고나라 <span class="accent">동시 게시</span></li>
+        <li>판매 후 <span class="accent">자동 가격 최적화</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 3: DEMO FLOW ========== -->
+<section>
+  <h2>E2E 파이프라인</h2>
+  <div style="margin-top:20px;">
+    <div class="pipeline-step"><div class="step-num">1</div> 사진 업로드 (drag & drop)</div>
+    <div class="pipeline-step" style="border-color:#7ee787;"><div class="step-num" style="background:#7ee787;">2</div> Vision AI 상품 분석 (브랜드·모델·카테고리)</div>
+    <div class="pipeline-step" style="border-color:#bc8cff;"><div class="step-num" style="background:#bc8cff;">3</div> 사용자 확정 또는 직접 입력</div>
+    <div class="pipeline-step" style="border-color:#f0883e;"><div class="step-num" style="background:#f0883e;">4</div> 시세 크롤링 + 가격 전략 (Goal-driven)</div>
+    <div class="pipeline-step" style="border-color:#f85149;"><div class="step-num" style="background:#f85149;">5</div> AI 판매글 생성 → Critic 비평 → 재작성 루프</div>
+    <div class="pipeline-step" style="border-color:#58a6ff;"><div class="step-num" style="background:#58a6ff;">6</div> 번개장터 + 중고나라 동시 게시 (Playwright)</div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 4: ARCHITECTURE OVERVIEW ========== -->
+<section>
+  <h2>아키텍처 개요</h2>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-number accent">7</div>
+      <div class="stat-label">AI 에이전트</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number green">10</div>
+      <div class="stat-label">에이전틱 툴</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number orange">3</div>
+      <div class="stat-label">Agentic Loop</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number purple">508</div>
+      <div class="stat-label">테스트</div>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top:24px;">
+    <strong>Deterministic Shell + Agentic Core</strong> 하이브리드<br>
+    <span class="dim">예측 가능한 외부 껍데기 안에서 LLM이 자율적으로 도구를 선택</span>
+  </div>
+</section>
+
+<!-- ========== SLIDE 5: 7 AGENTS ========== -->
+<section>
+  <h2>7 에이전트 구조</h2>
+  <table>
+    <thead>
+      <tr><th>#</th><th>에이전트</th><th>유형</th><th>역할</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0</td><td class="purple">Mission Planner</td><td><span class="badge badge-purple" style="font-size:0.85em;">LLM+Fallback</span></td><td>목표 해석 · 실행 계획 생성</td></tr>
+      <tr><td>1</td><td>Product Identity</td><td><span class="badge badge-green" style="font-size:0.85em;">Deterministic</span></td><td>Vision AI 상품 식별</td></tr>
+      <tr><td>2</td><td class="accent">Market Intelligence</td><td><span class="badge badge-blue" style="font-size:0.85em;">ReAct</span></td><td>시세 크롤링 + RAG 검색</td></tr>
+      <tr><td>3</td><td class="accent">Copywriting</td><td><span class="badge badge-blue" style="font-size:0.85em;">ReAct</span></td><td>판매글 생성 · 재작성</td></tr>
+      <tr><td>4</td><td class="accent">Validation/Recovery</td><td><span class="badge badge-blue" style="font-size:0.85em;">ReAct</span></td><td>게시 검증 · 장애 복구</td></tr>
+      <tr><td>5</td><td>Post-sale Optimization</td><td><span class="badge badge-green" style="font-size:0.85em;">Deterministic</span></td><td>판매 후 가격 최적화</td></tr>
+      <tr><td>6</td><td class="orange">Listing Critic</td><td><span class="badge badge-purple" style="font-size:0.85em;">LLM+Fallback</span></td><td>판매글 품질 비평</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== SLIDE 6: GRAPH FLOW ========== -->
+<section>
+  <h2>LangGraph 플로우</h2>
+  <div class="code-block" style="font-size:0.55em; line-height:1.7;">
+<span class="purple">START</span>
+  <span class="flow-arrow">→</span> <span class="purple">Mission Planner</span> <span class="dim">(목표 해석 · 계획)</span>
+  <span class="flow-arrow">→</span> Product Identity <span class="dim">(상품 식별)</span>
+  <span class="flow-arrow">→</span> Pre-listing Clarification <span class="dim">(정보 부족 감지)</span>
+  <span class="flow-arrow">→</span> <span class="accent">Market Intelligence</span> <span class="dim">(ReAct: 크롤링+RAG)</span>
+  <span class="flow-arrow">→</span> Pricing Strategy <span class="dim">(Goal-driven 가격)</span>
+  <span class="flow-arrow">→</span> <span class="accent">Copywriting</span> <span class="dim">(ReAct: 판매글 생성)</span>
+  <span class="flow-arrow">→</span> <span class="orange">Listing Critic</span> <span class="dim">(품질 비평)</span>
+       ├─ <span class="green">pass (score >= 70)</span> → Validation → Package → <span class="green">END</span>
+       ├─ <span class="orange">rewrite (retry < 2)</span> → Copywriting <span class="dim">← 재생성 루프</span>
+       └─ <span class="purple">replan</span> → Mission Planner <span class="dim">← 전략 재수립</span>
+  </div>
+</section>
+
+<!-- ========== SLIDE 7: 3 AGENTIC LOOPS ========== -->
+<section>
+  <h2>3 Agentic Loops</h2>
+
+  <div style="margin-top:20px;">
+    <h3 style="font-size:0.8em;"><span class="orange">Loop 1.</span> Critic → Rewrite</h3>
+    <div class="loop-diagram">
+      <div class="loop-node active">Copywriting</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node critic">Critic 비평</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node" style="color:#8b949e;">score < 70?</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node active">재작성 (최대 2회)</div>
+    </div>
+
+    <h3 style="font-size:0.8em; margin-top:20px;"><span class="purple">Loop 2.</span> Critic → Replan</h3>
+    <div class="loop-diagram">
+      <div class="loop-node critic">Critic (재작성 한도 초과)</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node planner">Mission Planner</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node" style="color:#8b949e;">계획 수정</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node active">파이프라인 재실행</div>
+    </div>
+
+    <h3 style="font-size:0.8em; margin-top:20px;"><span class="accent">Loop 3.</span> Validation → Recovery</h3>
+    <div class="loop-diagram">
+      <div class="loop-node active">게시 시도</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node" style="border-color:#f85149; color:#f85149;">실패</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node active">진단 → 패치 → 재시도</div>
+      <span class="flow-arrow">→</span>
+      <div class="loop-node" style="border-color:#7ee787; color:#7ee787;">Discord 알림</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 8: GOAL-DRIVEN ========== -->
+<section>
+  <h2>Goal-driven 행동 변화</h2>
+  <p style="font-size:0.7em; color:#8b949e;">같은 상품이라도 판매 목표에 따라 전략이 달라집니다</p>
+  <table style="margin-top:20px;">
+    <thead>
+      <tr><th></th><th><span class="green">빠른 판매</span></th><th><span class="accent">균형</span></th><th><span class="orange">수익 극대화</span></th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>가격 배수</strong></td><td>시세 × 0.90</td><td>시세 × 0.97</td><td>시세 × 1.05</td></tr>
+      <tr><td><strong>카피 톤</strong></td><td>간결 · 긴급</td><td>실용 · 신뢰</td><td>프리미엄 · 가치</td></tr>
+      <tr><td><strong>네고 정책</strong></td><td>소폭 가능</td><td>조건부 가능</td><td>불가</td></tr>
+      <tr><td><strong>비평 기준</strong></td><td>관용적</td><td>표준</td><td>엄격</td></tr>
+      <tr><td><strong>Critic 재시도</strong></td><td>최대 1회</td><td>최대 2회</td><td>최대 3회</td></tr>
+    </tbody>
+  </table>
+  <div class="highlight-box" style="margin-top:16px;">
+    Mission Planner가 목표 설정 → 모든 하위 에이전트가 목표에 맞게 행동 변화
+  </div>
+</section>
+
+<!-- ========== SLIDE 9: TECH STACK ========== -->
+<section>
+  <h2>기술 스택</h2>
+  <div class="two-col" style="margin-top:20px;">
+    <div>
+      <table>
+        <thead><tr><th>레이어</th><th>기술</th></tr></thead>
+        <tbody>
+          <tr><td>백엔드</td><td>FastAPI + Pydantic v2</td></tr>
+          <tr><td>워크플로우</td><td>LangGraph 1.1</td></tr>
+          <tr><td>에이전틱</td><td>LangChain create_agent</td></tr>
+          <tr><td>LLM</td><td>GPT-4.1-mini · Gemini · Solar</td></tr>
+          <tr><td>Vision</td><td>GPT-4.1-mini · Gemini 2.5 Flash</td></tr>
+          <tr><td>DB</td><td>Supabase (pgvector)</td></tr>
+          <tr><td>크롤러</td><td>Playwright</td></tr>
+          <tr><td>프론트엔드</td><td>React 18 + TypeScript</td></tr>
+          <tr><td>배포</td><td>Docker Compose + EC2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3 style="font-size:0.75em; margin-bottom:12px;">LLM Fallback 체인</h3>
+      <div class="code-block" style="font-size:0.55em;">
+OpenAI gpt-4.1-mini<br>
+  <span class="dim">↓ 실패 시</span><br>
+Gemini 2.5 Flash<br>
+  <span class="dim">↓ 실패 시</span><br>
+Solar<br>
+  <span class="dim">↓ 실패 시</span><br>
+<span class="orange">룰 기반 템플릿 (LLM 없이 동작)</span>
+      </div>
+      <h3 style="font-size:0.75em; margin-top:16px; margin-bottom:8px;">RAG 3단계</h3>
+      <div class="code-block" style="font-size:0.55em;">
+1. pgvector 벡터 검색<br>
+2. 키워드 폴백 검색<br>
+3. LLM 가격 추정
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 10: TOOLS ========== -->
+<section>
+  <h2>10 에이전틱 툴</h2>
+  <table style="font-size:0.6em;">
+    <thead>
+      <tr><th>#</th><th>툴</th><th>에이전트</th><th>기능</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td class="accent">lc_market_crawl_tool</td><td>Agent 2</td><td>번개장터·중고나라 실시간 크롤링</td></tr>
+      <tr><td>2</td><td class="accent">lc_rag_price_tool</td><td>Agent 2</td><td>pgvector RAG 가격 검색</td></tr>
+      <tr><td>3</td><td class="accent">lc_generate_listing_tool</td><td>Agent 3</td><td>신규 판매글 LLM 생성</td></tr>
+      <tr><td>4</td><td class="accent">lc_rewrite_listing_tool</td><td>Agent 3</td><td>피드백 기반 재작성</td></tr>
+      <tr><td>5</td><td class="accent">lc_diagnose_publish_failure_tool</td><td>Agent 4</td><td>게시 실패 진단 (8종 에러 분류)</td></tr>
+      <tr><td>6</td><td class="accent">lc_auto_patch_tool</td><td>Agent 4</td><td>LLM 기반 자동 패치</td></tr>
+      <tr><td>7</td><td class="accent">lc_discord_alert_tool</td><td>Agent 4</td><td>Discord 장애 알림</td></tr>
+      <tr><td>8-10</td><td class="dim">내부 구현 공유 툴</td><td>-</td><td>_impl 함수 기반 직접 호출</td></tr>
+    </tbody>
+  </table>
+  <div class="highlight-box" style="margin-top:12px;">
+    <code>agentic_tools.py</code> <span class="dim">— 단일 facade 진입점, ReAct 에이전트가 LLM 판단으로 자율 선택</span>
+  </div>
+</section>
+
+<!-- ========== SLIDE 11: DOMAIN DESIGN ========== -->
+<section>
+  <h2>도메인 설계</h2>
+  <div class="two-col" style="margin-top:16px;">
+    <div>
+      <h3 style="font-size:0.75em;">상태 머신 (13개 상태)</h3>
+      <div class="code-block" style="font-size:0.5em; line-height:1.6;">
+created → images_attached → analyzing
+  → analysis_complete → product_confirmed
+  → listing_generated → publish_ready
+  → publishing → published
+  → <span class="green">sold</span> / <span class="orange">unsold</span>
+  → <span class="red">publish_failed</span> → recovering
+      </div>
+      <p style="font-size:0.55em; color:#8b949e; margin-top:8px;">
+        ALLOWED_TRANSITIONS로 유효 전이만 허용<br>
+        expected_status 기반 원자적 업데이트 (TOCTOU 방어)
+      </p>
+    </div>
+    <div>
+      <h3 style="font-size:0.75em;">예외 → HTTP 매핑</h3>
+      <table style="font-size:0.55em;">
+        <tbody>
+          <tr><td>SessionNotFound</td><td><span class="red">404</span></td></tr>
+          <tr><td>InvalidUserInput</td><td><span class="orange">400</span></td></tr>
+          <tr><td>InvalidStateTransition</td><td><span class="orange">409</span></td></tr>
+          <tr><td>ListingGenerationError</td><td><span class="red">500</span></td></tr>
+          <tr><td>PublishExecutionError</td><td><span class="red">502</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.55em; color:#8b949e; margin-top:8px;">
+        main.py 글로벌 핸들러 단일 지점<br>
+        라우터는 예외를 잡지 않음
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 12: PUBLISH RELIABILITY ========== -->
+<section>
+  <h2>게시 신뢰성</h2>
+  <div class="two-col" style="margin-top:20px;">
+    <div>
+      <h3 style="font-size:0.75em;">에러 분류 (8종)</h3>
+      <div style="font-size:0.6em; text-align:left;">
+        <div style="margin:4px 0;"><span class="badge badge-orange" style="font-size:0.9em;">auth_expired</span> 인증 만료</div>
+        <div style="margin:4px 0;"><span class="badge badge-orange" style="font-size:0.9em;">rate_limited</span> 요청 제한</div>
+        <div style="margin:4px 0;"><span class="badge badge-orange" style="font-size:0.9em;">network_error</span> 네트워크</div>
+        <div style="margin:4px 0;"><span class="badge badge-orange" style="font-size:0.9em;">captcha</span> 캡차 감지</div>
+        <div style="margin:4px 0;"><span class="badge badge-blue" style="font-size:0.9em;">validation</span> 입력 검증</div>
+        <div style="margin:4px 0;"><span class="badge badge-blue" style="font-size:0.9em;">selector_changed</span> UI 변경</div>
+        <div style="margin:4px 0;"><span class="badge badge-purple" style="font-size:0.9em;">timeout</span> 시간 초과</div>
+        <div style="margin:4px 0;"><span class="badge badge-purple" style="font-size:0.9em;">unknown</span> 미분류</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.75em;">복구 전략</h3>
+      <ul style="font-size:0.6em;">
+        <li><strong>classify_error()</strong> — 메시지 기반 에러 분류</li>
+        <li><strong>get_retry_delay()</strong> — 지수 백오프</li>
+        <li><strong>auto_recoverable</strong> 판정 → 자동 재시도</li>
+        <li><strong>asyncio.gather</strong> 병렬 게시</li>
+        <li><strong>Discord 자동 알림</strong> (3회 연속 실패)</li>
+      </ul>
+      <h3 style="font-size:0.75em; margin-top:16px;">멀티 플랫폼</h3>
+      <div style="font-size:0.6em;">
+        <span class="badge badge-green" style="font-size:1em;">번개장터</span>
+        <span class="badge badge-blue" style="font-size:1em;">중고나라</span>
+        <span class="badge badge-orange" style="font-size:1em;">당근마켓 (실험)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 13: FRONTEND ========== -->
+<section>
+  <h2>프론트엔드</h2>
+  <div class="two-col" style="margin-top:20px;">
+    <div>
+      <h3 style="font-size:0.75em;">ChatGPT 스타일 UI</h3>
+      <ul style="font-size:0.6em;">
+        <li>React 18 + TypeScript + Vite</li>
+        <li>타임라인 기반 대화형 인터페이스</li>
+        <li>SSE 실시간 상태 업데이트</li>
+        <li>스마트 폴링 (활성 2.5s / 비활성 10s)</li>
+        <li>다크 테마 + 반응형 모바일</li>
+      </ul>
+      <h3 style="font-size:0.75em; margin-top:16px;">13개 상태 카드</h3>
+      <ul style="font-size:0.6em;">
+        <li>ImageUploadCard (drag & drop)</li>
+        <li>ProductConfirmationCard (후보 선택)</li>
+        <li>DraftCard (판매글 + AI 비평 + 직접 수정)</li>
+        <li>PublishApprovalCard / ResultCard</li>
+        <li>SaleStatusCard / OptimizationCard</li>
+        <li>ProgressCard / ErrorCard (공용)</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.75em;">웹 UI 플랫폼 로그인</h3>
+      <div class="highlight-box" style="font-size:0.6em;">
+        사이드바에서 "로그인" 클릭<br>
+        → Playwright 브라우저 실행<br>
+        → 사용자가 직접 로그인<br>
+        → "로그인 완료" 탭 클릭<br>
+        → 쿠키 자동 저장<br>
+        <span class="dim">(스크립트 로그인 불필요)</span>
+      </div>
+      <h3 style="font-size:0.75em; margin-top:16px;">판매글 직접 수정</h3>
+      <div class="highlight-box" style="font-size:0.6em;">
+        AI 생성 초안에서<br>
+        제목 · 설명 · 가격 인라인 편집<br>
+        → 백엔드 DB 즉시 반영
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 14: TESTING ========== -->
+<section>
+  <h2>테스트 전략</h2>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-number green">508</div>
+      <div class="stat-label">전체 테스트</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number accent">~300</div>
+      <div class="stat-label">Unit (0.5초)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number orange">~120</div>
+      <div class="stat-label">Integration</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number purple">3+5</div>
+      <div class="stat-label">E2E + Sync</div>
+    </div>
+  </div>
+  <div class="two-col" style="margin-top:24px;">
+    <div>
+      <h3 style="font-size:0.7em;">테스트 원칙</h3>
+      <ul style="font-size:0.6em;">
+        <li>LLM 응답 의존 assertion <strong class="red">금지</strong></li>
+        <li>룰 기반 fallback 경로만 검증</li>
+        <li>외부 LLM은 반드시 mock</li>
+        <li>dependency_overrides로 격리</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.7em;">핵심 검증</h3>
+      <ul style="font-size:0.6em;">
+        <li>상태 전이 완전성 · 원자성</li>
+        <li>노드별 output contract (9노드)</li>
+        <li>도메인 예외 → HTTP 매핑</li>
+        <li>백엔드-프론트 타입 drift 감지</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 15: LAYERED ARCHITECTURE ========== -->
+<section>
+  <h2>레이어 구조</h2>
+  <div style="margin-top:20px;">
+    <div class="flow-box" style="width:80%; border-color:#58a6ff;">
+      <strong class="accent">API Layer</strong><br>
+      <span style="font-size:0.8em;">FastAPI 라우터 · DI 주입 · 글로벌 예외 핸들러</span>
+    </div>
+    <div style="font-size:1.2em; color:#30363d;">▼</div>
+    <div class="flow-box" style="width:80%; border-color:#7ee787;">
+      <strong class="green">Service Layer</strong><br>
+      <span style="font-size:0.8em;">SessionService · ListingService · PublishService · RecoveryService</span>
+    </div>
+    <div style="font-size:1.2em; color:#30363d;">▼</div>
+    <div class="flow-box" style="width:80%; border-color:#bc8cff;">
+      <strong class="purple">Domain Layer</strong><br>
+      <span style="font-size:0.8em;">SessionStatus · CanonicalListingSchema · 예외 · Goal Strategy · Publish Policy</span>
+    </div>
+    <div style="font-size:1.2em; color:#30363d;">▼</div>
+    <div class="flow-box" style="width:80%; border-color:#f0883e;">
+      <strong class="orange">Graph Layer (LangGraph)</strong><br>
+      <span style="font-size:0.8em;">7 에이전트 노드 · 10 툴 · StateGraph · 라우팅</span>
+    </div>
+    <div style="font-size:1.2em; color:#30363d;">▼</div>
+    <div class="flow-box" style="width:80%; border-color:#f85149;">
+      <strong class="red">Infrastructure</strong><br>
+      <span style="font-size:0.8em;">Supabase · Playwright Publishers · Storage · Discord</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 16: ENGINEERING HIGHLIGHTS ========== -->
+<section>
+  <h2>엔지니어링 하이라이트</h2>
+  <div class="two-col" style="margin-top:16px;">
+    <div>
+      <h3 style="font-size:0.7em;">안정성</h3>
+      <ul style="font-size:0.58em;">
+        <li><strong>Lazy import</strong> — supabase·langgraph 미설치 환경 호환</li>
+        <li><strong>expected_status</strong> — TOCTOU race condition 방어</li>
+        <li><strong>LLM fallback</strong> — OpenAI→Gemini→Solar→룰 기반</li>
+        <li><strong>전용 이벤트루프</strong> — Windows asyncio 호환</li>
+        <li><strong>에러 분류</strong> — 8종 자동 판정 + 지수 백오프</li>
+      </ul>
+      <h3 style="font-size:0.7em; margin-top:12px;">관찰 가능성</h3>
+      <ul style="font-size:0.58em;">
+        <li>JSON 구조화 로깅 + request_id 자동 전파</li>
+        <li>노드별 실행 시간 추적</li>
+        <li>Agent trace 보존 (tool_calls → DB → UI)</li>
+        <li>SSE 실시간 상태 스트림</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.7em;">코드 품질</h3>
+      <ul style="font-size:0.58em;">
+        <li><strong>76 마일스톤</strong> CTO 코드리뷰 반복</li>
+        <li><strong>DI 완전 적용</strong> — 테스트 격리</li>
+        <li><strong>도메인 예외 5종</strong> — 글로벌 핸들러 단일</li>
+        <li><strong>facade 패턴</strong> — 툴 import 단일 진입점</li>
+        <li><strong>순수 함수 분리</strong> — session_meta·product·prompt</li>
+      </ul>
+      <h3 style="font-size:0.7em; margin-top:12px;">배포</h3>
+      <ul style="font-size:0.58em;">
+        <li>Docker Compose (backend + nginx frontend)</li>
+        <li>GitHub Actions CI/CD</li>
+        <li>AWS EC2 자동 배포</li>
+        <li>Discord 배포 알림</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 17: MILESTONES ========== -->
+<section>
+  <h2>개발 여정</h2>
+  <div style="font-size:0.6em; text-align:left; max-width:700px; margin:20px auto;">
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M1~M10</div>
+      <div style="flex:1; background:linear-gradient(90deg, #161b22 0%, #238636 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">기반 구축 · God File 분해 · 테스트 체계</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M11~M20</div>
+      <div style="flex:1; background:linear-gradient(90deg, #238636 0%, #1f6feb 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">DI · 예외 · 프론트엔드 · Docker</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M21~M40</div>
+      <div style="flex:1; background:linear-gradient(90deg, #1f6feb 0%, #8957e5 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">서비스 절개 · 에이전트 확장 · Goal-driven</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M41~M60</div>
+      <div style="flex:1; background:linear-gradient(90deg, #8957e5 0%, #f0883e 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">E2E 봉합 · 게시 신뢰성 · CTO 리뷰 대응</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M61~76+</div>
+      <div style="flex:1; background:linear-gradient(90deg, #f0883e 0%, #f85149 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">보안 · SSE · 병렬 게시 · UI 완성 · 플랫폼 로그인</div>
+    </div>
+  </div>
+  <div class="stat-grid" style="margin-top:16px;">
+    <div class="stat-card" style="padding:16px 24px;">
+      <div class="stat-number accent" style="font-size:1.6em;">76+</div>
+      <div class="stat-label">마일스톤</div>
+    </div>
+    <div class="stat-card" style="padding:16px 24px;">
+      <div class="stat-number green" style="font-size:1.6em;">508</div>
+      <div class="stat-label">테스트</div>
+    </div>
+    <div class="stat-card" style="padding:16px 24px;">
+      <div class="stat-number orange" style="font-size:1.6em;">92</div>
+      <div class="stat-label">CTO 점수</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 18: CLOSING ========== -->
+<section>
+  <h1 style="font-size:2.4em;">감사합니다</h1>
+  <p style="font-size:0.8em; color:#8b949e; margin-top:20px;">
+    사구팔구 — AI 중고거래 자동 게시 플랫폼
+  </p>
+  <div style="margin-top:40px;">
+    <div class="highlight-box">
+      <span style="font-size:0.7em;">
+        <strong>7</strong> AI 에이전트 · <strong>10</strong> 툴 · <strong>3</strong> Agentic Loop · <strong>508</strong> 테스트<br>
+        <span class="dim" style="font-size:0.9em;">사진 한 장 → 분석 → 전략 → 카피 → 비평 → 게시 자동화</span>
+      </span>
+    </div>
+  </div>
+  <p style="font-size:0.55em; color:#30363d; margin-top:40px;">
+    ← / → 또는 Space로 슬라이드 이동
+  </p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  transition: 'slide',
+  transitionSpeed: 'default',
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  center: true,
+});
+</script>
+</body>
+</html>

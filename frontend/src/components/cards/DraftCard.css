@@ -220,3 +220,74 @@
   color: #888;
   margin-bottom: -4px;
 }
+
+/* AI 품질 평가 */
+.draft-card__feedback {
+  background: #161b22;
+  border: 1px solid #2a2a2e;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.draft-card__feedback-title {
+  font-size: 13px;
+  color: #ececec;
+  margin: 0 0 12px;
+}
+
+.draft-card__feedback-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.draft-card__feedback-table thead th {
+  text-align: left;
+  color: #666;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-bottom: 1px solid #2a2a2e;
+  white-space: nowrap;
+}
+
+.draft-card__feedback-table tbody td {
+  padding: 8px;
+  border-bottom: 1px solid #1e1e22;
+  vertical-align: top;
+  color: #aaa;
+  line-height: 1.5;
+}
+
+.draft-card__feedback-type {
+  color: #ececec;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.draft-card__feedback-impact {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.draft-card__feedback-impact--high {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.draft-card__feedback-impact--medium {
+  background: rgba(240, 136, 62, 0.15);
+  color: #f0883e;
+}
+
+.draft-card__feedback-impact--low {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+}
+
+.draft-card__feedback-reason {
+  color: #999;
+}
