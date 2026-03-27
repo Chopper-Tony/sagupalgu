@@ -64,6 +64,25 @@ class TestCopywritingAgent:
         assert result["status"] == "draft_generated"
         assert result["checkpoint"] == "B_draft_complete"
 
+    def test_rewrite_react실패시_fallback으로_rewrite_결과_반영(self, base_state):
+        """M77 회귀 방지: ReAct가 None 반환해도 rewrite_instruction이 있으면 fallback rewrite 실행"""
+        from app.graph.seller_copilot_nodes import copywriting_node
+
+        existing_listing = {**base_state["canonical_listing"], "title": "기존 제목"}
+        rewritten = {**base_state["canonical_listing"], "title": "신뢰감 있는 재작성 제목"}
+        state = {**base_state, "canonical_listing": existing_listing, "rewrite_instruction": "더 신뢰감 있게"}
+
+        # ReAct 경로 실패 (None 반환) → fallback으로 rewrite
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
+            with patch("app.services.listing_service.ListingService") as MockSvc:
+                instance = MockSvc.return_value
+                instance.rewrite_listing = AsyncMock(return_value=rewritten)
+                result = copywriting_node(state)
+
+        # 기존 제목이 아니라 rewritten 제목이어야 함
+        assert result["canonical_listing"]["title"] == "신뢰감 있는 재작성 제목"
+        assert result["rewrite_instruction"] is None
+
     def test_llm_실패시_템플릿_fallback(self, base_state):
         """LLM 호출 실패 시 템플릿 기반으로 fallback"""
         from app.graph.seller_copilot_nodes import copywriting_node

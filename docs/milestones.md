@@ -119,6 +119,8 @@
 | M69~M73 완료 | 92+ 예상 | rewrite fallback 회귀 수정·idempotency 확인·_run_async 원칙 명시·except 세분화·updatedAt·전이 로그, 테스트 508개 |
 | M74~M76 + A1~A2 + E2E fix 완료 | — | readiness 고도화·AI 피드백 표시·post-sale 강화·UI ChatGPT화·배포 준비·Playwright Windows 수정·이미지 경로/카테고리 수정, **UI E2E 풀 완주 성공**(번개장터+중고나라 동시 게시) |
 | UI-FIX: 프론트 UX 개선 + 플랫폼 로그인 수정 | ✅ 완료 | rewrite/publish 후 무한 스피너 수정(상태 동일 시 수동 카드 push) ✅, DraftCard 플랫폼 선택 디폴트 빈 배열(사용자 선택 시 색상 변화) ✅, DraftCard "직접 수정" 버튼(제목·설명·가격 인라인 편집→백엔드 DB 반영) ✅, `POST /sessions/{id}/update-listing` 엔드포인트 신설 ✅, Vite `/uploads` 프록시(상품 이미지 렌더링) ✅, SessionSidebar 재로그인 버튼 ✅, **플랫폼 로그인 "로그인 완료" 버튼 탭 방식**(URL 감지 폐기, 오탐 0) ✅, 번개장터 카테고리 매핑 없으면 대분류 "기타" fallback ✅ |
+| UX-fix-2: UX 개선 + Vision + CLAUDE.md 정리 | ✅ 완료 | 번개장터 수수료 ×1.035(3.5%) ✅, 게시 후 대기 30초→5초 ✅, DraftCard AI 평가 표 형식 ✅, 게시 완료 카드 중복 수정 ✅, Vision 프롬프트 개선(30종 카테고리·오인식 방지) ✅, CLAUDE.md 공식 가이드 기반 100줄 재구성 ✅, .claude/rules/ 분할 ✅, presentation.html 발표 자료 ✅, 509 테스트 통과 ✅ |
+| M77: rewrite 회귀 봉합 | ✅ 완료 | copywriting_node ReAct 실패 시 fallback rewrite 재시도 추가(CTO P0 rewrite 결과 소실 방지) ✅, 회귀 방지 테스트 `test_rewrite_react실패시_fallback으로_rewrite_결과_반영` 추가 ✅, 509 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력
 

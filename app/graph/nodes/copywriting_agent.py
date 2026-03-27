@@ -49,6 +49,11 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
 
     new_listing = _run_copywriting_agent(state, product, market_context, strategy, image_paths, rewrite_instruction)
 
+    # ReAct 실패 + rewrite 요청이면 fallback으로 재시도 (rewrite 결과 소실 방지)
+    if not new_listing and rewrite_instruction:
+        _log(state, "agent3:react_rewrite_failed → fallback_rewrite")
+        new_listing = _fallback_generate(state, product, market_context, strategy, image_paths, rewrite_instruction)
+
     if new_listing:
         new_listing = _normalize_listing(new_listing, product, strategy, image_paths)
         state["canonical_listing"] = new_listing
