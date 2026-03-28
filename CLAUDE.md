@@ -37,9 +37,12 @@ cd frontend && npm install && npm run dev
 # Docker 풀스택
 docker compose up --build
 
-# 테스트 (613개)
+# 백엔드 테스트 (661개)
 python -m pytest tests/           # 전체
 python -m pytest tests/ -m unit   # unit만 (0.5초)
+
+# 프론트엔드 테스트 (21개)
+cd frontend && npm test
 ```
 
 ## 레이어 구조
@@ -57,7 +60,8 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
 - `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 613개 (unit ~350 + integration ~160 + E2E 3 + sync 5)
+- `tests/` — 661개 (unit ~380 + integration ~180 + E2E 3 + sync 5)
+- `frontend/src/lib/__tests__/` — 프론트엔드 21개 (vitest + @testing-library/react)
 
 ## 핵심 코딩 규칙
 
@@ -72,8 +76,9 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
 - **Agent trace**: tool_calls·critic_score 등 그래프→서비스→DB→UI 보존 필수
-- **인증**: `app/core/auth.py` JWT 검증, local/dev는 X-Dev-User-Id 헤더 bypass
-- **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window
+- **인증**: `app/core/auth.py` JWT 검증 + 전 엔드포인트 소유권 검증, local/dev X-Dev-User-Id bypass
+- **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window, 경로 그룹별 bucket
+- **Rewrite 정책**: rewrite_instruction 있으면 template 신규 생성 금지, 기존 listing 유지
 
 ## 아키텍처 상세
 
@@ -100,12 +105,16 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 ## 최근 변경 (이번 세션)
 
-- **M84~M87** (Phase 0): Rewrite fallback 봉합, 전달물 위생, Readiness 경량화, Settings lazy
-- **M88~M91** (Phase 1): JWT 인증, CORS 제한, Broad Exception 세분화, Rate Limiting
-- **M92~M95** (Phase 2): pgvector RAG 검증, Supabase Storage E2E, Publish Spine 정리, 복구 E2E
-- **M96** (Phase 3): SessionService 3차 절개 — PublishOrchestrator + SaleTracker 분리
-- **M98** (Phase 3): Coverage 리포트 CI 연동
+- **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지
+- **M101** (Phase A): 소유권 검증 — 전 엔드포인트 get_current_user + user_id 검증, 403
+- **M102** (Phase B): Rate Limit 키 재설계 — 경로 그룹별 독립 bucket
+- **M103** (Phase B): Broad Exception 정리 — 핵심 노드 세분화, 57건→46건
+- **M104** (Phase C): Prod 점검 스크립트 — CORS/debug/JWT/LLM/publisher 자동 검증
+- **M105** (Phase C): Smoke Test 스크립트 — health + 세션 API 자동 검증
+- **M106** (Phase D): Market 서비스 유닛 테스트 — QueryBuilder/RelevanceScorer/PriceAggregator 25개
+- **M107** (Phase D): ListingService + ProductService 통합 테스트 22개
+- **M108** (Phase D): 프론트엔드 테스트 인프라 — vitest + 21개 스모크 테스트
 
 ## 마일스톤 이력
 
-98+ 마일스톤 완료. 상세: @docs/milestones.md
+109+ 마일스톤 완료. 상세: @docs/milestones.md

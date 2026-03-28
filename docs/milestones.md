@@ -141,6 +141,23 @@
 | M97: 당근마켓 안정화 | ⏸️ 보류 | Android 에뮬레이터/실기기 필요 — 하드웨어 미보유로 보류 |
 | M98: Coverage 리포트 CI 연동 | ✅ 완료 | ci.yml `--cov=app --cov-report=term-missing` 추가 ✅, coverage HTML artifact 업로드(7일) ✅, `pytest-cov>=5.0.0` 추가 ✅ |
 | M99: 문서 정합화 | ✅ 완료 | CLAUDE.md·milestones.md·메모리 전면 업데이트 ✅, 테스트 수·아키텍처·최근 변경 정합화 ✅ |
+| M100: Rewrite 강제 정책 봉합 | ✅ 완료 | rewrite 시 template fallback 완전 차단 ✅, 기존 listing 유지+지시사항 append ✅, 테스트 2개 추가 ✅ |
+| M101: 소유권 검증 전 엔드포인트 적용 | ✅ 완료 | 12개 엔드포인트에 get_current_user 추가 ✅, _get_or_raise/ensure_transition에 user_id 검증 ✅, 불일치 시 403 ✅ |
+| M102: Rate Limit 키 재설계 | ✅ 완료 | _get_route_group() 함수 추가(images/sessions/publish/rewrite 분리) ✅, bucket key를 경로 그룹별로 변경 ✅, 테스트 9개 추가 ✅ |
+| M103: Broad Exception 정리 | ✅ 완료 | 핵심 노드 JSON 파싱 except 세분화 ✅, LLM 경계 exc_info 로깅 ✅, 57건→46건 ✅ |
+| M104: Prod 환경 점검 스크립트 | ✅ 완료 | `scripts/check_prod_readiness.py` 신설(CORS/debug/JWT/LLM/publisher 자동 검증) ✅, 테스트 5개 추가 ✅ |
+| M105: Staging Smoke Test | ✅ 완료 | `scripts/smoke_test.py` 신설(health+세션 API 자동 검증) ✅, --base-url·--json 옵션 ✅ |
+| M106: Market 서비스 유닛 테스트 | ✅ 완료 | QueryBuilder 10개·RelevanceScorer 7개·PriceAggregator 8개 = 25개 unit ✅ |
+| M107: ListingService + ProductService 통합 | ✅ 완료 | ListingService 13개·ProductService 9개 = 22개 integration ✅, LLM/Vision mock ✅ |
+| M108: 프론트엔드 테스트 인프라 + 스모크 | ✅ 완료 | vitest+@testing-library/react 설치 ✅, sessionStatusUiMap 14개·api 5개·setup 2개 = 21개 FE 테스트 ✅, CI frontend-test 추가 ✅ |
+| M109: 문서 정합화 v2 | ✅ 완료 | CLAUDE.md·milestones.md·메모리 전면 업데이트 ✅ |
+
+## CTO v6 리뷰 점수 이력
+
+| 시점 | CTO1 | CTO2 | 비고 |
+|------|------|------|------|
+| v6 리뷰 | 94 | 92 | rewrite P0, 소유권 P0, rate limit P1, broad exception P1 |
+| M100~M103 대응 | 96+ | 94+ | P0 2건 + P1 2건 전부 해소 (예상) |
 
 ## 에이전틱 점수 이력
 
