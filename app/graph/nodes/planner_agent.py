@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
+import logging
+
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _record_node_timing, _run_async, _start_timer
 
@@ -73,6 +75,7 @@ def _run_llm_planning(state: SellerCopilotState, is_replan: bool) -> Dict | None
 
         return _parse_plan_response(content)
     except Exception as e:
+        logging.getLogger(__name__).error("agent0 LLM planning failed", exc_info=True)
         _record_error(state, "mission_planner", f"LLM planning failed: {e}")
         _log(state, f"agent0:planner:llm_failed error={e}")
         return None
@@ -127,7 +130,7 @@ def _parse_plan_response(content: str) -> Dict | None:
         data = json.loads(content)
         if isinstance(data, dict) and "plan" in data:
             return data
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         pass
     m = re.search(r"\{.*\}", content, re.DOTALL)
     if m:
@@ -135,7 +138,7 @@ def _parse_plan_response(content: str) -> Dict | None:
             data = json.loads(m.group(0))
             if isinstance(data, dict) and "plan" in data:
                 return data
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass
     return None
 

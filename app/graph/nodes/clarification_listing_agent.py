@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
+import logging
+
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _run_async
 
@@ -131,6 +133,7 @@ def _generate_questions_llm(
         if isinstance(data, list) and all(isinstance(q, dict) and "question" in q for q in data):
             return data
     except Exception as e:
+        logging.getLogger(__name__).error("pre_listing_clarification LLM failed", exc_info=True)
         _record_error(state, "pre_listing_clarification", f"LLM question gen failed: {e}")
     return None
 

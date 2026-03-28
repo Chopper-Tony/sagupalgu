@@ -39,7 +39,7 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
         try:
             followup_dt = datetime.fromisoformat(followup_str)
             days_listed = max(1, (datetime.now(timezone.utc) - followup_dt).days + 7)
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     opt_call = _run_async(lambda: price_optimization_tool(

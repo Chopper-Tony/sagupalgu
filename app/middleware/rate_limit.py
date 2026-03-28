@@ -17,12 +17,14 @@ from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
-# 엔드포인트 패턴별 제한 (requests_per_minute)
+# route_group별 제한 (requests_per_minute)
 _RATE_LIMITS: dict[str, int] = {
-    "POST:/sessions/{id}/images": 5,     # 이미지 업로드
-    "POST:/sessions": 10,                # 세션 생성
-    "POST:default": 20,                  # 기타 POST
-    "GET:default": 60,                   # 기타 GET
+    "post:images": 5,       # 이미지 업로드
+    "post:sessions": 10,    # 세션 생성
+    "post:publish": 10,     # 게시 실행
+    "post:rewrite": 10,     # 재작성
+    "post:default": 20,     # 기타 POST
+    "get:default": 60,      # 기타 GET
 }
 
 # 내부 저장소: {client_key: [timestamp, ...]}
@@ -38,16 +40,28 @@ def _get_client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _get_route_group(method: str, path: str) -> str:
+    """요청 메서드+경로를 route group으로 분류.
+
+    같은 그룹 내 요청은 하나의 rate limit bucket을 공유한다.
+    """
+    if method == "POST":
+        if "/images" in path:
+            return "post:images"
+        if path.endswith("/sessions"):
+            return "post:sessions"
+        if "/publish" in path:
+            return "post:publish"
+        if "/rewrite" in path:
+            return "post:rewrite"
+        return "post:default"
+    return "get:default"
+
+
 def _get_rate_limit(method: str, path: str) -> int:
     """요청 메서드+경로에 맞는 rate limit을 반환."""
-    # 이미지 업로드
-    if method == "POST" and "/images" in path:
-        return _RATE_LIMITS["POST:/sessions/{id}/images"]
-    # 세션 생성
-    if method == "POST" and path.endswith("/sessions"):
-        return _RATE_LIMITS["POST:/sessions"]
-    # 메서드별 기본값
-    return _RATE_LIMITS.get(f"{method}:default", 60)
+    group = _get_route_group(method, path)
+    return _RATE_LIMITS.get(group, 60)
 
 
 def _is_rate_limited(client_key: str, limit: int, window: int = 60) -> tuple[bool, int]:
@@ -82,10 +96,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         client_key = _get_client_key(request)
         method = request.method
-        limit = _get_rate_limit(method, request.url.path)
+        path = request.url.path
+        route_group = _get_route_group(method, path)
+        limit = _RATE_LIMITS.get(route_group, 60)
 
         is_limited, remaining = _is_rate_limited(
-            f"{client_key}:{method}", limit,
+            f"{client_key}:{route_group}", limit,
         )
 
         if is_limited:

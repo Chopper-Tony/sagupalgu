@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 
+import logging
+
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import (
     _build_react_llm,
@@ -125,7 +127,7 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
                         elif "auto_recoverable" in parsed:
                             if parsed.get("auto_recoverable") or parsed.get("should_retry"):
                                 any_auto_recoverable = True
-                except Exception:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     pass
 
         import re
@@ -137,10 +139,11 @@ def recovery_node(state: SellerCopilotState) -> SellerCopilotState:
                 final_json = json.loads(m.group(0))
                 if final_json.get("auto_recoverable") or final_json.get("should_retry"):
                     any_auto_recoverable = True
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass
 
     except Exception as e:
+        logging.getLogger(__name__).error("agent4 ReAct recovery agent failed", exc_info=True)
         _record_error(state, "recovery_node", f"react_agent failed: {e}")
         _log(state, f"agent4:react_agent:failed error={e} → fallback to direct tool calls")
 

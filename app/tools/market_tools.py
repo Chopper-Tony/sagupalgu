@@ -53,7 +53,7 @@ async def lc_rag_price_tool(brand: str, model: str, recent_listings_json: str = 
     if recent_listings_json:
         try:
             recent_listings = json.loads(recent_listings_json)
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass
     result = await _rag_price_impl(confirmed_product, recent_listings)
     output = result.get("output", {})

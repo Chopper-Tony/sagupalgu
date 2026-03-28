@@ -142,7 +142,7 @@ def _build_react_llm():
                     api_key=settings.openai_api_key,
                     temperature=0.0,
                 )
-        except Exception:
+        except (ImportError, ValueError, RuntimeError):
             continue
     return None
 
@@ -162,7 +162,7 @@ def _extract_market_context(text: str) -> dict:
             "sample_count": int(data.get("sample_count") or 0),
             "crawler_sources": data.get("crawler_sources") or [],
         }
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         m = re.search(r"\{.*?\}", text, re.DOTALL)
         if m:
             try:
@@ -173,6 +173,6 @@ def _extract_market_context(text: str) -> dict:
                     "sample_count": int(data.get("sample_count") or 0),
                     "crawler_sources": data.get("crawler_sources") or [],
                 }
-            except Exception:
+            except (json.JSONDecodeError, ValueError, TypeError):
                 pass
     return {"median_price": None, "price_band": [], "sample_count": 0, "crawler_sources": []}
