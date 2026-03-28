@@ -26,3 +26,8 @@ class PublishResult:
 class PlatformPublisher(Protocol):
     async def publish(self, package: PlatformPackage, account: PublisherAccountContext) -> PublishResult:
         ...
+
+    @classmethod
+    def build_account_context(cls, settings: Any) -> PublisherAccountContext:
+        """플랫폼별 인증 정보를 settings에서 구성한다."""
+        ...
