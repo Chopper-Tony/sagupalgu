@@ -51,6 +51,9 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
             marketContext={session.market_context ?? null}
             criticScore={session.agent_trace?.critic_score ?? null}
             criticFeedback={session.agent_trace?.critic_feedback ?? []}
+            toolCalls={session.agent_trace?.tool_calls ?? []}
+            decisionRationale={session.agent_trace?.decision_rationale ?? []}
+            plan={session.agent_trace?.plan ?? null}
             onApprove={(platforms) => onAction("prepare_publish", platforms)}
             onRewrite={(instruction) => onAction("rewrite", instruction)}
             onDirectEdit={(edited) => onAction("direct_edit", edited)}

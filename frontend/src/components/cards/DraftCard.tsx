@@ -8,11 +8,24 @@ interface CriticFeedback {
   reason: string;
 }
 
+interface ToolCall {
+  tool_name: string;
+  success: boolean;
+}
+
+interface AgentPlan {
+  focus: string;
+  steps: string[];
+}
+
 interface DraftCardProps {
   listing: CanonicalListing;
   marketContext: MarketContext | null;
   criticScore: number | null;
   criticFeedback: CriticFeedback[];
+  toolCalls: ToolCall[];
+  decisionRationale: string[];
+  plan: AgentPlan | null;
   onApprove: (platforms: string[]) => void;
   onRewrite: (instruction: string) => void;
   onDirectEdit: (listing: CanonicalListing) => void;
@@ -30,7 +43,17 @@ const TYPE_LABEL: Record<string, string> = {
   title: "제목", description: "설명", price: "가격", trust: "신뢰도", seo: "검색 최적화", missing: "누락",
 };
 
-export function DraftCard({ listing, marketContext, criticScore, criticFeedback, onApprove, onRewrite, onDirectEdit }: DraftCardProps) {
+const TOOL_LABEL: Record<string, string> = {
+  lc_market_crawl_tool: "시세 크롤링",
+  lc_rag_price_tool: "RAG 가격 검색",
+  lc_generate_listing_tool: "판매글 생성",
+  lc_rewrite_listing_tool: "판매글 재작성",
+  lc_diagnose_publish_failure_tool: "게시 실패 진단",
+  lc_auto_patch_tool: "자동 패치",
+  lc_discord_alert_tool: "Discord 알림",
+};
+
+export function DraftCard({ listing, marketContext, criticScore, criticFeedback, toolCalls, decisionRationale, plan, onApprove, onRewrite, onDirectEdit }: DraftCardProps) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [rewriteText, setRewriteText] = useState("");
   const [showRewrite, setShowRewrite] = useState(false);
@@ -143,6 +166,48 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
             </table>
           )}
         </div>
+      )}
+
+      {(toolCalls.length > 0 || decisionRationale.length > 0 || plan) && (
+        <details className="draft-card__agent-trace">
+          <summary className="draft-card__agent-trace-title">
+            AI 의사결정 과정 ({toolCalls.length}개 도구 호출)
+          </summary>
+
+          {plan && (
+            <div className="draft-card__agent-section">
+              <p className="draft-card__agent-section-label">실행 전략</p>
+              <p className="draft-card__agent-plan-focus">{plan.focus}</p>
+              {plan.steps?.length > 0 && (
+                <ol className="draft-card__agent-plan-steps">
+                  {plan.steps.map((step, i) => <li key={i}>{step}</li>)}
+                </ol>
+              )}
+            </div>
+          )}
+
+          {toolCalls.length > 0 && (
+            <div className="draft-card__agent-section">
+              <p className="draft-card__agent-section-label">도구 호출 이력</p>
+              <div className="draft-card__agent-tools">
+                {toolCalls.map((tc, i) => (
+                  <span key={i} className={`draft-card__agent-tool ${tc.success ? "draft-card__agent-tool--ok" : "draft-card__agent-tool--fail"}`}>
+                    {tc.success ? "✓" : "✗"} {TOOL_LABEL[tc.tool_name] ?? tc.tool_name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {decisionRationale.length > 0 && (
+            <div className="draft-card__agent-section">
+              <p className="draft-card__agent-section-label">의사결정 근거</p>
+              <ul className="draft-card__agent-rationale">
+                {decisionRationale.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          )}
+        </details>
       )}
 
       <div className="draft-card__platforms">

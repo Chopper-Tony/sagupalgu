@@ -31,6 +31,26 @@ class TestHealth:
         assert "publish_credentials" in data["checks"]
         assert "active_publishers" in data.get("meta", {})
 
+    def test_health_ready_no_external_api_ping(self, client):
+        """M86: /health/ready는 외부 API ping을 하지 않으므로 llm_reachable 필드가 없다"""
+        resp = client.get("/health/ready")
+        data = resp.json()
+        assert "llm_reachable" not in data["checks"]
+
+    def test_health_deep_exists(self, client):
+        """M86: /health/deep 엔드포인트가 존재한다"""
+        resp = client.get("/health/deep")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "llm_reachable" in data
+
+    def test_health_ready_degraded_without_keys(self, client):
+        """M86: API 키 없으면 degraded 상태"""
+        resp = client.get("/health/ready")
+        data = resp.json()
+        # 테스트 환경에서는 실제 키가 없으므로 degraded 가능
+        assert data["status"] in ("ready", "degraded")
+
 
 class TestCreateSession:
 

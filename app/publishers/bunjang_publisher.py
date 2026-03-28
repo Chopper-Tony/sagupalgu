@@ -46,7 +46,7 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
         if ok:
             logger.info("[번개장터] 대분류 '기타' 선택 성공")
             return
-        logger.warning("[번개장터] 대분류 '기타' 선택 실패, 카테고리 선택 건너뜀")
+        raise Exception(f"번개장터 카테고리 선택 실패: '{category_str}' → '기타' 선택 불가")
 
     async def publish(self, package: ListingPackage) -> PublishResult:
         page = await self.new_page()

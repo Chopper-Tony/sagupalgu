@@ -57,7 +57,7 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
 - `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 508개 (unit ~300 + integration ~120 + E2E 3 + sync 5)
+- `tests/` — 555개 (unit ~320 + integration ~140 + E2E 3 + sync 5)
 
 ## 핵심 코딩 규칙
 
@@ -97,15 +97,11 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 ## 최근 변경 (이번 세션)
 
-- **M77**: rewrite 회귀 봉합 — ReAct 실패 시 fallback rewrite 재시도 추가, 회귀 방지 테스트
-- Vision AI 프롬프트 개선 — 30종 카테고리 예시, 오인식 방지 지시, 한국어 대응
-- 번개장터 수수료: +10,000원 고정 → ×1.035 (실 수수료율 3.5%)
-- 게시 후 대기: 30초 → 5초 (자동 게시에 불필요한 대기 제거)
-- DraftCard AI 품질 평가: 표(table) 형식으로 개선
-- 게시 완료 카드 중복 표시 버그 수정
-- CLAUDE.md: 공식 가이드 기반 재구성 (1300줄 → 100줄, `.claude/rules/` 분할)
-- 발표 자료 (presentation.html, reveal.js 18 슬라이드)
+- **M84**: Rewrite fallback 설계 결함 봉합 — fallback 중복 호출 제거, 규칙 기반 rewrite 최후 수단, 경고 로그
+- **M85**: 전달물 위생 스크립트 — `scripts/build_archive.py` + `.archiveignore` (clean archive 생성)
+- **M86**: Readiness 프로브 경량화 — 외부 API ping 제거, `/health/deep` 분리
+- **M87**: Settings import-time 초기화 제거 — `_SettingsProxy` lazy 프록시, security.py lazy Fernet
 
 ## 마일스톤 이력
 
-77+ 마일스톤 완료. 상세: @docs/milestones.md
+87+ 마일스톤 완료. 상세: @docs/milestones.md

@@ -96,6 +96,77 @@ class TestCopywritingAgent:
         assert result["canonical_listing"] is not None
         assert result["status"] == "draft_generated"
 
+    def test_rewrite_2단_fallback_실패시_규칙기반_반영(self, base_state):
+        """M84: ReAct 실패 + ListingService 실패 시에도 rewrite_instruction이 규칙 기반으로 반영된다"""
+        from app.graph.seller_copilot_nodes import copywriting_node
+
+        existing_listing = {**base_state["canonical_listing"], "title": "기존 제목", "description": "기존 설명"}
+        state = {
+            **base_state,
+            "canonical_listing": existing_listing,
+            "rewrite_instruction": "가격을 500,000원으로 낮춰주세요",
+        }
+
+        # ReAct + ListingService 모두 실패
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
+            with patch("app.services.listing_service.ListingService") as MockSvc:
+                MockSvc.return_value.rewrite_listing = AsyncMock(side_effect=Exception("서비스 장애"))
+                result = copywriting_node(state)
+
+        listing = result["canonical_listing"]
+        # 규칙 기반으로 가격이 변경되어야 함
+        assert listing["price"] == 500000
+        # rewrite_instruction이 description에 반영되어야 함
+        assert "500,000원" in listing["description"]
+        # 소비됨
+        assert result["rewrite_instruction"] is None
+
+    def test_rewrite_fallback_중복호출_방지(self, base_state):
+        """M84: _run_copywriting_agent는 None만 반환, fallback은 copywriting_node에서만 호출"""
+        from app.graph.nodes.copywriting_agent import _run_copywriting_agent
+
+        state = {**base_state, "rewrite_instruction": "수정해줘"}
+
+        # ReAct 실패 시 None 반환 (내부에서 fallback 호출하지 않음)
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
+            result = _run_copywriting_agent(
+                state, state["confirmed_product"], {}, {}, [], "수정해줘"
+            )
+
+        assert result is None
+
+    def test_rewrite_instruction_lost_경고_로그(self, base_state):
+        """M84: rewrite_instruction이 있는데 canonical_listing도 없이 template으로 빠지면 경고 로그"""
+        from app.graph.seller_copilot_nodes import copywriting_node
+
+        state = {**base_state, "canonical_listing": None, "rewrite_instruction": "수정해줘"}
+
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
+            with patch("app.services.listing_service.ListingService") as MockSvc:
+                MockSvc.return_value.build_canonical_listing = AsyncMock(side_effect=Exception("장애"))
+                result = copywriting_node(state)
+
+        # template이 생성되어야 함
+        assert result["canonical_listing"] is not None
+        assert result["status"] == "draft_generated"
+        # 경고 로그가 기록되어야 함
+        logs = " ".join(result.get("debug_logs") or [])
+        assert "rewrite_instruction_lost" in logs
+
+    def test_apply_rewrite_instruction_rule_based(self, base_state):
+        """M84: 규칙 기반 재작성 함수 단위 테스트"""
+        from app.graph.nodes.copywriting_agent import _apply_rewrite_instruction_rule_based
+
+        existing = {**base_state["canonical_listing"], "description": "좋은 상품입니다"}
+        product = base_state["confirmed_product"]
+        strategy = base_state["strategy"]
+
+        result = _apply_rewrite_instruction_rule_based(
+            existing, "가격을 300,000원으로 인하해주세요", product, strategy,
+        )
+        assert result["price"] == 300000
+        assert "300,000원" in result["description"]
+
 
 # ─────────────────────────────────────────────────────────────────
 # 에이전트 4: 검증 — retry 루프

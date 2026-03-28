@@ -59,6 +59,8 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
         state["canonical_listing"] = new_listing
         state["rewrite_instruction"] = None
     elif not state.get("canonical_listing"):
+        if rewrite_instruction:
+            _log(state, f"agent3:warning:rewrite_instruction_lost instruction={rewrite_instruction[:50]}")
         state["canonical_listing"] = _build_template_listing(product, strategy, market_context, state)
 
     state["checkpoint"] = "B_draft_complete"
@@ -117,8 +119,8 @@ def _run_copywriting_agent(
 
     except Exception as e:
         _record_error(state, "copywriting_node", f"react_agent failed: {e}")
-        _log(state, f"agent3:react_agent:failed error={e} → fallback to direct service call")
-        return _fallback_generate(state, product, market_context, strategy, image_paths, rewrite_instruction)
+        _log(state, f"agent3:react_agent:failed error={e} → returning None for node-level fallback")
+        return None
 
 
 def _fallback_generate(
@@ -157,8 +159,54 @@ def _fallback_generate(
         return listing
     except Exception as e2:
         _record_error(state, "copywriting_node", f"fallback failed: {e2}")
+        # rewrite_instruction이 있는데 template로 빠지면 사용자 요청 소실
+        # → 기존 listing에 규칙 기반 반영 시도
+        existing = state.get("canonical_listing")
+        if rewrite_instruction and existing:
+            _log(state, f"agent3:fallback:failed → rule_based_rewrite instruction={rewrite_instruction[:50]}")
+            return _apply_rewrite_instruction_rule_based(existing, rewrite_instruction, product, strategy)
+        if rewrite_instruction and not existing:
+            _log(state, f"agent3:warning:rewrite_instruction_lost instruction={rewrite_instruction[:50]}")
         _log(state, f"agent3:fallback:failed error={e2} → template")
         return _build_template_listing(product, strategy, market_context, state)
+
+
+# ── 규칙 기반 재작성 (LLM 완전 실패 시 최후 수단) ─────────────────
+
+
+def _apply_rewrite_instruction_rule_based(
+    existing: Dict, instruction: str, product: Dict, strategy: Dict,
+) -> Dict:
+    """LLM/서비스 모두 실패 시 rewrite_instruction을 규칙 기반으로 기존 listing에 반영.
+
+    가격 변경 지시 → 가격 필드 직접 수정
+    설명 추가/수정 지시 → description에 append
+    그 외 → description 끝에 지시 내용 반영
+    """
+    patched = dict(existing)
+    lower = instruction.lower()
+
+    # 가격 관련 지시: 숫자 추출 시도
+    import re as _re
+    price_match = _re.search(r'(\d[\d,]*)\s*원', instruction)
+    if price_match and any(kw in lower for kw in ("가격", "원으로", "인하", "인상", "할인")):
+        new_price = int(price_match.group(1).replace(",", ""))
+        if new_price > 0:
+            patched["price"] = new_price
+
+    # 설명 관련 지시
+    desc = patched.get("description") or ""
+    patched["description"] = f"{desc}\n\n[판매자 수정] {instruction}".strip()
+
+    # 최소 필수 키 보장
+    patched.setdefault("title", f"{product.get('model', '상품')} 판매합니다")
+    patched.setdefault("price", _safe_int(strategy.get("recommended_price"), 0))
+    patched.setdefault("tags", [product.get("model", "상품")])
+    patched.setdefault("images", [])
+    patched.setdefault("product", product)
+    patched.setdefault("strategy", strategy.get("goal", "fast_sell"))
+
+    return patched
 
 
 # ── 프롬프트 빌드 ────────────────────────────────────────────────
