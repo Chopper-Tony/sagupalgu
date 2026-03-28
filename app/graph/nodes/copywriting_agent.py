@@ -58,9 +58,15 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
         new_listing = _normalize_listing(new_listing, product, strategy, image_paths)
         state["canonical_listing"] = new_listing
         state["rewrite_instruction"] = None
+    elif rewrite_instruction and state.get("canonical_listing"):
+        # 정책: rewrite 상황에서 모든 fallback 실패 시 기존 listing 유지 + 지시사항 반영
+        # template 신규 생성 절대 금지 (CTO P0: rewrite 결과가 template에 밀리는 것 방지)
+        existing = dict(state["canonical_listing"])
+        existing["description"] = f"{existing.get('description', '')}\n\n[판매자 수정 요청] {rewrite_instruction}".strip()
+        state["canonical_listing"] = existing
+        state["rewrite_instruction"] = None
+        _log(state, f"agent3:rewrite_all_failed → preserving existing listing + instruction appended")
     elif not state.get("canonical_listing"):
-        if rewrite_instruction:
-            _log(state, f"agent3:warning:rewrite_instruction_lost instruction={rewrite_instruction[:50]}")
         state["canonical_listing"] = _build_template_listing(product, strategy, market_context, state)
 
     state["checkpoint"] = "B_draft_complete"
