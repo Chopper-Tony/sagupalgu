@@ -351,24 +351,33 @@ class TestRecoveryNodeDiagnosis:
             "patch_suggestions": [],
         }
 
-        # recovery_node 내부에서 lazy import하므로 agentic_tools 모듈을 패치
-        with patch(
-            "app.graph.nodes.helpers._build_react_llm", return_value=None
-        ), patch(
-            "app.tools.recovery_tools.diagnose_publish_failure_tool",
-            return_value=mock_diag,
-        ), patch(
-            "app.tools.recovery_tools.auto_patch_tool",
-            new_callable=AsyncMock,
-            return_value=mock_patch,
-        ), patch(
-            "app.tools.recovery_tools.discord_alert_tool",
-            new_callable=AsyncMock,
+        # ReAct 경로를 강제 실패시켜 fallback 경로로 보냄
+        # fallback에서 lazy import되는 도구들을 mock
+        mock_diag_fn = MagicMock(return_value=mock_diag)
+        mock_patch_fn = MagicMock(return_value=mock_patch)
+        mock_discord_fn = MagicMock(
             return_value={"tool_name": "discord_alert_tool", "success": True},
+        )
+
+        with patch(
+            "app.graph.nodes.recovery_agent._build_react_llm",
+            side_effect=ValueError("LLM 없음 — 강제 fallback"),
+        ), patch(
+            "app.graph.nodes.recovery_agent._run_async",
+            side_effect=lambda fn: fn() if callable(fn) else fn,
+        ), patch(
+            "app.tools.agentic_tools.diagnose_publish_failure_tool",
+            mock_diag_fn,
+        ), patch(
+            "app.tools.agentic_tools.auto_patch_tool",
+            mock_patch_fn,
+        ), patch(
+            "app.tools.agentic_tools.discord_alert_tool",
+            mock_discord_fn,
         ):
             result_state = recovery_node(state)
 
-        # publish_diagnostics가 아닌 patch_suggestions와 should_retry_publish로 결과 확인
+        # fallback에서 diagnose → auto_recoverable=True → should_retry_publish=True
         assert result_state.get("should_retry_publish") is True
         assert result_state.get("patch_suggestions") is not None
         assert len(result_state["patch_suggestions"]) > 0
