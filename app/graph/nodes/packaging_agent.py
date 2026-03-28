@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import logging
+
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _log, _record_error, _run_async, _safe_int
 
@@ -85,6 +87,7 @@ def publish_node(state: SellerCopilotState) -> SellerCopilotState:
             else:
                 _log(state, f"publish_node:failed platform={platform} error={result.error_message}")
         except Exception as e:
+            logging.getLogger(__name__).error("publish_node %s failed", platform, exc_info=True)
             _record_error(state, "publish_node", f"{platform}: {e}")
             publish_results[platform] = {
                 "success": False,

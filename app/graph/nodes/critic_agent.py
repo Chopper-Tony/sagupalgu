@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 from typing import Dict
 
+import logging
+
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _record_node_timing, _run_async, _safe_int, _start_timer
 
@@ -99,6 +101,7 @@ def _run_llm_critique(
         return _parse_critique_response(content)
 
     except Exception as e:
+        logging.getLogger(__name__).error("agent6 LLM critique failed", exc_info=True)
         _record_error(state, "listing_critic", f"LLM critique failed: {e}")
         _log(state, f"agent6:critic:llm_failed error={e} → rule fallback")
         return None
@@ -163,7 +166,7 @@ def _parse_critique_response(content: str) -> Dict | None:
         data = json.loads(content)
         if isinstance(data, dict) and "score" in data:
             return data
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         pass
     m = re.search(r"\{.*\}", content, re.DOTALL)
     if m:
@@ -171,7 +174,7 @@ def _parse_critique_response(content: str) -> Dict | None:
             data = json.loads(m.group(0))
             if isinstance(data, dict) and "score" in data:
                 return data
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass
     return None
 

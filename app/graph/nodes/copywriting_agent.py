@@ -16,6 +16,8 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+import logging
+
 from app.graph.seller_copilot_state import CanonicalListing, SellerCopilotState
 from app.graph.nodes.helpers import (
     _build_react_llm,
@@ -124,6 +126,7 @@ def _run_copywriting_agent(
         return _extract_listing_payload(result, state)
 
     except Exception as e:
+        logging.getLogger(__name__).error("agent3 ReAct agent failed", exc_info=True)
         _record_error(state, "copywriting_node", f"react_agent failed: {e}")
         _log(state, f"agent3:react_agent:failed error={e} → returning None for node-level fallback")
         return None
@@ -164,6 +167,7 @@ def _fallback_generate(
         _log(state, "agent3:fallback:direct_service_call:success")
         return listing
     except Exception as e2:
+        logging.getLogger(__name__).error("agent3 fallback generate failed", exc_info=True)
         _record_error(state, "copywriting_node", f"fallback failed: {e2}")
         # rewrite_instruction이 있는데 template로 빠지면 사용자 요청 소실
         # → 기존 listing에 규칙 기반 반영 시도

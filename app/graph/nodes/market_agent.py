@@ -7,6 +7,8 @@ Agent 2 — 시세·가격 전략 에이전트 (ReAct)
 """
 from __future__ import annotations
 
+import logging
+
 from app.graph.seller_copilot_state import MarketContext, PricingStrategy, SellerCopilotState
 from app.graph.nodes.helpers import (
     _build_react_llm,
@@ -96,6 +98,7 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         market_context_result = _extract_market_context(final_content)
 
     except Exception as e:
+        logging.getLogger(__name__).error("agent2 ReAct agent failed", exc_info=True)
         _record_error(state, "market_intelligence_node", f"react_agent failed: {e}")
         _log(state, f"agent2:react_agent:failed error={e} → fallback to direct tool call")
 
