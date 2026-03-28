@@ -133,6 +133,14 @@
 | M89: CORS 환경별 제한 | ✅ 완료 | `config.py` allowed_origins 기본값 `"*"` → `"http://localhost:3000,http://localhost:5173"` ✅, `main.py` allow_methods `["*"]` → 명시적 열거 ✅, 577 테스트 통과 ✅ |
 | M90: Broad Exception 세분화 | ✅ 완료 | SSE stream except에 로깅 추가 ✅, health/ready supabase except 로깅 ✅, platform_auth 4곳 로깅 확인 ✅, pgvector 5곳 로깅 확인 ✅, 577 테스트 통과 ✅ |
 | M91: Rate Limiting 기본 도입 | ✅ 완료 | `app/middleware/rate_limit.py` 신설(in-memory sliding window·이미지 5/min·POST 20/min·GET 60/min) ✅, RateLimitMiddleware main.py 등록 ✅, 429 응답·X-RateLimit 헤더 ✅, 테스트 7개 추가 ✅, 577 테스트 통과 ✅ |
+| M92: pgvector + RAG 실사용 검증 | ✅ 완료 | 벡터검색→키워드→빈결과 3경로 통합 테스트 ✅, RAG 파이프라인 fallback 체인 검증 ✅, insert/readiness 테스트 ✅, 테스트 11개 추가 ✅, 613 테스트 통과 ✅ |
+| M93: Supabase Storage E2E | ✅ 완료 | `USE_CLOUD_STORAGE` feature flag 추가 ✅, flag on→storage_client·off→로컬·실패 시 fallback ✅, 테스트 4개 추가 ✅, 613 테스트 통과 ✅ |
+| M94: Publish Spine 정리 | ✅ 완료 | `PlatformPublisher.build_account_context` classmethod 추가 ✅, 각 publisher에 구현·PublishService if/elif→registry 위임 ✅, 테스트 7개 추가 ✅, 613 테스트 통과 ✅ |
+| M95: 에러 복구 E2E 시나리오 | ✅ 완료 | 게시 실패→recovery→재시도 성공 ✅, 3회 연속 실패→Discord alert ✅, classify_error 8종 분류 ✅, recovery_node mock 진단 ✅, 테스트 14개 추가 ✅, 613 테스트 통과 ✅ |
+| M96: SessionService 3차 절개 | ✅ 완료 | `publish_orchestrator.py` 신설(게시 준비·실행·복구·Discord) ✅, `sale_tracker.py` 신설(판매 상태+최적화) ✅, SessionService 449줄→338줄 ✅, DI 체인 업데이트 ✅, 613 테스트 통과 ✅ |
+| M97: 당근마켓 안정화 | ⏸️ 보류 | Android 에뮬레이터/실기기 필요 — 하드웨어 미보유로 보류 |
+| M98: Coverage 리포트 CI 연동 | ✅ 완료 | ci.yml `--cov=app --cov-report=term-missing` 추가 ✅, coverage HTML artifact 업로드(7일) ✅, `pytest-cov>=5.0.0` 추가 ✅ |
+| M99: 문서 정합화 | ✅ 완료 | CLAUDE.md·milestones.md·메모리 전면 업데이트 ✅, 테스트 수·아키텍처·최근 변경 정합화 ✅ |
 
 ## 에이전틱 점수 이력
 

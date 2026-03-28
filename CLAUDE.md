@@ -37,7 +37,7 @@ cd frontend && npm install && npm run dev
 # Docker 풀스택
 docker compose up --build
 
-# 테스트 (577개)
+# 테스트 (613개)
 python -m pytest tests/           # 전체
 python -m pytest tests/ -m unit   # unit만 (0.5초)
 ```
@@ -57,7 +57,7 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
 - `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 577개 (unit ~340 + integration ~140 + E2E 3 + sync 5)
+- `tests/` — 613개 (unit ~350 + integration ~160 + E2E 3 + sync 5)
 
 ## 핵심 코딩 규칙
 
@@ -81,7 +81,7 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 **Production Path**: SessionService/SellerCopilotService 하이브리드 오케스트레이션.
 서비스가 상품 식별·시세 분석 선처리, LangGraph는 가격 전략→카피→비평→검증→패키징 담당.
-게시·복구·최적화는 SessionService가 노드 함수 직접 호출.
+게시·복구는 PublishOrchestrator, 판매 후 최적화는 SaleTracker가 담당.
 
 ## 프론트엔드
 
@@ -100,11 +100,12 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 ## 최근 변경 (이번 세션)
 
-- **M88**: 인증 기반 — JWT 검증 + `get_current_user()` DI, temp-user-id 제거, dev bypass
-- **M89**: CORS 환경별 제한 — `allowed_origins` 기본값 localhost, `allow_methods` 명시
-- **M90**: Broad Exception 세분화 — SSE/health/publisher 로깅 보강
-- **M91**: Rate Limiting — in-memory sliding window, 이미지 5/min, POST 20/min
+- **M84~M87** (Phase 0): Rewrite fallback 봉합, 전달물 위생, Readiness 경량화, Settings lazy
+- **M88~M91** (Phase 1): JWT 인증, CORS 제한, Broad Exception 세분화, Rate Limiting
+- **M92~M95** (Phase 2): pgvector RAG 검증, Supabase Storage E2E, Publish Spine 정리, 복구 E2E
+- **M96** (Phase 3): SessionService 3차 절개 — PublishOrchestrator + SaleTracker 분리
+- **M98** (Phase 3): Coverage 리포트 CI 연동
 
 ## 마일스톤 이력
 
-91+ 마일스톤 완료. 상세: @docs/milestones.md
+98+ 마일스톤 완료. 상세: @docs/milestones.md
