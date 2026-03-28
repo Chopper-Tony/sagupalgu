@@ -34,6 +34,20 @@ class SessionRepository:
         data = response.data or []
         return data[0] if data else None
 
+    def get_by_id_and_user(self, session_id: str, user_id: str):
+        """세션 ID + 소유자 ID로 조회. 소유권 불일치 시 None 반환."""
+        response = (
+            get_supabase()
+            .table(self.table_name)
+            .select("*")
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        data = response.data or []
+        return data[0] if data else None
+
     def update(self, session_id: str, payload: dict, expected_status: str | None = None):
         payload["updated_at"] = datetime.now(timezone.utc).isoformat()
         query = (

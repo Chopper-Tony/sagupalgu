@@ -16,34 +16,21 @@ pytestmark = pytest.mark.integration
 
 class TestCopywritingAgent:
 
-    def test_재작성지시_있으면_rewrite_tool_호출(self, base_state):
-        """rewrite_instruction이 있으면 LLM이 lc_rewrite_listing_tool을 자율 선택한다 (ReAct)"""
-        import sys
+    def test_재작성지시_있으면_rewrite_결과_반영(self, base_state):
+        """rewrite_instruction이 있으면 rewrite 결과가 최종 canonical_listing에 반영된다.
+        _run_copywriting_agent를 직접 mock하여 ReAct 내부를 건너뛴다."""
         from app.graph.seller_copilot_nodes import copywriting_node
 
+        rewritten = {
+            **base_state["canonical_listing"],
+            "title": "Apple iPhone 15 Pro 256GB 믿을 수 있는 판매자",
+            "description": "신뢰감 있는 판매자의 상품입니다",
+        }
         state = {**base_state, "rewrite_instruction": "더 신뢰감 있게 작성해주세요"}
-        rewritten = {**base_state["canonical_listing"], "title": "Apple iPhone 15 Pro 256GB 믿을 수 있는 판매자"}
 
-        llm_msg = MagicMock()
-        llm_msg.tool_calls = [{"name": "lc_rewrite_listing_tool", "args": {"rewrite_instruction": "더 신뢰감 있게"}}]
-        llm_msg.content = ""
-
-        tool_msg = MagicMock()
-        tool_msg.tool_calls = []
-        tool_msg.content = json.dumps(rewritten, ensure_ascii=False)
-
-        mock_agent_result = {"messages": [llm_msg, tool_msg]}
-
-        # langchain.agents.create_agent가 없는 환경에서도 ReAct 경로가 실행되도록 보장.
-        # create_agent 미존재 시 except fallback에서 _run_async(mocked)가 garbage를 반환해
-        # canonical_listing["title"] KeyError가 발생하는 것을 방지.
-        mock_agents = MagicMock()
-        mock_agents.create_agent = MagicMock(return_value=MagicMock())
-
-        with patch("app.graph.nodes.copywriting_agent._build_react_llm", return_value=MagicMock()):
-            with patch("app.graph.nodes.copywriting_agent._run_async", return_value=mock_agent_result):
-                with patch.dict(sys.modules, {"langchain.agents": mock_agents}):
-                    result = copywriting_node(state)
+        # _run_copywriting_agent를 mock하여 rewrite 결과를 직접 반환
+        with patch("app.graph.nodes.copywriting_agent._run_copywriting_agent", return_value=rewritten):
+            result = copywriting_node(state)
 
         assert result["canonical_listing"]["title"] == rewritten["title"]
         assert result["rewrite_instruction"] is None

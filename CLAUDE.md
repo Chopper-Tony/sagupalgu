@@ -76,7 +76,7 @@ cd frontend && npm test
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
 - **Agent trace**: tool_calls·critic_score 등 그래프→서비스→DB→UI 보존 필수
-- **인증**: `app/core/auth.py` JWT 검증 + 전 엔드포인트 소유권 검증, local/dev X-Dev-User-Id bypass
+- **인증**: `app/core/auth.py` JWT 검증 + 전 엔드포인트(SSE 포함) 소유권 검증, DB 레벨 user_id 필터
 - **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window, 경로 그룹별 bucket
 - **Rewrite 정책**: rewrite_instruction 있으면 template 신규 생성 금지, 기존 listing 유지
 
@@ -114,6 +114,9 @@ cd frontend && npm test
 - **M106** (Phase D): Market 서비스 유닛 테스트 — QueryBuilder/RelevanceScorer/PriceAggregator 25개
 - **M107** (Phase D): ListingService + ProductService 통합 테스트 22개
 - **M108** (Phase D): 프론트엔드 테스트 인프라 — vitest + 21개 스모크 테스트
+- **M110** (Phase A): SSE stream 소유권 + rewrite 테스트 mock 강화
+- **M111** (Phase A): SessionRepository DB 레벨 소유권 (get_by_id_and_user)
+- **M112** (Phase A): Rate Limit 경로 그룹별 bucket (이미 적용 확인)
 
 ## 마일스톤 이력
 
