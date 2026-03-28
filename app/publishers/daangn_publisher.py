@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 class DaangnPublisher(PlatformPublisher):
+    @classmethod
+    def build_account_context(cls, settings) -> PublisherAccountContext:
+        return PublisherAccountContext(
+            platform_account_id="env-daangn",
+            platform="daangn",
+            auth_type="device",
+            secret_payload={
+                "device_id": getattr(settings, "daangn_device_id", "") or "",
+            },
+        )
+
     async def publish(
         self, package: PlatformPackage, account: PublisherAccountContext,
     ) -> PublishResult:
