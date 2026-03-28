@@ -54,9 +54,10 @@ async def create_session(
 @router.get("/{session_id}", response_model=SessionDetailResponse)
 async def get_session(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
-    result = await session_service.get_session(session_id)
+    result = await session_service.get_session(session_id, user_id=user.user_id)
     return SessionDetailResponse(**result)
 
 
@@ -64,6 +65,7 @@ async def get_session(
 async def stream_session(
     session_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     """SSE 스트림으로 세션 상태 변경을 실시간 전송한다.
@@ -129,6 +131,7 @@ _MAX_FILE_COUNT = 10
 async def upload_images(
     session_id: str,
     files: List[UploadFile] = File(..., description="업로드할 이미지 파일"),
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     if len(files) > _MAX_FILE_COUNT:
@@ -179,7 +182,7 @@ async def upload_images(
             image_urls.append(f"/uploads/{session_id}/{filename}")
 
     result = await session_service.attach_images(
-        session_id=session_id, image_urls=image_urls,
+        session_id=session_id, image_urls=image_urls, user_id=user.user_id,
     )
     return UploadImagesResponse(**result)
 
@@ -187,9 +190,10 @@ async def upload_images(
 @router.post("/{session_id}/analyze", response_model=AnalyzeSessionResponse)
 async def analyze_session(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
-    result = await session_service.analyze_session(session_id=session_id)
+    result = await session_service.analyze_session(session_id=session_id, user_id=user.user_id)
     return AnalyzeSessionResponse(**result)
 
 
@@ -197,10 +201,11 @@ async def analyze_session(
 async def confirm_product(
     session_id: str,
     request: ConfirmProductRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     result = await session_service.confirm_product(
-        session_id=session_id, candidate_index=request.candidate_index,
+        session_id=session_id, candidate_index=request.candidate_index, user_id=user.user_id,
     )
     return ConfirmProductResponse(**result)
 
@@ -209,11 +214,12 @@ async def confirm_product(
 async def provide_product_info(
     session_id: str,
     request: ProvideProductInfoRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     result = await session_service.provide_product_info(
         session_id=session_id, model=request.model,
-        brand=request.brand, category=request.category,
+        brand=request.brand, category=request.category, user_id=user.user_id,
     )
     return ProvideProductInfoResponse(**result)
 
@@ -221,9 +227,10 @@ async def provide_product_info(
 @router.post("/{session_id}/generate-listing", response_model=GenerateListingResponse)
 async def generate_listing(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
-    result = await session_service.generate_listing(session_id=session_id)
+    result = await session_service.generate_listing(session_id=session_id, user_id=user.user_id)
     return GenerateListingResponse(**result)
 
 
@@ -231,10 +238,11 @@ async def generate_listing(
 async def prepare_publish(
     session_id: str,
     request: PreparePublishRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     result = await session_service.prepare_publish(
-        session_id=session_id, platform_targets=request.platform_targets,
+        session_id=session_id, platform_targets=request.platform_targets, user_id=user.user_id,
     )
     return PreparePublishResponse(**result)
 
@@ -242,9 +250,10 @@ async def prepare_publish(
 @router.post("/{session_id}/publish", response_model=PublishResponse)
 async def publish_session(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
-    result = await session_service.publish_session(session_id=session_id)
+    result = await session_service.publish_session(session_id=session_id, user_id=user.user_id)
     return PublishResponse(**result)
 
 
@@ -252,10 +261,11 @@ async def publish_session(
 async def rewrite_listing(
     session_id: str,
     request: RewriteListingRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     result = await session_service.rewrite_listing(
-        session_id=session_id, instruction=request.instruction,
+        session_id=session_id, instruction=request.instruction, user_id=user.user_id,
     )
     return RewriteListingResponse(**result)
 
@@ -264,12 +274,13 @@ async def rewrite_listing(
 async def update_listing(
     session_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     """사용자가 직접 수정한 판매글을 DB에 반영한다."""
     body = await request.json()
     result = await session_service.update_listing(
-        session_id=session_id, updated_listing=body,
+        session_id=session_id, updated_listing=body, user_id=user.user_id,
     )
     return result
 
@@ -277,10 +288,11 @@ async def update_listing(
 @router.post("/{session_id}/seller-tips")
 async def get_seller_tips(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     """판매 팁 생성 — AI가 현재 판매글을 분석하여 가격·사진·제목 개선 팁을 제공한다."""
-    session = await session_service.get_session(session_id)
+    session = await session_service.get_session(session_id, user_id=user.user_id)
     listing = session.get("canonical_listing") or {}
     market = session.get("market_context") or {}
     trace = session.get("agent_trace") or {}
@@ -344,10 +356,11 @@ async def get_seller_tips(
 @router.post("/{session_id}/buyer-analysis")
 async def buyer_price_analysis(
     session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     """구매자 관점 가격 분석 — 이 가격이 적정한지, 협상 여지가 있는지 AI가 분석한다."""
-    session = await session_service.get_session(session_id)
+    session = await session_service.get_session(session_id, user_id=user.user_id)
     listing = session.get("canonical_listing") or {}
     market = session.get("market_context") or {}
 
@@ -404,9 +417,10 @@ async def buyer_price_analysis(
 async def update_sale_status(
     session_id: str,
     request: SaleStatusRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
     result = await session_service.update_sale_status(
-        session_id=session_id, sale_status=request.sale_status,
+        session_id=session_id, sale_status=request.sale_status, user_id=user.user_id,
     )
     return SaleStatusResponse(**result)

@@ -67,9 +67,10 @@ class TestConfirmProduct:
     def test_default_candidate_index_is_zero(self, client, mock_svc):
         resp = client.post(f"{BASE}/sess-001/confirm-product", json={})
         assert resp.status_code == 200
-        mock_svc.confirm_product.assert_called_once_with(
-            session_id="sess-001", candidate_index=0
-        )
+        mock_svc.confirm_product.assert_called_once()
+        call_kwargs = mock_svc.confirm_product.call_args.kwargs
+        assert call_kwargs["session_id"] == "sess-001"
+        assert call_kwargs["candidate_index"] == 0
 
     @pytest.mark.integration
     def test_invalid_transition_maps_to_409(self, client, mock_svc):

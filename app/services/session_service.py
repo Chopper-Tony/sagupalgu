@@ -62,13 +62,13 @@ class SessionService:
         session = self.repo.create(user_id=user_id)
         return build_session_ui_response(session.to_record())
 
-    async def get_session(self, session_id: str) -> dict[str, Any]:
-        return build_session_ui_response(self._get_or_raise(session_id))
+    async def get_session(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
+        return build_session_ui_response(self._get_or_raise(session_id, user_id))
 
     # ── 이미지 업로드 ──────────────────────────────────────────────
 
-    async def attach_images(self, session_id: str, image_urls: list[str]) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "images_uploaded")
+    async def attach_images(self, session_id: str, image_urls: list[str], user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "images_uploaded", user_id)
         product_data = dict(session.get("product_data_jsonb") or {})
         attach_image_paths(product_data, image_urls)
         return self._persist_and_respond(
@@ -79,8 +79,8 @@ class SessionService:
 
     # ── 상품 분석 ──────────────────────────────────────────────────
 
-    async def analyze_session(self, session_id: str) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "awaiting_product_confirmation")
+    async def analyze_session(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "awaiting_product_confirmation", user_id)
 
         product_data = dict(session.get("product_data_jsonb") or {})
         image_paths = product_data.get("image_paths") or []
@@ -103,8 +103,8 @@ class SessionService:
 
     # ── 상품 확정 ──────────────────────────────────────────────────
 
-    async def confirm_product(self, session_id: str, candidate_index: int) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "product_confirmed")
+    async def confirm_product(self, session_id: str, candidate_index: int, user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "product_confirmed", user_id)
         product_data = dict(session.get("product_data_jsonb") or {})
         confirm_from_candidate(product_data, candidate_index)
 
@@ -120,8 +120,9 @@ class SessionService:
     async def provide_product_info(
         self, session_id: str, model: str,
         brand: str | None = None, category: str | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "product_confirmed")
+        session = self._ensure_transition(session_id, "product_confirmed", user_id)
         product_data = dict(session.get("product_data_jsonb") or {})
         confirm_from_user_input(product_data, model, brand, category)
 
@@ -136,8 +137,8 @@ class SessionService:
 
     # ── 판매글 생성 / 재작성 ────────────────────────────────────────
 
-    async def generate_listing(self, session_id: str) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "draft_generated")
+    async def generate_listing(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "draft_generated", user_id)
         current_status = session["status"]
 
         result_payload = await self.copilot_service.run_listing_pipeline(
@@ -212,8 +213,8 @@ class SessionService:
         logger.info("fallback_template_used title=%s price=%s", template.get("title"), template.get("price"))
         return listing_data
 
-    async def rewrite_listing(self, session_id: str, instruction: str) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "draft_generated")
+    async def rewrite_listing(self, session_id: str, instruction: str, user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "draft_generated", user_id)
         current_status = session["status"]
         if not instruction or not instruction.strip():
             raise InvalidUserInputError("재작성 지시사항이 필요합니다")
@@ -235,9 +236,9 @@ class SessionService:
             listing_data=listing_data, workflow_meta=workflow_meta,
         )
 
-    async def update_listing(self, session_id: str, updated_listing: dict[str, Any]) -> dict[str, Any]:
+    async def update_listing(self, session_id: str, updated_listing: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
         """사용자가 직접 수정한 판매글을 DB에 반영한다."""
-        session = self._ensure_transition(session_id, "draft_generated")
+        session = self._ensure_transition(session_id, "draft_generated", user_id)
         current_status = session["status"]
 
         listing_data = dict(session.get("listing_data_jsonb") or {})
@@ -258,30 +259,33 @@ class SessionService:
 
     # ── 게시 준비 / 게시 (PublishOrchestrator 위임) ──────────────────
 
-    async def prepare_publish(self, session_id: str, platform_targets: list[str]) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "awaiting_publish_approval")
+    async def prepare_publish(self, session_id: str, platform_targets: list[str], user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "awaiting_publish_approval", user_id)
         return await self.publish_orchestrator.prepare_publish(
             session_id, session, session["status"], platform_targets,
         )
 
-    async def publish_session(self, session_id: str) -> dict[str, Any]:
-        session = self._ensure_transition(session_id, "publishing")
+    async def publish_session(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
+        session = self._ensure_transition(session_id, "publishing", user_id)
         return await self.publish_orchestrator.publish_session(
             session_id, session, session["status"],
         )
 
     # ── 판매 상태 입력 (SaleTracker 위임) ──────────────────────────
 
-    async def update_sale_status(self, session_id: str, sale_status: str) -> dict[str, Any]:
-        session = self._get_or_raise(session_id)
+    async def update_sale_status(self, session_id: str, sale_status: str, user_id: str | None = None) -> dict[str, Any]:
+        session = self._get_or_raise(session_id, user_id)
         return await self.sale_tracker.update_sale_status(session_id, session, sale_status)
 
     # ── 내부 헬퍼 ────────────────────────────────────────────────
 
-    def _get_or_raise(self, session_id: str) -> dict[str, Any]:
+    def _get_or_raise(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
         session = self.repo.get_by_id(session_id)
         if not session:
             raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
+        if user_id and session.get("user_id") and session["user_id"] != user_id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="이 세션에 대한 권한이 없습니다")
         return session
 
     def _update_or_raise(
@@ -303,11 +307,11 @@ class SessionService:
             raise SessionUpdateError(f"세션 업데이트 실패: {session_id}")
         return result
 
-    def _ensure_transition(self, session_id: str, next_status: str) -> dict[str, Any]:
-        """세션 조회 + 상태 전이 유효성 검증을 한 번에 수행한다."""
+    def _ensure_transition(self, session_id: str, next_status: str, user_id: str | None = None) -> dict[str, Any]:
+        """세션 조회 + 소유권 검증 + 상태 전이 유효성 검증을 한 번에 수행한다."""
         import logging
         logger = logging.getLogger(__name__)
-        session = self._get_or_raise(session_id)
+        session = self._get_or_raise(session_id, user_id)
         from_status = session["status"]
         assert_allowed_transition(from_status, next_status)
         logger.info(
