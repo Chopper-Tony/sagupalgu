@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import sys
 
@@ -38,6 +39,8 @@ def create_app() -> FastAPI:
     from app.core.config import settings
     from app.core.logging import configure_logging
     from app.middleware.request_id import RequestIdMiddleware
+
+    logger = logging.getLogger(__name__)
 
     configure_logging(level="DEBUG" if settings.debug else "INFO")
 
@@ -81,7 +84,7 @@ def create_app() -> FastAPI:
 
     @application.get("/health/ready")
     def health_ready():
-        """Readiness probe — 현재 선택된 실행 경로의 준비 상태 확인."""
+        """Readiness probe — 내부 의존성 준비 상태만 확인. 외부 API ping 없음."""
         supabase_ok = False
         try:
             from app.db.client import get_supabase
@@ -89,7 +92,8 @@ def create_app() -> FastAPI:
             if client:
                 client.table("sell_sessions").select("id").limit(1).execute()
                 supabase_ok = True
-        except Exception:
+        except Exception as e:
+            logger.debug("supabase_check_failed: %s", e)
             supabase_ok = False
 
         vision_provider = settings.vision_provider
@@ -103,26 +107,6 @@ def create_app() -> FastAPI:
             bool(settings.gemini_api_key),
             bool(getattr(settings, "upstage_api_key", None)),
         ])
-
-        # 실제 LLM provider 연결 검증 (경량 핑)
-        llm_reachable = False
-        try:
-            import httpx
-            if settings.openai_api_key:
-                r = httpx.get(
-                    "https://api.openai.com/v1/models",
-                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                    timeout=5,
-                )
-                llm_reachable = r.status_code == 200
-            elif settings.gemini_api_key:
-                r = httpx.get(
-                    f"https://generativelanguage.googleapis.com/v1beta/models?key={settings.gemini_api_key}",
-                    timeout=5,
-                )
-                llm_reachable = r.status_code == 200
-        except Exception:
-            llm_reachable = False
 
         # 활성 publish target: credential이 설정된 플랫폼만
         active_publishers = []
@@ -147,7 +131,6 @@ def create_app() -> FastAPI:
             "vision_provider": vision_ok,
             "listing_llm": listing_llm_ok,
             "llm_fallback": has_llm,
-            "llm_reachable": llm_reachable,
             "publish_credentials": publish_ok,
         }
         all_ready = all(checks.values())
@@ -162,6 +145,31 @@ def create_app() -> FastAPI:
                 "listing_provider": listing_provider,
             },
         }
+
+    @application.get("/health/deep")
+    def health_deep():
+        """Deep check — 외부 API 연결 검증 (운영자 수동 확인용, K8s 프로브 사용 금지)."""
+        llm_reachable = False
+        try:
+            import httpx
+            if settings.openai_api_key:
+                r = httpx.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                    timeout=5,
+                )
+                llm_reachable = r.status_code == 200
+            elif settings.gemini_api_key:
+                r = httpx.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={settings.gemini_api_key}",
+                    timeout=5,
+                )
+                llm_reachable = r.status_code == 200
+        except Exception as e:
+            logger.debug("llm_reachability_check_failed: %s", e)
+            llm_reachable = False
+
+        return {"llm_reachable": llm_reachable}
 
     @application.get("/health")
     def health():

@@ -125,6 +125,10 @@
 | M81: 게시 성공률 안정화 | ✅ 완료 | 카테고리 선택 실패 시 예외 발생(기존: 무시) ✅, 타임아웃 120초→180초 ✅, 에러 분류 3종 추가(image_upload/category_selection/form_validation) ✅, 세션 만료 감지(_check_session_freshness 쿠키 expires 검사) ✅, 527 테스트 통과 ✅ |
 | M82: 데모 리허설 스크립트 | ✅ 완료 | scripts/manual/demo_rehearsal.py(전체 파이프라인 순차 실행·단계별 시간 측정·성공/실패 리포트·golden session 백업·--skip-publish) ✅ |
 | M83: Agent Decision Visualization | ✅ 완료 | DraftCard에 도구 호출 이력(tool_calls 배지)·실행 전략(plan focus+steps)·의사결정 근거(decision_rationale) 시각화 ✅, `<details>` 접기/펼치기 UI ✅, 도구명 한글 라벨 매핑 ✅, CSS 스타일링(성공/실패 뱃지) ✅, 빌드 에러 0·527 테스트 통과 ✅ |
+| M84: Rewrite Fallback 설계 결함 봉합 | ✅ 완료 | `_run_copywriting_agent` except 블록 fallback 중복 제거(None 반환 통일) ✅, `_fallback_generate` except 블록에서 rewrite_instruction 규칙 기반 반영(`_apply_rewrite_instruction_rule_based`) ✅, template fallback 시 rewrite_instruction 소실 경고 로그 ✅, 테스트 4개 추가 ✅, 555 테스트 통과 ✅ |
+| M85: 전달물 위생 스크립트 | ✅ 완료 | `scripts/build_archive.py` 신설(clean zip/tar.gz 생성·--dry-run·--output) ✅, `.archiveignore` 신설(.env·uploads·sessions·node_modules·dist·__pycache__ 등 제외) ✅, `tests/test_archive_hygiene.py` 18개 unit 테스트 ✅, 555 테스트 통과 ✅ |
+| M86: Readiness 프로브 경량화 | ✅ 완료 | `/health/ready`에서 외부 API httpx.get ping 제거(llm_reachable→API 키 존재 여부로 판정) ✅, `/health/deep` 별도 엔드포인트 신설(운영자 수동 확인용·기존 외부 ping 로직 이동) ✅, supabase except에 로깅 추가 ✅, 테스트 3개 추가 ✅, 555 테스트 통과 ✅ |
+| M87: Settings Import-time 초기화 제거 | ✅ 완료 | `config.py` `settings = get_settings()` 모듈 수준 호출 → `_SettingsProxy` lazy 프록시 전환(속성 접근 시점 초기화) ✅, `security.py` `fernet` 전역 → `_get_fernet()` lru_cache lazy 함수 ✅, 테스트 3개 추가 ✅, 555 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력
 

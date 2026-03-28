@@ -220,3 +220,32 @@ class TestHealthEndpoint:
         resp = api_client.get("/health")
         meta = resp.json().get("meta", {})
         assert isinstance(meta.get("active_publishers"), list)
+
+
+# ── M87: Settings lazy 초기화 테스트 ─────────────────────────────
+
+
+class TestSettingsLazy:
+
+    @pytest.mark.unit
+    def test_settings_proxy_lazy(self):
+        """settings는 _SettingsProxy이며 속성 접근 시 get_settings() 호출"""
+        from app.core.config import settings, _SettingsProxy
+        assert isinstance(settings, _SettingsProxy)
+        # 속성 접근이 정상 동작
+        assert isinstance(settings.app_name, str)
+
+    @pytest.mark.unit
+    def test_get_settings_cached(self):
+        """get_settings()는 lru_cache로 동일 인스턴스 반환"""
+        from app.core.config import get_settings
+        s1 = get_settings()
+        s2 = get_settings()
+        assert s1 is s2
+
+    @pytest.mark.unit
+    def test_security_lazy_fernet(self):
+        """security의 _get_fernet()이 lazy하게 호출됨"""
+        from app.core.security import _get_fernet
+        f = _get_fernet()
+        assert f is not None

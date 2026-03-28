@@ -151,4 +151,23 @@ def get_settings() -> "Settings":
     return Settings()
 
 
-settings = get_settings()
+def _get_settings_lazy() -> "Settings":
+    """모듈 수준 `settings` 참조를 위한 lazy proxy.
+
+    직접 Settings() 인스턴스를 모듈 로드 시점에 생성하지 않고,
+    속성 접근 시점에 get_settings()를 호출한다.
+    """
+    return get_settings()
+
+
+class _SettingsProxy:
+    """속성 접근 시 get_settings()를 lazy 호출하는 프록시 객체."""
+
+    def __getattr__(self, name: str):
+        return getattr(get_settings(), name)
+
+    def __repr__(self) -> str:
+        return f"<SettingsProxy → {get_settings()!r}>"
+
+
+settings = _SettingsProxy()

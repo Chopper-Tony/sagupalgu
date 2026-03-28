@@ -1,0 +1,44 @@
+# =========================
+# Archive 전용 제외 규칙
+# .gitignore와 함께 적용됨
+# =========================
+
+# 환경 변수 (.env.example은 포함)
+.env
+.env.*
+!.env.example
+
+# 런타임 데이터
+uploads/
+sessions/
+*_session.json
+screenshots/
+
+# Python 가상환경
+.venv/
+venv/
+
+# Python 캐시
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / Frontend 빌드
+frontend/node_modules/
+frontend/dist/
+
+# Git / IDE / CI
+.git/
+.claude/
+.vscode/
+.idea/
+
+# 데이터베이스
+*.sqlite3
+*.db
+
+# 기타
+*.log
+tmp_processed/
+playwright-report/
+test-results/
