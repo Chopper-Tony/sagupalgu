@@ -13,7 +13,9 @@ from app.domain.publish_policy import (
     classify_error,
 )
 from app.services.publish_service import PublishService
+from app.services.publish_orchestrator import PublishOrchestrator
 from app.services.recovery_service import RecoveryService
+from app.services.sale_tracker import SaleTracker
 from app.services.session_service import SessionService
 
 
@@ -44,17 +46,20 @@ def _make_session_service(
         "tool_calls": [{"tool_name": "diagnose_publish_failure_tool", "success": True}],
     }
 
-    copilot_svc = MagicMock()
-    optimization_svc = MagicMock()
-    product_svc = MagicMock()
+    publish_orchestrator = PublishOrchestrator(
+        session_repository=repo,
+        publish_service=publish_svc,
+        recovery_service=recovery_svc,
+    )
+
+    sale_tracker = MagicMock(spec=SaleTracker)
 
     svc = SessionService(
         session_repository=repo,
-        product_service=product_svc,
-        publish_service=publish_svc,
-        copilot_service=copilot_svc,
-        recovery_service=recovery_svc,
-        optimization_service=optimization_svc,
+        product_service=MagicMock(),
+        publish_orchestrator=publish_orchestrator,
+        copilot_service=MagicMock(),
+        sale_tracker=sale_tracker,
     )
     return svc
 
@@ -129,9 +134,9 @@ class TestPublishFailureRecovery:
 
         result = await svc.publish_session("sess-recovery-001")
 
-        # recovery_service.run_recovery 호출 확인
-        svc.recovery_service.run_recovery.assert_called_once()
-        call_kwargs = svc.recovery_service.run_recovery.call_args
+        # recovery_service.run_recovery 호출 확인 (PublishOrchestrator 내부)
+        svc.publish_orchestrator.recovery_service.run_recovery.assert_called_once()
+        call_kwargs = svc.publish_orchestrator.recovery_service.run_recovery.call_args
         assert call_kwargs.kwargs["session_id"] == "sess-recovery-001"
         assert call_kwargs.kwargs["publish_results"] == fail_results
 
@@ -208,7 +213,7 @@ class TestPublishFailureRecovery:
             publish_results=(fail_results, True),
         )
 
-        with patch.object(svc, "_send_discord_alert", new_callable=AsyncMock) as mock_alert:
+        with patch.object(svc.publish_orchestrator, "_send_discord_alert", new_callable=AsyncMock) as mock_alert:
             await svc.publish_session("sess-recovery-001")
 
             # 3회째이므로 Discord 알림 발송
@@ -238,7 +243,7 @@ class TestPublishFailureRecovery:
             publish_results=(fail_results, True),
         )
 
-        with patch.object(svc, "_send_discord_alert", new_callable=AsyncMock) as mock_alert:
+        with patch.object(svc.publish_orchestrator, "_send_discord_alert", new_callable=AsyncMock) as mock_alert:
             await svc.publish_session("sess-recovery-001")
             # 1회째이므로 Discord 알림 미발송
             mock_alert.assert_not_called()

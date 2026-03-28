@@ -155,10 +155,9 @@ class TestUpdateOrRaiseAtomicity:
         svc = SessionService(
             session_repository=mock_repo,
             product_service=MagicMock(),
-            publish_service=MagicMock(),
+            publish_orchestrator=MagicMock(),
             copilot_service=MagicMock(),
-            recovery_service=MagicMock(),
-            optimization_service=MagicMock(),
+            sale_tracker=MagicMock(),
         )
 
         with pytest.raises(InvalidStateTransitionError):
@@ -183,10 +182,9 @@ class TestUpdateOrRaiseAtomicity:
         svc = SessionService(
             session_repository=mock_repo,
             product_service=MagicMock(),
-            publish_service=MagicMock(),
+            publish_orchestrator=MagicMock(),
             copilot_service=MagicMock(),
-            recovery_service=MagicMock(),
-            optimization_service=MagicMock(),
+            sale_tracker=MagicMock(),
         )
 
         with pytest.raises(SessionUpdateError):
@@ -204,10 +202,9 @@ class TestUpdateOrRaiseAtomicity:
         svc = SessionService(
             session_repository=mock_repo,
             product_service=MagicMock(),
-            publish_service=MagicMock(),
+            publish_orchestrator=MagicMock(),
             copilot_service=MagicMock(),
-            recovery_service=MagicMock(),
-            optimization_service=MagicMock(),
+            sale_tracker=MagicMock(),
         )
 
         result = svc._update_or_raise("sess-1", {"status": "publishing"}, expected_status="draft_generated")
@@ -232,10 +229,9 @@ class TestPersistAndRespondAtomicity:
         svc = SessionService(
             session_repository=mock_repo,
             product_service=MagicMock(),
-            publish_service=MagicMock(),
+            publish_orchestrator=MagicMock(),
             copilot_service=MagicMock(),
-            recovery_service=MagicMock(),
-            optimization_service=MagicMock(),
+            sale_tracker=MagicMock(),
         )
 
         svc._persist_and_respond(

@@ -344,10 +344,9 @@ class TestAtomicityIntegration:
         svc = SessionService(
             session_repository=mock_repo,
             product_service=MagicMock(),
-            publish_service=MagicMock(),
+            publish_orchestrator=MagicMock(),
             copilot_service=MagicMock(),
-            recovery_service=MagicMock(),
-            optimization_service=MagicMock(),
+            sale_tracker=MagicMock(),
         )
 
         # 첫 번째: 성공
