@@ -41,7 +41,7 @@ class TestCORS:
     @pytest.mark.integration
     def test_cors_header_present_for_known_origin(self, client):
         resp = client.get("/health", headers={"Origin": "http://localhost:5173"})
-        # allow_origins=["*"] 이므로 Access-Control-Allow-Origin 포함
+        # 기본 allowed_origins에 localhost:5173 포함
         assert "access-control-allow-origin" in resp.headers
 
     @pytest.mark.integration
@@ -54,6 +54,24 @@ class TestCORS:
             },
         )
         assert resp.status_code in (200, 204)
+
+    @pytest.mark.unit
+    def test_cors_default_not_wildcard(self):
+        """기본 allowed_origins가 '*'(와일드카드)가 아닌지 확인."""
+        from app.core.config import Settings
+
+        # Settings 기본값 검증 (환경변수 무시하기 위해 필드 default 직접 확인)
+        field_info = Settings.model_fields["allowed_origins"]
+        assert field_info.default != "*", "기본 CORS origin은 와일드카드(*)이면 안 됩니다"
+
+    @pytest.mark.unit
+    def test_cors_local_origins_include_localhost(self):
+        """기본값에 localhost 개발 서버 origin이 포함되어야 함."""
+        from app.core.config import Settings
+
+        default_origins = Settings.model_fields["allowed_origins"].default
+        assert "http://localhost:3000" in default_origins
+        assert "http://localhost:5173" in default_origins
 
 
 # ─────────────────────────────────────────────────────────────────

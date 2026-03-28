@@ -37,7 +37,7 @@ cd frontend && npm install && npm run dev
 # Docker 풀스택
 docker compose up --build
 
-# 테스트 (508개)
+# 테스트 (577개)
 python -m pytest tests/           # 전체
 python -m pytest tests/ -m unit   # unit만 (0.5초)
 ```
@@ -57,7 +57,7 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
 - `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 555개 (unit ~320 + integration ~140 + E2E 3 + sync 5)
+- `tests/` — 577개 (unit ~340 + integration ~140 + E2E 3 + sync 5)
 
 ## 핵심 코딩 규칙
 
@@ -68,9 +68,12 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 - **예외**: `app/domain/exceptions.py`에 정의, `main.py` 글로벌 핸들러 단일
 - **DI**: `app/dependencies.py` Depends()로만 주입, 라우터에서 직접 생성 금지
 - **lazy import**: supabase·langgraph·langchain은 함수 내부에서만 import
+- **Settings**: `config.py`의 `settings`는 `_SettingsProxy` lazy 프록시 — import 시점 초기화 없음
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
 - **Agent trace**: tool_calls·critic_score 등 그래프→서비스→DB→UI 보존 필수
+- **인증**: `app/core/auth.py` JWT 검증, local/dev는 X-Dev-User-Id 헤더 bypass
+- **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window
 
 ## 아키텍처 상세
 
@@ -97,11 +100,11 @@ python -m pytest tests/ -m unit   # unit만 (0.5초)
 
 ## 최근 변경 (이번 세션)
 
-- **M84**: Rewrite fallback 설계 결함 봉합 — fallback 중복 호출 제거, 규칙 기반 rewrite 최후 수단, 경고 로그
-- **M85**: 전달물 위생 스크립트 — `scripts/build_archive.py` + `.archiveignore` (clean archive 생성)
-- **M86**: Readiness 프로브 경량화 — 외부 API ping 제거, `/health/deep` 분리
-- **M87**: Settings import-time 초기화 제거 — `_SettingsProxy` lazy 프록시, security.py lazy Fernet
+- **M88**: 인증 기반 — JWT 검증 + `get_current_user()` DI, temp-user-id 제거, dev bypass
+- **M89**: CORS 환경별 제한 — `allowed_origins` 기본값 localhost, `allow_methods` 명시
+- **M90**: Broad Exception 세분화 — SSE/health/publisher 로깅 보강
+- **M91**: Rate Limiting — in-memory sliding window, 이미지 5/min, POST 20/min
 
 ## 마일스톤 이력
 
-87+ 마일스톤 완료. 상세: @docs/milestones.md
+91+ 마일스톤 완료. 상세: @docs/milestones.md

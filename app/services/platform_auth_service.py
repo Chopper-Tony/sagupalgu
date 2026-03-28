@@ -148,7 +148,8 @@ async def _bunjang_login(config: dict) -> dict[str, Any]:
                 if result:
                     clicked = True
                     break
-            except Exception:
+            except Exception as e:
+                logger.warning("[번개장터] 로그인 상태 확인 중 오류: %s", e)
                 break
 
         if clicked:
@@ -162,8 +163,8 @@ async def _bunjang_login(config: dict) -> dict[str, Any]:
             logger.warning("[번개장터] 로그인 타임아웃 (2분) 또는 브라우저 닫힘")
             try:
                 await browser.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[번개장터] 브라우저 종료 중 오류 (무시): %s", e)
             return {"success": False, "error": "번개장터 로그인 시간 초과 (2분)"}
 
 
@@ -206,7 +207,8 @@ async def _joongna_login(config: dict) -> dict[str, Any]:
                 if result:
                     clicked = True
                     break
-            except Exception:
+            except Exception as e:
+                logger.warning("[중고나라] 로그인 상태 확인 중 오류: %s", e)
                 break
 
         if clicked:
@@ -220,8 +222,8 @@ async def _joongna_login(config: dict) -> dict[str, Any]:
             logger.warning("[중고나라] 로그인 타임아웃 (2분) 또는 브라우저 닫힘")
             try:
                 await browser.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[중고나라] 브라우저 종료 중 오류 (무시): %s", e)
             return {"success": False, "error": "중고나라 로그인 시간 초과 (2분)"}
 
 

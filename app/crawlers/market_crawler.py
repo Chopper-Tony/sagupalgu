@@ -148,7 +148,7 @@ class MarketCrawler:
                 logger.info(f"[번개장터] '{query}' → {len(items)}개")
                 return items
 
-        except Exception as e:
+        except (aiohttp.ClientError, json.JSONDecodeError, ValueError, KeyError) as e:
             logger.error(f"[번개장터] 크롤링 실패: {e}")
             return []
 
@@ -213,7 +213,7 @@ class MarketCrawler:
                     if content:
                         logger.info(f"[중고나라] API 성공 (web.joongna.com/api/search/products)")
                 logger.debug(f"[중고나라] POST → {resp.status}")
-        except Exception as e:
+        except (aiohttp.ClientError, json.JSONDecodeError, ValueError, KeyError) as e:
             logger.debug(f"[중고나라] POST 실패: {e}")
 
         # API 실패 → __NEXT_DATA__ HTML 파싱
@@ -292,7 +292,7 @@ class MarketCrawler:
             logger.info(f"[중고나라 HTML] '{query}' → {len(items)}개")
             return items
 
-        except Exception as e:
+        except (aiohttp.ClientError, json.JSONDecodeError, ValueError, KeyError) as e:
             logger.error(f"[중고나라 HTML] 실패: {e}")
             return []
 

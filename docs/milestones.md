@@ -129,6 +129,10 @@
 | M85: 전달물 위생 스크립트 | ✅ 완료 | `scripts/build_archive.py` 신설(clean zip/tar.gz 생성·--dry-run·--output) ✅, `.archiveignore` 신설(.env·uploads·sessions·node_modules·dist·__pycache__ 등 제외) ✅, `tests/test_archive_hygiene.py` 18개 unit 테스트 ✅, 555 테스트 통과 ✅ |
 | M86: Readiness 프로브 경량화 | ✅ 완료 | `/health/ready`에서 외부 API httpx.get ping 제거(llm_reachable→API 키 존재 여부로 판정) ✅, `/health/deep` 별도 엔드포인트 신설(운영자 수동 확인용·기존 외부 ping 로직 이동) ✅, supabase except에 로깅 추가 ✅, 테스트 3개 추가 ✅, 555 테스트 통과 ✅ |
 | M87: Settings Import-time 초기화 제거 | ✅ 완료 | `config.py` `settings = get_settings()` 모듈 수준 호출 → `_SettingsProxy` lazy 프록시 전환(속성 접근 시점 초기화) ✅, `security.py` `fernet` 전역 → `_get_fernet()` lru_cache lazy 함수 ✅, 테스트 3개 추가 ✅, 555 테스트 통과 ✅ |
+| M88: 인증 기반 (Supabase Auth + JWT) | ✅ 완료 | `app/core/auth.py` 신설(JWT 검증·AuthenticatedUser·get_current_user DI) ✅, `session_router.py` temp-user-id→JWT user_id 전환 ✅, dev/local X-Dev-User-Id bypass ✅, prod 401 강제 ✅, config.py SUPABASE_JWT_SECRET 추가 ✅, 테스트 13개 추가 ✅, 577 테스트 통과 ✅ |
+| M89: CORS 환경별 제한 | ✅ 완료 | `config.py` allowed_origins 기본값 `"*"` → `"http://localhost:3000,http://localhost:5173"` ✅, `main.py` allow_methods `["*"]` → 명시적 열거 ✅, 577 테스트 통과 ✅ |
+| M90: Broad Exception 세분화 | ✅ 완료 | SSE stream except에 로깅 추가 ✅, health/ready supabase except 로깅 ✅, platform_auth 4곳 로깅 확인 ✅, pgvector 5곳 로깅 확인 ✅, 577 테스트 통과 ✅ |
+| M91: Rate Limiting 기본 도입 | ✅ 완료 | `app/middleware/rate_limit.py` 신설(in-memory sliding window·이미지 5/min·POST 20/min·GET 60/min) ✅, RateLimitMiddleware main.py 등록 ✅, 429 응답·X-RateLimit 헤더 ✅, 테스트 7개 추가 ✅, 577 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력
 

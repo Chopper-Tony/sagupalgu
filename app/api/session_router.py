@@ -4,16 +4,17 @@
 예외 처리는 main.py 글로벌 핸들러에 위임한다.
 엔드포인트는 순수한 서비스 호출 + 응답 변환만 담당.
 """
+import asyncio
+import json as _json
+import logging
 import os
 import uuid
 from typing import List
 
-import asyncio
-import json as _json
-
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from app.core.auth import AuthenticatedUser, get_current_user
 from app.dependencies import get_session_service
 from app.schemas.session import (
     AnalyzeSessionResponse,
@@ -36,14 +37,17 @@ from app.schemas.session import (
 )
 from app.services.session_service import SessionService
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 @router.post("", response_model=CreateSessionResponse)
 async def create_session(
+    user: AuthenticatedUser = Depends(get_current_user),
     session_service: SessionService = Depends(get_session_service),
 ):
-    result = await session_service.create_session(user_id="temp-user-id")
+    result = await session_service.create_session(user_id=user.user_id)
     return CreateSessionResponse(**result)
 
 
@@ -90,7 +94,8 @@ async def stream_session(
                 # 하트비트 (연결 유지)
                 yield f": heartbeat\n\n"
                 await asyncio.sleep(1.5)
-            except Exception:
+            except Exception as e:
+                logger.warning("sse_stream_error session=%s: %s", session_id, e)
                 break
 
     return StreamingResponse(

@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     from app.api.session_router import router as session_router
     from app.core.config import settings
     from app.core.logging import configure_logging
+    from app.middleware.rate_limit import RateLimitMiddleware
     from app.middleware.request_id import RequestIdMiddleware
 
     logger = logging.getLogger(__name__)
@@ -55,10 +56,11 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
     application.add_middleware(RequestIdMiddleware)
+    application.add_middleware(RateLimitMiddleware)
 
     # 예외 핸들러
     @application.exception_handler(SagupalguError)

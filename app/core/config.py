@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     supabase_url: str = Field(..., alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(..., alias="SUPABASE_SERVICE_ROLE_KEY")
+    supabase_jwt_secret: str | None = Field(default=None, alias="SUPABASE_JWT_SECRET")
 
     secret_encryption_key: str = Field(..., alias="SECRET_ENCRYPTION_KEY")
 
@@ -140,9 +141,9 @@ class Settings(BaseSettings):
     # ------------------------------
 
     allowed_origins: str = Field(
-        default="*",
+        default="http://localhost:3000,http://localhost:5173",
         alias="ALLOWED_ORIGINS",
-        description="콤마 구분 origin 목록. prod에서는 실제 도메인으로 제한.",
+        description="콤마 구분 origin 목록. prod에서는 ALLOWED_ORIGINS 환경변수로 실제 도메인 설정 필수.",
     )
 
 
