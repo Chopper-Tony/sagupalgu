@@ -135,23 +135,41 @@ class TestCopywritingAgent:
 
         assert result is None
 
-    def test_rewrite_instruction_lost_경고_로그(self, base_state):
-        """M84: rewrite_instruction이 있는데 canonical_listing도 없이 template으로 빠지면 경고 로그"""
+    def test_rewrite_모든_fallback_실패시_기존_listing_유지(self, base_state):
+        """M100: rewrite 전체 실패 시 기존 listing을 유지하고 template으로 빠지지 않음"""
         from app.graph.seller_copilot_nodes import copywriting_node
 
-        state = {**base_state, "canonical_listing": None, "rewrite_instruction": "수정해줘"}
+        existing = {**base_state["canonical_listing"], "title": "기존 제목", "description": "기존 설명"}
+        state = {**base_state, "canonical_listing": existing, "rewrite_instruction": "더 매력적으로"}
+
+        # ReAct + ListingService + 규칙기반 모두 실패 시나리오
+        with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
+            with patch("app.services.listing_service.ListingService") as MockSvc:
+                MockSvc.return_value.rewrite_listing = AsyncMock(side_effect=Exception("장애"))
+                result = copywriting_node(state)
+
+        # 기존 listing이 유지되어야 함 (template 신규 생성 금지)
+        assert result["canonical_listing"]["title"] == "기존 제목"
+        # rewrite_instruction이 description에 반영
+        assert "더 매력적으로" in result["canonical_listing"]["description"]
+        assert result["rewrite_instruction"] is None
+        # 로그에 기록
+        logs = " ".join(result.get("debug_logs") or [])
+        assert "rewrite_all_failed" in logs or "rule_based_rewrite" in logs
+
+    def test_rewrite_없고_listing_없으면_template_생성(self, base_state):
+        """rewrite_instruction 없고 canonical_listing도 없으면 template 정상 생성"""
+        from app.graph.seller_copilot_nodes import copywriting_node
+
+        state = {**base_state, "canonical_listing": None, "rewrite_instruction": None}
 
         with patch("app.graph.nodes.copywriting_agent._build_react_llm", side_effect=ValueError("no LLM")):
             with patch("app.services.listing_service.ListingService") as MockSvc:
                 MockSvc.return_value.build_canonical_listing = AsyncMock(side_effect=Exception("장애"))
                 result = copywriting_node(state)
 
-        # template이 생성되어야 함
         assert result["canonical_listing"] is not None
         assert result["status"] == "draft_generated"
-        # 경고 로그가 기록되어야 함
-        logs = " ".join(result.get("debug_logs") or [])
-        assert "rewrite_instruction_lost" in logs
 
     def test_apply_rewrite_instruction_rule_based(self, base_state):
         """M84: 규칙 기반 재작성 함수 단위 테스트"""
