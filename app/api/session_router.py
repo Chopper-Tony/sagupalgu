@@ -137,6 +137,10 @@ async def upload_images(
     upload_dir = os.path.join("uploads", session_id)
     os.makedirs(upload_dir, exist_ok=True)
 
+    # 클라우드 스토리지 사용 여부 확인
+    from app.core.config import get_settings
+    use_cloud = get_settings().use_cloud_storage
+
     image_urls: List[str] = []
     for f in files:
         ext = os.path.splitext(f.filename or "img.jpg")[1].lower() or ".jpg"
@@ -153,7 +157,26 @@ async def upload_images(
         filepath = os.path.join(upload_dir, filename)
         with open(filepath, "wb") as fh:
             fh.write(content)
-        image_urls.append(f"/uploads/{session_id}/{filename}")
+
+        # 클라우드 스토리지 업로드 (실패 시 로컬 fallback)
+        if use_cloud:
+            try:
+                from app.storage.storage_client import upload_image as cloud_upload
+                cloud_url = cloud_upload(
+                    content,
+                    f"{session_id}/{filename}",
+                    content_type=f.content_type or "image/jpeg",
+                )
+                image_urls.append(cloud_url)
+                logger.info("cloud_upload_success session=%s file=%s", session_id, filename)
+            except Exception:
+                logger.warning(
+                    "cloud_upload_failed session=%s file=%s — 로컬 fallback",
+                    session_id, filename, exc_info=True,
+                )
+                image_urls.append(f"/uploads/{session_id}/{filename}")
+        else:
+            image_urls.append(f"/uploads/{session_id}/{filename}")
 
     result = await session_service.attach_images(
         session_id=session_id, image_urls=image_urls,

@@ -38,12 +38,20 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
 
-      - name: Run full test suite
-        run: python -m pytest tests/ --tb=short -q
+      - name: Run full test suite with coverage
+        run: python -m pytest tests/ --tb=short -q --cov=app --cov-report=term-missing --cov-report=html:coverage-report
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report/
+          retention-days: 7
 
   type-sync:
     runs-on: ubuntu-latest

@@ -136,6 +136,11 @@ class Settings(BaseSettings):
         alias="STORAGE_BUCKET_NAME",
     )
 
+    use_cloud_storage: bool = Field(
+        default=False,
+        alias="USE_CLOUD_STORAGE",
+    )
+
     # ------------------------------
     # CORS
     # ------------------------------

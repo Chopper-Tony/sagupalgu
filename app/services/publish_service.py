@@ -31,48 +31,11 @@ class PublishService:
         return publisher_cls()
 
     def build_account_context(self, platform: str) -> PublisherAccountContext:
-
-        if platform == "joongna":
-
-            if not settings.joongna_username or not settings.joongna_password:
-                raise ValueError("Joongna credentials are not configured")
-
-            return PublisherAccountContext(
-                platform_account_id="env-joongna",
-                platform="joongna",
-                auth_type="id_password",
-                secret_payload={
-                    "username": settings.joongna_username,
-                    "password": settings.joongna_password,
-                },
-            )
-
-        if platform == "bunjang":
-
-            if not settings.bunjang_username or not settings.bunjang_password:
-                raise ValueError("Bunjang credentials are not configured")
-
-            return PublisherAccountContext(
-                platform_account_id="env-bunjang",
-                platform="bunjang",
-                auth_type="username_password",
-                secret_payload={
-                    "username": settings.bunjang_username,
-                    "password": settings.bunjang_password,
-                },
-            )
-
-        if platform == "daangn":
-            return PublisherAccountContext(
-                platform_account_id="env-daangn",
-                platform="daangn",
-                auth_type="device",
-                secret_payload={
-                    "device_id": settings.daangn_device_id or "",
-                },
-            )
-
-        raise ValueError(f"Unsupported platform: {platform}")
+        """플랫폼별 인증 정보를 registry 기반으로 구성한다."""
+        publisher_cls = self.PUBLISHER_REGISTRY.get(platform)
+        if publisher_cls is None:
+            raise ValueError(f"Unsupported platform: {platform}")
+        return publisher_cls.build_account_context(settings)
 
     @staticmethod
     def _resolve_image_paths(images: list) -> list[str]:
