@@ -114,10 +114,11 @@ cd frontend && npm test
 - **M106** (Phase D): Market 서비스 유닛 테스트 — QueryBuilder/RelevanceScorer/PriceAggregator 25개
 - **M107** (Phase D): ListingService + ProductService 통합 테스트 22개
 - **M108** (Phase D): 프론트엔드 테스트 인프라 — vitest + 21개 스모크 테스트
-- **M110** (Phase A): SSE stream 소유권 + rewrite 테스트 mock 강화
-- **M111** (Phase A): SessionRepository DB 레벨 소유권 (get_by_id_and_user)
-- **M112** (Phase A): Rate Limit 경로 그룹별 bucket (이미 적용 확인)
+- **M110** (Phase A v7): SSE stream 소유권 검증 + rewrite 테스트 mock 강화
+- **M111** (Phase A v7): SessionRepository DB 레벨 소유권 검증 (`get_by_id_and_user`)
+- **M112** (Phase A v7): Rate Limit 경로 그룹별 bucket 적용 확인
+- **M113** (Phase B v7): `copywriting_agent` 슬림화 — `_resolve_final_listing` 정책 함수 분리
 
 ## 마일스톤 이력
 
-109+ 마일스톤 완료. 상세: @docs/milestones.md
+113+ 마일스톤 완료. 상세: @docs/milestones.md

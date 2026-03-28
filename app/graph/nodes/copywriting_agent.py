@@ -35,6 +35,7 @@ from app.graph.nodes.helpers import (
 
 
 def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
+    """Agent 3 메인 노드. ReAct → fallback → 정책 기반 최종 결정."""
     _timer = _start_timer()
     _log(state, "agent3:copywriting:start")
 
@@ -49,32 +50,70 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
     rewrite_instruction = state.get("rewrite_instruction")
     image_paths = state.get("image_paths") or []
 
+    # 1단계: ReAct 에이전트 실행
     new_listing = _run_copywriting_agent(state, product, market_context, strategy, image_paths, rewrite_instruction)
 
-    # ReAct 실패 + rewrite 요청이면 fallback으로 재시도 (rewrite 결과 소실 방지)
+    # 2단계: ReAct 실패 + rewrite 요청이면 fallback 재시도
     if not new_listing and rewrite_instruction:
         _log(state, "agent3:react_rewrite_failed → fallback_rewrite")
         new_listing = _fallback_generate(state, product, market_context, strategy, image_paths, rewrite_instruction)
 
-    if new_listing:
-        new_listing = _normalize_listing(new_listing, product, strategy, image_paths)
-        state["canonical_listing"] = new_listing
+    # 3단계: 최종 listing 결정 (정책 기반)
+    state["canonical_listing"] = _resolve_final_listing(
+        new_listing, state, product, strategy, market_context, image_paths, rewrite_instruction,
+    )
+    if new_listing or rewrite_instruction:
         state["rewrite_instruction"] = None
-    elif rewrite_instruction and state.get("canonical_listing"):
-        # 정책: rewrite 상황에서 모든 fallback 실패 시 기존 listing 유지 + 지시사항 반영
-        # template 신규 생성 절대 금지 (CTO P0: rewrite 결과가 template에 밀리는 것 방지)
-        existing = dict(state["canonical_listing"])
-        existing["description"] = f"{existing.get('description', '')}\n\n[판매자 수정 요청] {rewrite_instruction}".strip()
-        state["canonical_listing"] = existing
-        state["rewrite_instruction"] = None
-        _log(state, f"agent3:rewrite_all_failed → preserving existing listing + instruction appended")
-    elif not state.get("canonical_listing"):
-        state["canonical_listing"] = _build_template_listing(product, strategy, market_context, state)
 
     state["checkpoint"] = "B_draft_complete"
     state["status"] = "draft_generated"
     _record_node_timing(state, "copywriting", _timer)
     return state
+
+
+def _resolve_final_listing(
+    new_listing: Optional[Dict],
+    state: SellerCopilotState,
+    product: Dict,
+    strategy: Dict,
+    market_context: Dict,
+    image_paths: List[str],
+    rewrite_instruction: Optional[str],
+) -> Dict:
+    """최종 canonical_listing을 결정하는 정책 함수.
+
+    정책 매트릭스:
+    ┌───────────────────────┬────────────────────────┬─────────────────────────────┐
+    │ 조건                   │ 결과                    │ 근거                         │
+    ├───────────────────────┼────────────────────────┼─────────────────────────────┤
+    │ new_listing 있음       │ normalize 후 사용       │ ReAct/fallback 성공          │
+    │ rewrite + 기존 있음    │ 기존 유지 + 지시 반영   │ template 신규 생성 금지       │
+    │ 기존 listing 없음      │ template 신규 생성      │ 최초 생성만 허용              │
+    │ 기존 listing 있음      │ 기존 유지               │ 변경 없음                    │
+    └───────────────────────┴────────────────────────┴─────────────────────────────┘
+    """
+    existing = state.get("canonical_listing")
+
+    # 케이스 1: 새 listing 생성/재작성 성공
+    if new_listing:
+        _log(state, "agent3:policy:new_listing_accepted")
+        return _normalize_listing(new_listing, product, strategy, image_paths)
+
+    # 케이스 2: rewrite 전체 실패 → 기존 listing 보존 + 지시사항 append
+    if rewrite_instruction and existing:
+        _log(state, f"agent3:policy:rewrite_all_failed → preserving existing + instruction")
+        patched = dict(existing)
+        patched["description"] = f"{patched.get('description', '')}\n\n[판매자 수정 요청] {rewrite_instruction}".strip()
+        return patched
+
+    # 케이스 3: 최초 생성도 실패 → template
+    if not existing:
+        _log(state, "agent3:policy:no_listing → template")
+        return _build_template_listing(product, strategy, market_context, state)
+
+    # 케이스 4: 기존 listing 유지 (변경 없음)
+    _log(state, "agent3:policy:existing_listing_preserved")
+    return existing
 
 
 # ── 에이전트 실행 ─────────────────────────────────────────────────
