@@ -22,21 +22,15 @@ from app.domain.exceptions import (
 )
 from app.domain.session_status import assert_allowed_transition
 from app.repositories.session_repository import SessionRepository
-from app.services.optimization_service import OptimizationService
 from app.services.product_service import ProductService
-from app.services.publish_service import PublishService
-from app.services.recovery_service import RecoveryService
+from app.services.publish_orchestrator import PublishOrchestrator
+from app.services.sale_tracker import SaleTracker
 from app.services.seller_copilot_service import SellerCopilotService
 from app.services.session_meta import (
     append_rewrite_entry,
-    append_tool_calls,
     normalize_listing_meta,
     set_analysis_checkpoint,
     set_product_confirmed,
-    set_publish_complete,
-    set_publish_diagnostics,
-    set_publish_prepared,
-    set_sale_status,
 )
 from app.services.session_product import (
     apply_analysis_result,
@@ -52,17 +46,15 @@ class SessionService:
         self,
         session_repository: SessionRepository,
         product_service: "ProductService",
-        publish_service: "PublishService",
+        publish_orchestrator: "PublishOrchestrator",
         copilot_service: "SellerCopilotService",
-        recovery_service: "RecoveryService",
-        optimization_service: "OptimizationService",
+        sale_tracker: "SaleTracker",
     ):
         self.repo = session_repository
         self.product_service = product_service
-        self.publish_service = publish_service
+        self.publish_orchestrator = publish_orchestrator
         self.copilot_service = copilot_service
-        self.recovery_service = recovery_service
-        self.optimization_service = optimization_service
+        self.sale_tracker = sale_tracker
 
     # ── 세션 생성 / 조회 ───────────────────────────────────────────
 
@@ -264,128 +256,25 @@ class SessionService:
             listing_data=listing_data,
         )
 
-    # ── 게시 준비 / 게시 ───────────────────────────────────────────
+    # ── 게시 준비 / 게시 (PublishOrchestrator 위임) ──────────────────
 
     async def prepare_publish(self, session_id: str, platform_targets: list[str]) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "awaiting_publish_approval")
-        current_status = session["status"]
-        if not platform_targets:
-            raise InvalidUserInputError("플랫폼을 선택해주세요")
-
-        listing_data = dict(session.get("listing_data_jsonb") or {})
-        canonical = listing_data.get("canonical_listing") or {}
-        if _safe_int(canonical.get("price"), 0) <= 0:
-            raise InvalidUserInputError("유효한 가격이 없습니다. 판매글을 다시 생성해주세요.")
-
-        listing_data["platform_packages"] = self.publish_service.build_platform_packages(
-            canonical_listing=canonical, platform_targets=platform_targets,
+        return await self.publish_orchestrator.prepare_publish(
+            session_id, session, session["status"], platform_targets,
         )
-
-        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        set_publish_prepared(workflow_meta)
-
-        updated = self._update_or_raise(session_id, {
-            "status": "awaiting_publish_approval",
-            "selected_platforms_jsonb": platform_targets,
-            "listing_data_jsonb": listing_data,
-            "workflow_meta_jsonb": workflow_meta,
-        }, expected_status=current_status)
-        return build_session_ui_response(updated)
 
     async def publish_session(self, session_id: str) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "publishing")
-        current_status = session["status"]
-        selected = session.get("selected_platforms_jsonb") or []
-        packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
-        if not selected:
-            raise InvalidUserInputError("선택된 플랫폼이 없습니다")
-
-        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        self._update_or_raise(
-            session_id,
-            {"status": "publishing", "workflow_meta_jsonb": workflow_meta},
-            expected_status=current_status,
+        return await self.publish_orchestrator.publish_session(
+            session_id, session, session["status"],
         )
 
-        publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
-        set_publish_complete(workflow_meta, publish_results)
-
-        final_status = "completed"
-        if any_failure:
-            await self._handle_publish_failure(session_id, workflow_meta, publish_results)
-            final_status = "publishing_failed"
-
-        return self._persist_and_respond(session_id, final_status, workflow_meta=workflow_meta)
-
-    async def _handle_publish_failure(
-        self, session_id: str, workflow_meta: dict[str, Any], publish_results: dict[str, Any],
-    ) -> None:
-        """게시 실패 시 recovery 서비스를 호출하고 진단 결과를 meta에 기록한다.
-        누적 실패 횟수가 임계값 이상이면 Discord 알림을 발송한다."""
-        product_data = (self.repo.get_by_id(session_id) or {}).get("product_data_jsonb") or {}
-        recovery_result = self.recovery_service.run_recovery(
-            session_id=session_id, product_data=product_data, publish_results=publish_results,
-        )
-        set_publish_diagnostics(
-            workflow_meta, recovery_result["publish_diagnostics"], recovery_result["tool_calls"],
-        )
-
-        # 누적 실패 횟수 기반 Discord 알림
-        from app.domain.publish_policy import DISCORD_ALERT_THRESHOLD
-        retry_count = workflow_meta.get("publish_retry_count", 0) + 1
-        workflow_meta["publish_retry_count"] = retry_count
-
-        if retry_count >= DISCORD_ALERT_THRESHOLD:
-            failed_platforms = [p for p, r in publish_results.items() if not r.get("success")]
-            await self._send_discord_alert(
-                session_id=session_id,
-                message=(
-                    f"게시 {retry_count}회 연속 실패\n"
-                    f"실패 플랫폼: {', '.join(failed_platforms)}\n"
-                    f"에러: {publish_results}"
-                ),
-            )
-
-    async def _send_discord_alert(self, session_id: str, message: str) -> None:
-        """Discord 알림을 발송한다. 실패해도 예외를 던지지 않는다."""
-        import logging
-        logger = logging.getLogger(__name__)
-        try:
-            from app.tools.agentic_tools import discord_alert_tool
-            await discord_alert_tool(message=message, session_id=session_id)
-            logger.info("discord_alert_sent session=%s", session_id)
-        except Exception as e:
-            logger.warning("discord_alert_failed session=%s error=%s", session_id, e)
-
-    # ── 판매 상태 입력 ─────────────────────────────────────────────
+    # ── 판매 상태 입력 (SaleTracker 위임) ──────────────────────────
 
     async def update_sale_status(self, session_id: str, sale_status: str) -> dict[str, Any]:
-        if sale_status not in ("sold", "unsold", "in_progress"):
-            raise InvalidUserInputError("sale_status는 sold / unsold / in_progress 중 하나여야 합니다")
-
         session = self._get_or_raise(session_id)
-        listing_data = dict(session.get("listing_data_jsonb") or {})
-        product_data = session.get("product_data_jsonb") or {}
-        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
-        set_sale_status(workflow_meta, sale_status)
-
-        opt_result = self.optimization_service.run_post_sale_optimization(
-            session_id=session_id, product_data=product_data, listing_data=listing_data,
-            sale_status=sale_status, followup_due_at=workflow_meta.get("followup_due_at"),
-        )
-        optimization = opt_result["optimization_suggestion"]
-        if optimization:
-            listing_data["optimization_suggestion"] = optimization
-
-        append_tool_calls(workflow_meta, opt_result["tool_calls"])
-        final_status = opt_result["status"] or (
-            "optimization_suggested" if optimization else "awaiting_sale_status_update"
-        )
-
-        return self._persist_and_respond(
-            session_id, final_status,
-            listing_data=listing_data, workflow_meta=workflow_meta,
-        )
+        return await self.sale_tracker.update_sale_status(session_id, session, sale_status)
 
     # ── 내부 헬퍼 ────────────────────────────────────────────────
 
