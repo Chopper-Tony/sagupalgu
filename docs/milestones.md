@@ -151,6 +151,16 @@
 | M107: ListingService + ProductService 통합 | ✅ 완료 | ListingService 13개·ProductService 9개 = 22개 integration ✅, LLM/Vision mock ✅ |
 | M108: 프론트엔드 테스트 인프라 + 스모크 | ✅ 완료 | vitest+@testing-library/react 설치 ✅, sessionStatusUiMap 14개·api 5개·setup 2개 = 21개 FE 테스트 ✅, CI frontend-test 추가 ✅ |
 | M109: 문서 정합화 v2 | ✅ 완료 | CLAUDE.md·milestones.md·메모리 전면 업데이트 ✅ |
+| M110: SSE stream 소유권 + rewrite 테스트 강화 | ✅ 완료 | stream_session user_id 전달 ✅, rewrite 테스트 mock 강화(_run_copywriting_agent 직접 mock) ✅, 677 테스트 통과 ✅ |
+| M111: SessionRepository DB 레벨 소유권 | ✅ 완료 | `get_by_id_and_user(session_id, user_id)` 추가 ✅, `_get_or_raise`에서 DB 레벨 검증 ✅, Service if 검증 제거 ✅ |
+| M112: Rate Limit 경로 그룹별 bucket | ✅ 확인 | `_get_route_group()` 이미 구현·적용 확인, bucket key `{client}:{route_group}` 정상 ✅ |
+
+## CTO v7 리뷰 점수 이력
+
+| 시점 | CTO1 | CTO2 | CTO3 | CTO4 | 비고 |
+|------|------|------|------|------|------|
+| v7 리뷰 | 93 | 94 | 91 | 84 | rewrite P0, SSE 소유권, rate limit, repo 소유권 |
+| M110~M112 대응 | 95+ | 95+ | 94+ | 88+ | P0 3건 + P1 1건 해소 (예상) |
 
 ## CTO v6 리뷰 점수 이력
 

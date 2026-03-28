@@ -79,7 +79,7 @@ async def stream_session(
             if await request.is_disconnected():
                 break
             try:
-                result = await session_service.get_session(session_id)
+                result = await session_service.get_session(session_id, user_id=user.user_id)
                 current_status = result.get("status")
 
                 # 상태 변경 시 또는 첫 연결 시 이벤트 전송

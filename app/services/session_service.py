@@ -280,12 +280,15 @@ class SessionService:
     # ── 내부 헬퍼 ────────────────────────────────────────────────
 
     def _get_or_raise(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
-        session = self.repo.get_by_id(session_id)
-        if not session:
-            raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
-        if user_id and session.get("user_id") and session["user_id"] != user_id:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=403, detail="이 세션에 대한 권한이 없습니다")
+        if user_id:
+            # DB 레벨 소유권 검증: WHERE id=? AND user_id=?
+            session = self.repo.get_by_id_and_user(session_id, user_id)
+            if not session:
+                raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
+        else:
+            session = self.repo.get_by_id(session_id)
+            if not session:
+                raise SessionNotFoundError(f"세션을 찾을 수 없습니다: {session_id}")
         return session
 
     def _update_or_raise(
