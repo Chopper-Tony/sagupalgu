@@ -11,6 +11,20 @@ from app.publishers._legacy_utils import to_legacy_listing_package
 
 
 class JoongnaPublisher(PlatformPublisher):
+    @classmethod
+    def build_account_context(cls, settings) -> PublisherAccountContext:
+        if not settings.joongna_username or not settings.joongna_password:
+            raise ValueError("Joongna credentials are not configured")
+        return PublisherAccountContext(
+            platform_account_id="env-joongna",
+            platform="joongna",
+            auth_type="id_password",
+            secret_payload={
+                "username": settings.joongna_username,
+                "password": settings.joongna_password,
+            },
+        )
+
     async def publish(
         self,
         package: PlatformPackage,

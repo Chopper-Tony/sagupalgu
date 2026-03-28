@@ -204,6 +204,20 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
 
 
 class BunjangPublisher(PlatformPublisher):
+    @classmethod
+    def build_account_context(cls, settings) -> PublisherAccountContext:
+        if not settings.bunjang_username or not settings.bunjang_password:
+            raise ValueError("Bunjang credentials are not configured")
+        return PublisherAccountContext(
+            platform_account_id="env-bunjang",
+            platform="bunjang",
+            auth_type="username_password",
+            secret_payload={
+                "username": settings.bunjang_username,
+                "password": settings.bunjang_password,
+            },
+        )
+
     async def publish(
         self,
         package: PlatformPackage,
