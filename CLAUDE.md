@@ -114,7 +114,9 @@ cd frontend && npm test
 - **M106** (Phase D): Market 서비스 유닛 테스트 — QueryBuilder/RelevanceScorer/PriceAggregator 25개
 - **M107** (Phase D): ListingService + ProductService 통합 테스트 22개
 - **M108** (Phase D): 프론트엔드 테스트 인프라 — vitest + 21개 스모크 테스트
+- **M110~M112** (Phase A v7): SSE 소유권, Repo DB 레벨 검증, Rate Limit 확인
+- **M113** (Phase B v7): copywriting_agent 슬림화 — _resolve_final_listing 정책 함수 분리
 
 ## 마일스톤 이력
 
-109+ 마일스톤 완료. 상세: @docs/milestones.md
+113+ 마일스톤 완료. 상세: @docs/milestones.md

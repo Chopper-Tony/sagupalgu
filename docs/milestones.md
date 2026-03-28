@@ -159,6 +159,8 @@
 | v6 리뷰 | 94 | 92 | rewrite P0, 소유권 P0, rate limit P1, broad exception P1 |
 | M100~M103 대응 | 96+ | 94+ | P0 2건 + P1 2건 전부 해소 (예상) |
 
+| M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
+
 ## 에이전틱 점수 이력
 
 | 시점 | 점수 | 주요 변경 |
