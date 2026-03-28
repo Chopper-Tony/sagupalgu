@@ -28,6 +28,9 @@ async def get_embedding(text: str, api_key: str) -> Optional[List[float]]:
             )
             resp.raise_for_status()
             return resp.json()["data"][0]["embedding"]
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning(f"[pgvector] embedding response parse failed: {e}")
+        return None
     except Exception as e:
         logger.warning(f"[pgvector] embedding failed: {e}")
         return None
@@ -68,6 +71,9 @@ async def vector_search_price_history(
         rows = result.data or []
         logger.info(f"[pgvector] vector search: {len(rows)}건 ({brand} {model})")
         return rows
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning(f"[pgvector] vector search 데이터 처리 실패: {e}")
+        return []
     except Exception as e:
         logger.warning(f"[pgvector] vector search RPC 실패: {e}")
         return []
@@ -90,6 +96,9 @@ async def keyword_search_price_history(
         rows = result.data or []
         logger.info(f"[pgvector] keyword search: {len(rows)}건 ({brand} {model})")
         return rows
+    except (ValueError, TypeError, KeyError) as e:
+        logger.warning(f"[pgvector] keyword search 데이터 처리 실패: {e}")
+        return []
     except Exception as e:
         logger.warning(f"[pgvector] keyword search 실패: {e}")
         return []
@@ -143,6 +152,9 @@ async def insert_price_records(
 
             supabase.table("price_history").insert(row).execute()
             inserted += 1
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning(f"[pgvector] insert 데이터 변환 실패 ({record.get('model')}): {e}")
+            continue
         except Exception as e:
             logger.warning(f"[pgvector] insert 실패 ({record.get('model')}): {e}")
             continue
@@ -158,5 +170,6 @@ async def is_table_ready() -> bool:
         supabase = get_supabase()
         supabase.table("price_history").select("id").limit(1).execute()
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("[pgvector] table readiness check failed: %s", e)
         return False

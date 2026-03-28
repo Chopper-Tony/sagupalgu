@@ -6,6 +6,15 @@ from fastapi.testclient import TestClient
 
 from app.dependencies import get_session_service
 from app.main import app
+from app.middleware.rate_limit import reset_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """각 테스트 전 rate limiter 상태 초기화."""
+    reset_rate_limiter()
+    yield
+    reset_rate_limiter()
 
 BASE = "/api/v1/sessions"
 

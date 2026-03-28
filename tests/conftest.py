@@ -3,6 +3,16 @@
 """
 import pytest
 
+from app.middleware.rate_limit import reset_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_global():
+    """모든 테스트 전후 rate limiter 초기화."""
+    reset_rate_limiter()
+    yield
+    reset_rate_limiter()
+
 
 @pytest.fixture
 def confirmed_product():
