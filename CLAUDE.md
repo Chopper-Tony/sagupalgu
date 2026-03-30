@@ -79,6 +79,7 @@ cd frontend && npm test
 - **인증**: `app/core/auth.py` JWT 검증 + 전 엔드포인트(SSE 포함) 소유권 검증, DB 레벨 user_id 필터
 - **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window, 경로 그룹별 bucket
 - **Rewrite 정책**: rewrite_instruction 있으면 template 신규 생성 금지, 기존 listing 유지
+- **게시 동시성**: `MAX_CONCURRENT_BROWSERS=2` 세마포어로 Playwright 동시 실행 제한
 
 ## 아키텍처 상세
 
@@ -104,6 +105,8 @@ cd frontend && npm test
 - Supabase Storage Public 버킷 생성 (코드는 완료)
 
 ## 최근 변경 (이번 세션)
+
+- **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
 
 - **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지
 - **M101** (Phase A): 소유권 검증 — 전 엔드포인트 get_current_user + user_id 검증, 403

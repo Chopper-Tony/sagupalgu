@@ -10,6 +10,7 @@ from typing import Any, Dict
 # ── 타임아웃 (초) ────────────────────────────────────────────────
 
 PUBLISH_TIMEOUT_SECONDS: int = 180  # 플랫폼별 게시 최대 대기 (이미지 업로드+폼 입력 포함)
+MAX_CONCURRENT_BROWSERS: int = 2   # Playwright 브라우저 동시 실행 상한 (메모리 보호)
 
 # ── 재시도 정책 ──────────────────────────────────────────────────
 
