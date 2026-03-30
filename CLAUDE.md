@@ -37,7 +37,7 @@ cd frontend && npm install && npm run dev
 # Docker 풀스택
 docker compose up --build
 
-# 백엔드 테스트 (661개)
+# 백엔드 테스트 (682개)
 python -m pytest tests/           # 전체
 python -m pytest tests/ -m unit   # unit만 (0.5초)
 
@@ -106,6 +106,7 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M115**: 게시 안정성 개선 — 이벤트 루프 블로킹 해소(`asyncio.to_thread`), 번개장터 카테고리 3단계 보완 + 폼 입력 순서 수정, pgvector/Gemini 캐싱, LLM 타임아웃 30초
 - **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
 
 - **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지

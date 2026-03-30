@@ -70,7 +70,8 @@ class TestKeywordSearch:
     @pytest.mark.asyncio
     async def test_키워드검색_정상_결과(self):
         """ILIKE 키워드 검색 → 결과 반환"""
-        from app.db.pgvector_store import keyword_search_price_history
+        from app.db.pgvector_store import keyword_search_price_history, _table_ready_cache
+        _table_ready_cache.clear()
 
         mock_rows = [
             {"model": "아이폰 15 Pro", "brand": "애플", "price": 980000, "platform": "bunjang"},
@@ -94,7 +95,8 @@ class TestKeywordSearch:
     @pytest.mark.asyncio
     async def test_키워드검색_실패시_빈_결과(self):
         """DB 에러 → 빈 리스트"""
-        from app.db.pgvector_store import keyword_search_price_history
+        from app.db.pgvector_store import keyword_search_price_history, _table_ready_cache
+        _table_ready_cache.clear()
 
         mock_supabase = MagicMock()
         mock_supabase.table.return_value.select.side_effect = Exception("DB 연결 실패")
@@ -195,7 +197,8 @@ class TestTableReadiness:
 
     @pytest.mark.asyncio
     async def test_테이블_존재_확인(self):
-        from app.db.pgvector_store import is_table_ready
+        from app.db.pgvector_store import is_table_ready, _table_ready_cache
+        _table_ready_cache.clear()
 
         mock_supabase = MagicMock()
         mock_supabase.table.return_value.select.return_value.limit.return_value.execute.return_value = MagicMock()
@@ -205,7 +208,8 @@ class TestTableReadiness:
 
     @pytest.mark.asyncio
     async def test_테이블_없음(self):
-        from app.db.pgvector_store import is_table_ready
+        from app.db.pgvector_store import is_table_ready, _table_ready_cache
+        _table_ready_cache.clear()
 
         mock_supabase = MagicMock()
         mock_supabase.table.return_value.select.side_effect = Exception("relation not found")
