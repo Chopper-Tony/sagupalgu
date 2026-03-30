@@ -171,6 +171,7 @@
 
 | M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
 | M114: Playwright 동시성 제한 + 로드맵 | ✅ 완료 | `MAX_CONCURRENT_BROWSERS=2` 세마포어 도입(메모리 보호) ✅, `publish_service.py` `_get_semaphore()` lazy 싱글턴 ✅, `architecture.md` 섹션 8 워커/큐 분리 로드맵 ✅, 테스트 5개 추가 ✅, 682 테스트 통과 ✅ |
+| M115: 게시 안정성 개선 | ✅ 완료 | `_run_graph()` → `asyncio.to_thread()` 래핑(이벤트 루프 블로킹 해소, 서버 먹통 방지) ✅, 번개장터 카테고리→이미지→상품명 순서 변경(폼 리셋 방지) ✅, `_CATEGORY_DEPTH_FIX` 3단계 보완 맵 11개(태블릿→디지털>태블릿>태블릿PC 등) ✅, pgvector `is_table_ready()` 캐싱(매 요청 DB 쿼리 제거) ✅, Gemini 429 시 프로세스 내 비활성화(OpenAI 전환) ✅, LLM HTTP 타임아웃 60→30초·`_run_async` 60초(빠른 fallback) ✅, `batch_publish_test.py` 배치 테스트 스크립트 ✅, 파이프라인 100%·게시 60%→개선 중 ✅, 682 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력
 

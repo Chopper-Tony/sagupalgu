@@ -190,14 +190,14 @@ async def _rag_price_impl(
 
         rag_result = None
 
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and not getattr(_rag_price_impl, "_gemini_disabled", False):
             try:
                 url = (
                     "https://generativelanguage.googleapis.com/v1beta/models/"
                     f"{settings.gemini_listing_model}:generateContent"
                     f"?key={settings.gemini_api_key}"
                 )
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=15.0) as client:
                     resp = await client.post(url, json={
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"temperature": 0.1},
@@ -207,6 +207,9 @@ async def _rag_price_impl(
                 rag_result = extract_json(text)
             except Exception as e:
                 logger.warning(f"[rag_price] gemini failed: {e}")
+                if "429" in str(e):
+                    _rag_price_impl._gemini_disabled = True
+                    logger.info("[rag_price] gemini 429 — 이번 프로세스에서 비활성화, OpenAI로 전환")
 
         if not rag_result and settings.openai_api_key:
             try:

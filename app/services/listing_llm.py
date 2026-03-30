@@ -56,7 +56,7 @@ async def generate_copy_with_openai(
         if delay > 0:
             await asyncio.sleep(delay)
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers=headers,
@@ -108,7 +108,7 @@ async def generate_copy_with_gemini(
         "generationConfig": {"temperature": 0.3},
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(url, json=payload)
         response.raise_for_status()
         data = response.json()
@@ -161,7 +161,7 @@ async def generate_copy_with_solar(
         "temperature": 0.3,
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             "https://api.upstage.ai/v1/solar/chat/completions",
             headers=headers,

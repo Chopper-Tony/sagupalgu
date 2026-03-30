@@ -107,7 +107,7 @@ def _run_async(coro_or_factory):
     )
     loop = _get_dedicated_loop()
     future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result(timeout=120)
+    return future.result(timeout=60)
 
 
 def _build_react_llm():

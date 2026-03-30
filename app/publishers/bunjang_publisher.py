@@ -30,18 +30,53 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
     EXTENDED_CATEGORY_MAP으로 카테고리 매핑 확장.
     """
 
+    # 2단계 매핑을 3단계로 보완하는 맵
+    _CATEGORY_DEPTH_FIX = {
+        "태블릿": ["디지털", "태블릿", "태블릿PC"],
+        "아이패드": ["디지털", "태블릿", "태블릿PC"],
+        "자전거": ["스포츠/레저", "자전거", "자전거"],
+        "여성의류": ["여성의류", "상의", "반팔티셔츠"],
+        "남성의류": ["남성의류", "상의", "반팔티셔츠"],
+        "가전제품": ["가전제품", "생활가전", "기타 생활가전"],
+        "이어폰": ["디지털", "오디오/영상/관련기기", "이어폰"],
+        "헤드폰": ["디지털", "오디오/영상/관련기기", "헤드폰"],
+        "카메라": ["디지털", "카메라/DSLR", "디지털카메라"],
+        "게임기": ["디지털", "게임/타이틀", "게임기"],
+        "신발": ["신발", "운동화", "기타 운동화"],
+    }
+
     async def _select_category(self, page: Page, category_str: str):
-        """legacy 매핑 우선 시도, 실패 시 대분류 '기타' 직접 클릭."""
+        """legacy 매핑 우선 시도, 2단계면 3단계 보완, 실패 시 '기타' fallback."""
         from legacy_spikes.secondhand_publisher.publishers.bunjang import CATEGORY_MAP
 
         category_str = (category_str or "").strip()
 
-        # legacy 매핑에 있으면 기존 로직 사용
-        if category_str in CATEGORY_MAP:
+        # 1) 3단계 보완 맵에 있으면 직접 3열 선택
+        if category_str in self._CATEGORY_DEPTH_FIX:
+            parts = self._CATEGORY_DEPTH_FIX[category_str]
+            logger.info("[번개장터] 카테고리 '%s' → 3단계 보완: %s", category_str, parts)
+            for idx, part in enumerate(parts[:3]):
+                ok = await self._find_and_click_category_in_column(page, part, idx)
+                if not ok:
+                    logger.warning("[번개장터] 3단계 보완 '%s' column=%d 실패 → '기타' fallback", part, idx)
+                    return await self._fallback_to_etc(page, category_str)
+            return
+
+        # 2) legacy 매핑에 있고 3단계면 기존 로직
+        if category_str in CATEGORY_MAP and len(CATEGORY_MAP[category_str]) >= 3:
             return await super()._select_category(page, category_str)
 
-        # 매핑에 없는 카테고리 → 대분류 첫 번째 열에서 '기타' 직접 클릭
-        logger.info("[번개장터] 카테고리 '%s' 매핑 없음 → 대분류 '기타' 선택", category_str)
+        # 3) legacy 매핑에 있지만 2단계 이하 → '기타' fallback
+        if category_str in CATEGORY_MAP:
+            logger.info("[번개장터] 카테고리 '%s' 매핑 %d단계 → '기타' fallback", category_str, len(CATEGORY_MAP[category_str]))
+            return await self._fallback_to_etc(page, category_str)
+
+        # 4) 매핑에 없는 카테고리 → '기타'
+        logger.info("[번개장터] 카테고리 '%s' 매핑 없음 → '기타' 선택", category_str)
+        return await self._fallback_to_etc(page, category_str)
+
+    async def _fallback_to_etc(self, page: Page, category_str: str):
+        """대분류 '기타' 1단계 선택 fallback."""
         ok = await self._find_and_click_category_in_column(page, "기타", 0)
         if ok:
             logger.info("[번개장터] 대분류 '기타' 선택 성공")
@@ -70,20 +105,20 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
 
             await self.screenshot(page, "write_page")
 
-            # ① 이미지
+            # ① 카테고리 (먼저 선택 — 3단계 카테고리 선택 시 폼 리셋 방지)
+            await self._select_category(page, package.category)
+
+            # ② 이미지
             await self._upload_images(page, package.image_paths)
 
-            # ② 이미지 미리보기 모달 닫기
+            # ③ 이미지 미리보기 모달 닫기
             await self._close_image_modal_if_open(page)
 
-            # ③ 상품명
+            # ④ 상품명 (카테고리 선택 후 입력해야 리셋 안 됨)
             title_input = page.locator("input[placeholder='상품명을 입력해 주세요.']").first
             await title_input.click()
             await title_input.fill(package.title)
             await self._human_delay()
-
-            # ④ 카테고리
-            await self._select_category(page, package.category)
 
             # ⑤ 상태
             await self._select_condition(page, package.condition)

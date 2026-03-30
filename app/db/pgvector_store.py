@@ -12,6 +12,9 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# 테이블 존재 여부 캐시 — 한 번 확인 후 재확인 불필요
+_table_ready_cache: dict[str, bool] = {}
+
 EMBEDDING_DIM = 1536
 EMBEDDING_MODEL = "text-embedding-3-small"
 
@@ -85,6 +88,9 @@ async def keyword_search_price_history(
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
     """벡터 검색 실패 시 대안: 키워드(ILIKE) 기반 검색."""
+    if _table_ready_cache.get("ready") is False:
+        return []
+
     from app.db.client import get_supabase
 
     try:
@@ -164,12 +170,17 @@ async def insert_price_records(
 
 
 async def is_table_ready() -> bool:
-    """price_history 테이블이 존재하고 사용 가능한지 확인."""
+    """price_history 테이블이 존재하고 사용 가능한지 확인. 결과 캐싱."""
+    if "ready" in _table_ready_cache:
+        return _table_ready_cache["ready"]
+
     from app.db.client import get_supabase
     try:
         supabase = get_supabase()
         supabase.table("price_history").select("id").limit(1).execute()
+        _table_ready_cache["ready"] = True
         return True
     except Exception as e:
         logger.debug("[pgvector] table readiness check failed: %s", e)
+        _table_ready_cache["ready"] = False
         return False
