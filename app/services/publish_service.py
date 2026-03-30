@@ -12,6 +12,19 @@ from app.publishers.publisher_interface import (
 
 class PublishService:
 
+    _browser_semaphore: "asyncio.Semaphore | None" = None
+
+    @classmethod
+    def _get_semaphore(cls) -> "asyncio.Semaphore":
+        """Playwright 브라우저 동시 실행 수를 제한하는 세마포어 (lazy 싱글턴)."""
+        if cls._browser_semaphore is None:
+            import asyncio
+
+            from app.domain.publish_policy import MAX_CONCURRENT_BROWSERS
+
+            cls._browser_semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
+        return cls._browser_semaphore
+
     PUBLISHER_REGISTRY = {
         "joongna": JoongnaPublisher,
         "bunjang": BunjangPublisher,
@@ -121,10 +134,11 @@ class PublishService:
                     "auto_recoverable": classification["auto_recoverable"],
                 }
             try:
-                result = await asyncio.wait_for(
-                    self.publish(platform=platform, payload=payload),
-                    timeout=PUBLISH_TIMEOUT_SECONDS,
-                )
+                async with self._get_semaphore():
+                    result = await asyncio.wait_for(
+                        self.publish(platform=platform, payload=payload),
+                        timeout=PUBLISH_TIMEOUT_SECONDS,
+                    )
                 error_code = result.error_code or ""
                 error_message = result.error_message or ""
                 classification = classify_error(error_code, error_message)

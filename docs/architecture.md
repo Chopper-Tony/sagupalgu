@@ -215,3 +215,52 @@ validation_node
 | 8 | `rewrite_listing_tool` | Agent 3 | 내부 공유 |
 | 9 | `diagnose_publish_failure_tool` | Agent 4 | fallback |
 | 10 | `price_optimization_tool` | Agent 5 | 규칙 기반 |
+
+---
+
+## 8. 게시 인프라 확장 로드맵
+
+### 현재 구조 (Phase 0)
+
+Playwright 브라우저가 **FastAPI API 워커 내에서 직접 실행**된다.
+Windows에서는 별도 스레드 + ProactorEventLoop으로 처리하며,
+`asyncio.gather`로 플랫폼별 병렬 게시를 수행한다.
+
+```
+FastAPI 요청 → publish_orchestrator → publish_service.execute_publish()
+  → asyncio.gather([bunjang, joongna])
+    → 각각 Semaphore 획득 → ThreadPool + Browser Process
+```
+
+**동시성 제한**: `MAX_CONCURRENT_BROWSERS = 2` 세마포어로 브라우저 동시 실행을 제한하여
+메모리 폭발(Chromium ~150-300MB/개)을 방지한다.
+
+**적합 규모**: 동시 사용자 1-5명, 분당 게시 1-2건 이하.
+
+### 한계
+
+| 문제 | 영향 |
+|------|------|
+| API 워커 스레드 점유 | 게시 중 180초간 워커 블로킹, 동시 처리 한계 |
+| 메모리 선형 증가 | 브라우저 수 = 메모리 사용량, 스케일아웃 불가 |
+| 장애 전파 | 브라우저 크래시가 API 프로세스에 직접 영향 |
+| 로드밸런서 타임아웃 | 180초 게시가 프록시 60초 기본 타임아웃과 충돌 |
+
+### 서비스화 단계 (Phase 1) — 워커/큐 분리
+
+```
+[API 서버]                    [메시지 큐]              [게시 워커]
+POST /publish                  Redis / SQS             Celery Worker
+  → 202 Accepted              ─────────────►           (Playwright)
+  → task_id 반환                                        ↓
+                                                     브라우저 실행
+GET /publish/{task_id}/status  ◄─────────────          결과 저장
+  or SSE stream                  결과 콜백
+```
+
+**변경 사항**:
+- `POST /publish` → `202 Accepted` + `task_id` 반환 (즉시 응답)
+- 게시 결과는 SSE 또는 폴링으로 수신
+- 게시 워커를 별도 컨테이너/프로세스로 분리
+- 워커 수평 확장 가능 (게시량에 비례)
+- API 서버는 브라우저 프로세스와 완전 격리

@@ -4,6 +4,7 @@ import pytest
 from app.domain.publish_policy import (
     DISCORD_ALERT_THRESHOLD,
     FAILURE_TAXONOMY,
+    MAX_CONCURRENT_BROWSERS,
     MAX_PUBLISH_RETRIES,
     PUBLISH_TIMEOUT_SECONDS,
     classify_error,
@@ -126,3 +127,63 @@ class TestTaxonomyCompleteness:
     def test_at_least_one_recoverable(self):
         recoverable = [c for c, e in FAILURE_TAXONOMY.items() if e["auto_recoverable"]]
         assert len(recoverable) >= 1
+
+
+# ── 동시성 제한 ────────────────────────────────────────────────
+
+
+class TestConcurrencyLimit:
+    @pytest.mark.unit
+    def test_max_concurrent_browsers_is_positive(self):
+        assert MAX_CONCURRENT_BROWSERS >= 1
+
+    @pytest.mark.unit
+    def test_max_concurrent_browsers_is_reasonable(self):
+        """메모리 보호를 위해 상한이 과도하지 않아야 한다."""
+        assert MAX_CONCURRENT_BROWSERS <= 10
+
+    @pytest.mark.unit
+    def test_semaphore_lazy_creation(self):
+        """PublishService._get_semaphore()가 asyncio.Semaphore를 반환한다."""
+        import asyncio
+
+        from app.services.publish_service import PublishService
+
+        # 이전 테스트에서 생성된 세마포어 초기화
+        PublishService._browser_semaphore = None
+        sem = PublishService._get_semaphore()
+        assert isinstance(sem, asyncio.Semaphore)
+
+    @pytest.mark.unit
+    def test_semaphore_is_singleton(self):
+        """같은 Semaphore 인스턴스를 반환해야 한다."""
+        from app.services.publish_service import PublishService
+
+        PublishService._browser_semaphore = None
+        sem1 = PublishService._get_semaphore()
+        sem2 = PublishService._get_semaphore()
+        assert sem1 is sem2
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_semaphore_limits_concurrency(self):
+        """세마포어가 동시 실행 수를 MAX_CONCURRENT_BROWSERS로 제한한다."""
+        import asyncio
+
+        from app.services.publish_service import PublishService
+
+        PublishService._browser_semaphore = None
+        sem = PublishService._get_semaphore()
+        running = 0
+        max_running = 0
+
+        async def _task():
+            nonlocal running, max_running
+            async with sem:
+                running += 1
+                max_running = max(max_running, running)
+                await asyncio.sleep(0.05)
+                running -= 1
+
+        await asyncio.gather(*[_task() for _ in range(5)])
+        assert max_running <= MAX_CONCURRENT_BROWSERS
