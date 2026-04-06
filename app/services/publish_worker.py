@@ -257,14 +257,23 @@ class PublishWorker:
                         }
 
                 new_status = "publishing_failed" if any_failure else "completed"
+                # session_ui.py는 workflow_meta["publish_results"]를 읽으므로
+                # 기존 오케스트레이터(set_publish_complete)와 동일한 키 사용
+                existing = get_supabase().table("sell_sessions").select(
+                    "workflow_meta_jsonb"
+                ).eq("id", session_id).execute()
+                meta = {}
+                if existing.data:
+                    meta = dict(existing.data[0].get("workflow_meta_jsonb") or {})
+                meta["publish_results"] = publish_results
+                meta["publish_complete"] = {
+                    "results": publish_results,
+                    "any_failure": any_failure,
+                }
+
                 get_supabase().table("sell_sessions").update({
                     "status": new_status,
-                    "workflow_meta_jsonb": {
-                        "publish_complete": {
-                            "results": publish_results,
-                            "any_failure": any_failure,
-                        }
-                    },
+                    "workflow_meta_jsonb": meta,
                 }).eq("id", session_id).execute()
 
                 logger.info(
