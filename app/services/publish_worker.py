@@ -96,6 +96,23 @@ class PublishWorker:
         }
 
         async with self._semaphore:
+            # 실행 전 세션 상태 검증 — publishing이 아니면 스킵
+            try:
+                from app.db.client import get_supabase
+                sess = get_supabase().table("sell_sessions").select(
+                    "session_status"
+                ).eq("id", session_id).execute()
+                if sess.data and sess.data[0].get("session_status") != "publishing":
+                    logger.info(
+                        "publish_job_skipped_stale session=%s status=%s job_id=%s",
+                        session_id, sess.data[0].get("session_status"), job_id,
+                    )
+                    self.job_repo.cancel(job_id)
+                    self._active_jobs = max(0, self._active_jobs - 1)
+                    return
+            except Exception as e:
+                logger.warning("session_state_check_failed job_id=%s: %s", job_id, e)
+
             self.job_repo.start(job_id)
             logger.info("publish_job_started %s", log_ctx)
 
@@ -195,9 +212,9 @@ class PublishWorker:
             "success": result.success,
             "error_code": result.error_code or "",
             "error_message": result.error_message or "",
-            "listing_id": result.listing_id,
-            "listing_url": result.listing_url,
-            "evidence_urls": [result.screenshot_path] if result.screenshot_path else [],
+            "listing_id": result.external_listing_id,
+            "listing_url": result.external_url,
+            "evidence_urls": [result.evidence_path] if result.evidence_path else [],
         }
 
     async def _update_session_on_complete(
@@ -240,7 +257,7 @@ class PublishWorker:
                         }
 
                 new_status = "publishing_failed" if any_failure else "completed"
-                get_supabase().table("sessions").update({
+                get_supabase().table("sell_sessions").update({
                     "session_status": new_status,
                     "workflow_meta_jsonb": {
                         "publish_complete": {
@@ -287,7 +304,7 @@ class PublishWorker:
         # 모든 작업 종료 → 세션 실패 처리
         try:
             from app.db.client import get_supabase
-            get_supabase().table("sessions").update({
+            get_supabase().table("sell_sessions").update({
                 "session_status": "publishing_failed",
             }).eq("id", session_id).execute()
         except Exception as e:

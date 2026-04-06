@@ -44,7 +44,7 @@ class PublishJobRepository:
             "user_id": user_id,
             "platform": platform,
             "payload_jsonb": payload,
-            "status": PublishJobStatus.PENDING,
+            "status": PublishJobStatus.PENDING.value,
             "max_attempts": max_attempts,
         }
         result = (
@@ -111,7 +111,7 @@ class PublishJobRepository:
             self._get_client()
             .table(TABLE)
             .select("*")
-            .in_("status", [PublishJobStatus.PENDING])
+            .in_("status", [PublishJobStatus.PENDING.value])
             .order("created_at")
             .limit(limit)
             .execute()
@@ -123,7 +123,7 @@ class PublishJobRepository:
             self._get_client()
             .table(TABLE)
             .select("*")
-            .eq("status", PublishJobStatus.RETRY_SCHEDULED)
+            .eq("status", PublishJobStatus.RETRY_SCHEDULED.value)
             .lte("next_retry_at", now)
             .order("next_retry_at")
             .limit(limit)
@@ -141,14 +141,14 @@ class PublishJobRepository:
                 self._get_client()
                 .table(TABLE)
                 .update({
-                    "status": PublishJobStatus.CLAIMED,
+                    "status": PublishJobStatus.CLAIMED.value,
                     "locked_by": worker_id,
                     "locked_at": now,
                 })
                 .eq("id", job_id)
                 .in_("status", [
-                    PublishJobStatus.PENDING,
-                    PublishJobStatus.RETRY_SCHEDULED,
+                    PublishJobStatus.PENDING.value,
+                    PublishJobStatus.RETRY_SCHEDULED.value,
                 ])
                 .execute()
             )
@@ -173,7 +173,7 @@ class PublishJobRepository:
         """작업 실행 시작."""
         now = datetime.now(timezone.utc).isoformat()
         self._get_client().table(TABLE).update({
-            "status": PublishJobStatus.RUNNING,
+            "status": PublishJobStatus.RUNNING.value,
             "started_at": now,
         }).eq("id", job_id).execute()
 
@@ -185,7 +185,7 @@ class PublishJobRepository:
         """작업 성공 완료."""
         now = datetime.now(timezone.utc).isoformat()
         self._get_client().table(TABLE).update({
-            "status": PublishJobStatus.COMPLETED,
+            "status": PublishJobStatus.COMPLETED.value,
             "finished_at": now,
             "locked_by": None,
             "locked_at": None,
@@ -220,7 +220,7 @@ class PublishJobRepository:
             ).isoformat()
 
             self._get_client().table(TABLE).update({
-                "status": PublishJobStatus.RETRY_SCHEDULED,
+                "status": PublishJobStatus.RETRY_SCHEDULED.value,
                 "attempt_count": attempt,
                 "error_code": error_code,
                 "error_message": error_message,
@@ -236,7 +236,7 @@ class PublishJobRepository:
         else:
             # 최종 실패
             self._get_client().table(TABLE).update({
-                "status": PublishJobStatus.FAILED,
+                "status": PublishJobStatus.FAILED.value,
                 "attempt_count": attempt,
                 "finished_at": now,
                 "error_code": error_code,
@@ -256,15 +256,15 @@ class PublishJobRepository:
             self._get_client()
             .table(TABLE)
             .update({
-                "status": PublishJobStatus.CANCELLED,
+                "status": PublishJobStatus.CANCELLED.value,
                 "locked_by": None,
                 "locked_at": None,
             })
             .eq("id", job_id)
             .not_.in_("status", [
-                PublishJobStatus.COMPLETED,
-                PublishJobStatus.FAILED,
-                PublishJobStatus.CANCELLED,
+                PublishJobStatus.COMPLETED.value,
+                PublishJobStatus.FAILED.value,
+                PublishJobStatus.CANCELLED.value,
             ])
             .execute()
         )
@@ -286,13 +286,13 @@ class PublishJobRepository:
             self._get_client()
             .table(TABLE)
             .update({
-                "status": PublishJobStatus.FAILED,
+                "status": PublishJobStatus.FAILED.value,
                 "error_code": "worker_stuck",
                 "error_message": f"Worker lock timeout ({WORKER_LOCK_TIMEOUT_SECONDS}s)",
                 "locked_by": None,
                 "locked_at": None,
             })
-            .in_("status", [PublishJobStatus.CLAIMED, PublishJobStatus.RUNNING])
+            .in_("status", [PublishJobStatus.CLAIMED.value, PublishJobStatus.RUNNING.value])
             .lte("locked_at", threshold_iso)
             .execute()
         )
@@ -320,9 +320,9 @@ class PublishJobRepository:
         result = (
             self._get_client()
             .table(TABLE)
-            .update({"status": PublishJobStatus.CANCELLED})
+            .update({"status": PublishJobStatus.CANCELLED.value})
             .eq("platform", platform)
-            .eq("status", PublishJobStatus.PENDING)
+            .eq("status", PublishJobStatus.PENDING.value)
             .execute()
         )
         count = len(result.data) if result.data else 0
@@ -334,11 +334,11 @@ class PublishJobRepository:
         result = (
             self._get_client()
             .table(TABLE)
-            .update({"status": PublishJobStatus.CANCELLED})
+            .update({"status": PublishJobStatus.CANCELLED.value})
             .eq("user_id", user_id)
             .in_("status", [
-                PublishJobStatus.PENDING,
-                PublishJobStatus.RETRY_SCHEDULED,
+                PublishJobStatus.PENDING.value,
+                PublishJobStatus.RETRY_SCHEDULED.value,
             ])
             .execute()
         )
