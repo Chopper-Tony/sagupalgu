@@ -127,6 +127,13 @@ class Settings(BaseSettings):
         alias="SCREENSHOT_DIR",
     )
 
+    # Job Queue
+    publish_use_queue: bool = Field(
+        default=True,
+        alias="PUBLISH_USE_QUEUE",
+        description="True=Job Queue 비동기, False=직접 실행 (테스트/개발용)",
+    )
+
     # ------------------------------
     # Supabase Storage
     # ------------------------------

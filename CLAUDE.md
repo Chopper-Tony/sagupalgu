@@ -108,10 +108,12 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
+- **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
 - **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)
 - **M118**: except Exception 세분화 — auth/optimization 구체화 2건, 외부 경계 exc_info 로깅 강화 18건
 - **M120**: Caddy healthcheck + Docker rolling restart + named volumes 영속성
-- **M116**: AWS 인프라 최적화 — Caddy HTTPS 리버스 프록시(`docker-compose.prod.yml`), S3 보조 스토리지(게시 증적 스크린샷), EC2 스왑 설정, deployment.md 전면 재작성
+- **M116**: AWS 인프라 최적화 — Caddy HTTPS 리버스 프록시(`docker-compose.prod.yml`), S3 보조 스토리지(게시 증적 스크린샷), EC2 스왑 설정, `deployment.md` 전면 재작성
 - **M115**: 게시 안정성 개선 — 이벤트 루프 블로킹 해소(`asyncio.to_thread`), 번개장터 카테고리 3단계 보완 + 폼 입력 순서 수정, pgvector/Gemini 캐싱, LLM 타임아웃 30초
 - **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
 

@@ -11,6 +11,7 @@ env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key' }}
   SECRET_ENCRYPTION_KEY: ${{ secrets.SECRET_ENCRYPTION_KEY || 'placeholder-encryption-key-32ch' }}
+  PUBLISH_USE_QUEUE: "false"  # CI에서는 publish_jobs 테이블 없으므로 동기 모드
 
 jobs:
   test:
