@@ -100,12 +100,12 @@ class PublishWorker:
             try:
                 from app.db.client import get_supabase
                 sess = get_supabase().table("sell_sessions").select(
-                    "session_status"
+                    "status"
                 ).eq("id", session_id).execute()
-                if sess.data and sess.data[0].get("session_status") != "publishing":
+                if sess.data and sess.data[0].get("status") != "publishing":
                     logger.info(
                         "publish_job_skipped_stale session=%s status=%s job_id=%s",
-                        session_id, sess.data[0].get("session_status"), job_id,
+                        session_id, sess.data[0].get("status"), job_id,
                     )
                     self.job_repo.cancel(job_id)
                     self._active_jobs = max(0, self._active_jobs - 1)
@@ -258,7 +258,7 @@ class PublishWorker:
 
                 new_status = "publishing_failed" if any_failure else "completed"
                 get_supabase().table("sell_sessions").update({
-                    "session_status": new_status,
+                    "status": new_status,
                     "workflow_meta_jsonb": {
                         "publish_complete": {
                             "results": publish_results,
@@ -305,7 +305,7 @@ class PublishWorker:
         try:
             from app.db.client import get_supabase
             get_supabase().table("sell_sessions").update({
-                "session_status": "publishing_failed",
+                "status": "publishing_failed",
             }).eq("id", session_id).execute()
         except Exception as e:
             logger.error(
