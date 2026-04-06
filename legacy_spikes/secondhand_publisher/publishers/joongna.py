@@ -216,9 +216,8 @@ class JoongnaPublisher(BasePublisher):
             except Exception:
                 shot = None
 
-            # 디버깅용: 성공 화면 30초 유지
             try:
-                await page.wait_for_timeout(30000)
+                await page.wait_for_timeout(3000)
             except Exception:
                 pass
 
@@ -238,9 +237,8 @@ class JoongnaPublisher(BasePublisher):
             except Exception:
                 shot = None
 
-            # 디버깅용: 실패 화면 30초 유지
             try:
-                await page.wait_for_timeout(30000)
+                await page.wait_for_timeout(3000)
             except Exception:
                 pass
 
