@@ -287,7 +287,7 @@ async def generate_copy(
                     tool_calls_context=tool_calls_context,
                 )
         except Exception as exc:
-            logger.warning("LLM provider %s failed: %s", provider, exc)
+            logger.warning("LLM provider %s failed: %s", provider, exc, exc_info=True)
             continue
 
     return build_template_copy(

@@ -202,7 +202,7 @@ class SessionService:
                 logger.info("fallback_listing_success title=%s price=%s", result.get("title"), result.get("price"))
                 return listing_data
         except Exception as e:
-            logger.warning("fallback LLM failed: %s", e)
+            logger.warning("fallback LLM failed: %s", e, exc_info=True)
 
         # LLM도 실패하면 템플릿 판매글
         from app.services.listing_llm import build_template_copy
