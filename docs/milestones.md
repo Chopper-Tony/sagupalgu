@@ -171,6 +171,7 @@
 
 | M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
 | M114: Playwright 동시성 제한 + 로드맵 | ✅ 완료 | `MAX_CONCURRENT_BROWSERS=2` 세마포어 도입(메모리 보호) ✅, `publish_service.py` `_get_semaphore()` lazy 싱글턴 ✅, `architecture.md` 섹션 8 워커/큐 분리 로드맵 ✅, 테스트 5개 추가 ✅, 682 테스트 통과 ✅ |
+| M121: Publish Job Queue 도입 | ✅ 완료 | `publish_jobs` 테이블 설계(7상태·per-account lock 유니크 인덱스) ✅, `PublishJobRepository` CRUD+claim+fail+retry+운영(stuck해제·큐통계·플랫폼중지·사용자비활성화) ✅, `PublishWorker` 백그라운드 폴링+세마포어+structured logging ✅, `PublishOrchestrator` 큐 등록 방식 전환(`_publish_via_queue`)+기존 동기 방식 유지(`publish_session_sync`) ✅, Admin API 7개(stats/list/get/retry/force-fail/pause/disable) ✅, `PUBLISH_USE_QUEUE` feature flag ✅, 단계별 타임아웃(`STEP_TIMEOUTS` 7단계) ✅, 테스트 26개 추가 ✅, 714 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력
 

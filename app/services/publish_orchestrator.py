@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from app.core.utils import safe_int as _safe_int
+from app.db.publish_job_repository import PublishJobRepository
 from app.domain.exceptions import InvalidUserInputError
 from app.repositories.session_repository import SessionRepository
 from app.services.publish_service import PublishService
@@ -29,10 +30,12 @@ class PublishOrchestrator:
         session_repository: SessionRepository,
         publish_service: PublishService,
         recovery_service: RecoveryService,
+        job_repo: PublishJobRepository | None = None,
     ):
         self.repo = session_repository
         self.publish_service = publish_service
         self.recovery_service = recovery_service
+        self.job_repo = job_repo or PublishJobRepository()
 
     async def prepare_publish(
         self,
@@ -71,8 +74,63 @@ class PublishOrchestrator:
         session_id: str,
         session: dict[str, Any],
         current_status: str,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
-        """게시 실행: 플랫폼별 병렬 게시 + 실패 복구."""
+        """게시 실행. PUBLISH_USE_QUEUE 설정에 따라 큐/직접 실행 분기."""
+        from app.core.config import settings
+        if settings.publish_use_queue:
+            return await self._publish_via_queue(
+                session_id, session, current_status, user_id,
+            )
+        return await self.publish_session_sync(
+            session_id, session, current_status,
+        )
+
+    async def _publish_via_queue(
+        self,
+        session_id: str,
+        session: dict[str, Any],
+        current_status: str,
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Job Queue에 등록하고 즉시 반환. 실제 실행은 PublishWorker가 처리."""
+        selected = session.get("selected_platforms_jsonb") or []
+        packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
+        if not selected:
+            raise InvalidUserInputError("선택된 플랫폼이 없습니다")
+
+        workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+        self._update_or_raise(
+            session_id,
+            {"status": "publishing", "workflow_meta_jsonb": workflow_meta},
+            expected_status=current_status,
+        )
+
+        # Job Queue에 등록 (워커가 비동기 처리)
+        jobs = self.job_repo.create_batch(
+            session_id=session_id,
+            user_id=user_id or session.get("user_id", ""),
+            platforms=selected,
+            packages=packages,
+        )
+        logger.info(
+            "publish_jobs_enqueued session=%s platforms=%s job_count=%d",
+            session_id, selected, len(jobs),
+        )
+
+        updated = self.repo.get_by_id(session_id)
+        return build_session_ui_response(updated or session)
+
+    async def publish_session_sync(
+        self,
+        session_id: str,
+        session: dict[str, Any],
+        current_status: str,
+    ) -> dict[str, Any]:
+        """동기 게시 실행 (기존 방식 — fallback용).
+
+        Job Queue 없이 직접 Playwright 실행. 개발/테스트 환경에서 사용.
+        """
         selected = session.get("selected_platforms_jsonb") or []
         packages = (session.get("listing_data_jsonb") or {}).get("platform_packages") or {}
         if not selected:

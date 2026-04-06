@@ -268,7 +268,7 @@ class SessionService:
     async def publish_session(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
         session = self._ensure_transition(session_id, "publishing", user_id)
         return await self.publish_orchestrator.publish_session(
-            session_id, session, session["status"],
+            session_id, session, session["status"], user_id=user_id,
         )
 
     # ── 판매 상태 입력 (SaleTracker 위임) ──────────────────────────

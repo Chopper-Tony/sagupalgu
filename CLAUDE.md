@@ -106,6 +106,8 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제fail/플랫폼중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
+- **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
 - **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
 
 - **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지
