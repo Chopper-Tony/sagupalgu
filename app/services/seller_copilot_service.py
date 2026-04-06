@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.domain.product_rules import (
     build_confirmed_product_from_candidate,
@@ -201,6 +204,7 @@ class SellerCopilotService:
         try:
             vision_result = await self.product_service.identify_product(image_paths)
         except Exception as exc:
+            logger.error("vision_analysis_failed: %s", exc, exc_info=True)
             raise ValueError(f"Vision analysis failed: {exc}") from exc
 
         candidates = list(getattr(vision_result, "candidates", []) or [])

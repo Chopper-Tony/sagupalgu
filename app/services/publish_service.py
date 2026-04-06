@@ -171,7 +171,7 @@ class PublishService:
                 }
             except Exception as e:
                 classification = classify_error("publish_exception", str(e))
-                logger.error("publish_exception platform=%s error=%s", platform, e)
+                logger.error("publish_exception platform=%s error=%s", platform, e, exc_info=True)
                 return {
                     "success": False, "platform": platform,
                     "error_code": classification["error_code"],

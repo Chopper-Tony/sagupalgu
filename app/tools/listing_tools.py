@@ -72,6 +72,7 @@ async def lc_generate_listing_tool(
         return str(result)
 
     except Exception as e:
+        logger.warning("[generate_listing_tool] failed: %s", e, exc_info=True)
         import json as _json
         return _json.dumps({
             "title": f"{brand} {model} 판매합니다",
@@ -133,6 +134,7 @@ async def lc_rewrite_listing_tool(
         return str(output)
 
     except Exception as e:
+        logger.warning("[rewrite_listing_tool] lc_ wrapper failed: %s", e, exc_info=True)
         import json as _json
         return _json.dumps({
             "title": current_title,
@@ -172,7 +174,7 @@ async def _rewrite_listing_impl(
         return make_tool_call("rewrite_listing_tool", tool_input, result, success=True)
 
     except Exception as e:
-        logger.error(f"[rewrite_listing_tool] failed: {e}")
+        logger.error("[rewrite_listing_tool] failed: %s", e, exc_info=True)
         return make_tool_call("rewrite_listing_tool", tool_input, canonical_listing, success=False, error=str(e))
 
 

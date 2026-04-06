@@ -61,7 +61,7 @@ def _decode_jwt(token: str) -> dict:
         payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
         return payload
-    except Exception as e:
+    except (ValueError, KeyError) as e:
         logger.warning("jwt_decode_failed: %s", e)
         raise HTTPException(status_code=401, detail="토큰 검증에 실패했습니다")
 
