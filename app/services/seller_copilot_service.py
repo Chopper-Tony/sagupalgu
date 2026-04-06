@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.domain.product_rules import (
     build_confirmed_product_from_candidate,
@@ -201,6 +204,7 @@ class SellerCopilotService:
         try:
             vision_result = await self.product_service.identify_product(image_paths)
         except Exception as exc:
+            logger.error("vision_analysis_failed: %s", exc, exc_info=True)
             raise ValueError(f"Vision analysis failed: {exc}") from exc
 
         candidates = list(getattr(vision_result, "candidates", []) or [])
@@ -235,10 +239,16 @@ class SellerCopilotService:
         market_context: dict[str, Any] | None = None,
         rewrite_instruction: str | None = None,
     ) -> dict[str, Any]:
-        """LangGraph 실행. 시세 분석은 그래프 안의 Agent 2가 ReAct로 자율 수행."""
-        # market_context를 주입하지 않으면 그래프 안 market_intelligence_node가
-        # ReAct로 lc_market_crawl_tool / lc_rag_price_tool을 자율 호출한다.
-        return self._run_graph(
+        """LangGraph 실행. 시세 분석은 그래프 안의 Agent 2가 ReAct로 자율 수행.
+
+        _run_graph()는 동기 함수(LangGraph .invoke())이므로
+        asyncio.to_thread()로 별도 스레드에서 실행하여
+        FastAPI 이벤트 루프 블로킹을 방지한다.
+        """
+        import asyncio
+
+        return await asyncio.to_thread(
+            self._run_graph,
             session_id=session_id, image_paths=image_paths,
             selected_platforms=target_platforms,
             confirmed_product=confirmed_product,

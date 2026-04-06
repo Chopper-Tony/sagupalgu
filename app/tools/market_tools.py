@@ -93,7 +93,7 @@ async def _market_crawl_impl(confirmed_product: Dict[str, Any]) -> Dict[str, Any
                         if item.platform not in crawler_sources:
                             crawler_sources.append(item.platform)
             except Exception as e:
-                logger.warning(f"[market_crawl] query={query} failed: {e}")
+                logger.warning("[market_crawl] query=%s failed: %s", query, e, exc_info=True)
                 continue
 
         price_context = PriceAggregator.aggregate(all_listings)
@@ -101,7 +101,7 @@ async def _market_crawl_impl(confirmed_product: Dict[str, Any]) -> Dict[str, Any
         return make_tool_call("market_crawl_tool", tool_input, output, success=True)
 
     except Exception as e:
-        logger.error(f"[market_crawl_tool] failed: {e}")
+        logger.error("[market_crawl_tool] failed: %s", e, exc_info=True)
         return make_tool_call(
             "market_crawl_tool", tool_input,
             {"median_price": None, "price_band": None, "sample_count": 0, "crawler_sources": [], "raw_listings": []},
@@ -156,7 +156,7 @@ async def _rag_price_impl(
                         retrieval_source = "pgvector"
                         logger.info(f"[rag_price] pgvector: {len(rows)}건 검색됨")
             except Exception as e:
-                logger.warning(f"[rag_price] pgvector search failed: {e}")
+                logger.warning("[rag_price] pgvector search failed: %s", e, exc_info=True)
 
         if not retrieved_docs:
             # 2순위: 키워드 기반 검색 (fallback)
@@ -168,7 +168,7 @@ async def _rag_price_impl(
                     retrieval_source = "keyword"
                     logger.info(f"[rag_price] keyword: {len(rows)}건 검색됨")
             except Exception as e:
-                logger.warning(f"[rag_price] keyword search failed: {e}")
+                logger.warning("[rag_price] keyword search failed: %s", e, exc_info=True)
 
         # ── Augmented Generation ───────────────────────────────────
         doc_summary = "\n".join([
@@ -190,14 +190,14 @@ async def _rag_price_impl(
 
         rag_result = None
 
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and not getattr(_rag_price_impl, "_gemini_disabled", False):
             try:
                 url = (
                     "https://generativelanguage.googleapis.com/v1beta/models/"
                     f"{settings.gemini_listing_model}:generateContent"
                     f"?key={settings.gemini_api_key}"
                 )
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=15.0) as client:
                     resp = await client.post(url, json={
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"temperature": 0.1},
@@ -206,7 +206,10 @@ async def _rag_price_impl(
                     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                 rag_result = extract_json(text)
             except Exception as e:
-                logger.warning(f"[rag_price] gemini failed: {e}")
+                logger.warning("[rag_price] gemini failed: %s", e, exc_info=True)
+                if "429" in str(e):
+                    _rag_price_impl._gemini_disabled = True
+                    logger.info("[rag_price] gemini 429 — 이번 프로세스에서 비활성화, OpenAI로 전환")
 
         if not rag_result and settings.openai_api_key:
             try:
@@ -224,7 +227,7 @@ async def _rag_price_impl(
                     text = resp.json()["choices"][0]["message"]["content"]
                     rag_result = extract_json(text)
             except Exception as e:
-                logger.warning(f"[rag_price] openai failed: {e}")
+                logger.warning("[rag_price] openai failed: %s", e, exc_info=True)
 
         output = rag_result or {
             "estimated_price_band": [],
@@ -238,7 +241,7 @@ async def _rag_price_impl(
         return make_tool_call("rag_price_tool", tool_input, output, success=True)
 
     except Exception as e:
-        logger.error(f"[rag_price_tool] failed: {e}")
+        logger.error("[rag_price_tool] failed: %s", e, exc_info=True)
         return make_tool_call(
             "rag_price_tool", tool_input,
             {"rag_available": False, "rag_summary": "", "estimated_price_band": [], "confidence": "low"},

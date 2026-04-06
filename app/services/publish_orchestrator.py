@@ -189,7 +189,7 @@ class PublishOrchestrator:
             await discord_alert_tool(message=message, session_id=session_id)
             logger.info("discord_alert_sent session=%s", session_id)
         except Exception as e:
-            logger.warning("discord_alert_failed session=%s error=%s", session_id, e)
+            logger.warning("discord_alert_failed session=%s error=%s", session_id, e, exc_info=True)
 
     def _update_or_raise(
         self, session_id: str, payload: dict[str, Any], expected_status: str | None = None,
