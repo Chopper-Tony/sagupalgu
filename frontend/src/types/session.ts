@@ -109,5 +109,14 @@ export interface SessionResponse {
     plan: { focus: string; steps: string[] } | null;
     critic_score: number | null;
     critic_feedback: Array<{ type: string; impact: string; reason: string }>;
+    job_progress?: Record<string, {
+      platform: string;
+      event: string;
+      timestamp?: number;
+      listing_id?: string;
+      listing_url?: string;
+      error_code?: string;
+      error_message?: string;
+    }>;
   };
 }

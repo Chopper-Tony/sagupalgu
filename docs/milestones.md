@@ -171,6 +171,9 @@
 
 | M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
 | M114: Playwright 동시성 제한 + 로드맵 | ✅ 완료 | `MAX_CONCURRENT_BROWSERS=2` 세마포어 도입(메모리 보호) ✅, `publish_service.py` `_get_semaphore()` lazy 싱글턴 ✅, `architecture.md` 섹션 8 워커/큐 분리 로드맵 ✅, 테스트 5개 추가 ✅, 682 테스트 통과 ✅ |
+| M122: Admin 인증 | ✅ 완료 | Admin 엔드포인트 `X-Admin-Key` 헤더 인증 ✅, `ADMIN_API_KEY` 환경변수 ✅, 키 미설정 시 403 차단 ✅, 테스트 3개 추가 ✅ |
+| M123: 워커 모니터링 + 헬스체크 | ✅ 완료 | `PublishWorker.status()` (alive/last_poll_at/active_jobs/total_processed/total_failed/semaphore_available) ✅, `/health/ready`에 `publish_worker` 체크 추가 ✅, meta에 worker 상세 포함 ✅, 큐 적체(pending>=10) Discord 알림 ✅, 테스트 2개 추가 ✅ |
+| M124: 게시 결과 SSE 스트림 | ✅ 완료 | 워커 `_update_job_progress()` → 세션 workflow_meta에 job_progress 기록 ✅, ProgressCard jobProgress prop 추가(플랫폼별 게시중/완료/실패 뱃지) ✅, session.ts job_progress 타입 추가 ✅, ChatWindow→ProgressCard 데이터 전달 ✅, CSS 스타일링 ✅, 프론트 빌드 성공 ✅, 테스트 1개 추가 ✅, 720 테스트 통과 ✅ |
 | M121: Publish Job Queue 도입 | ✅ 완료 | `publish_jobs` 테이블 설계(7상태·per-account lock 유니크 인덱스) ✅, `PublishJobRepository` CRUD+claim+fail+retry+운영(stuck해제·큐통계·플랫폼중지·사용자비활성화) ✅, `PublishWorker` 백그라운드 폴링+세마포어+structured logging ✅, `PublishOrchestrator` 큐 등록 방식 전환(`_publish_via_queue`)+기존 동기 방식 유지(`publish_session_sync`) ✅, Admin API 7개(stats/list/get/retry/force-fail/pause/disable) ✅, `PUBLISH_USE_QUEUE` feature flag ✅, 단계별 타임아웃(`STEP_TIMEOUTS` 7단계) ✅, 테스트 26개 추가 ✅, 714 테스트 통과 ✅ |
 
 ## 에이전틱 점수 이력

@@ -128,12 +128,20 @@ def create_app() -> FastAPI:
             or (listing_provider == "solar" and bool(getattr(settings, "upstage_api_key", None)))
         )
 
+        # 워커 상태
+        worker = getattr(application.state, "publish_worker", None)
+        worker_status = worker.status() if worker else None
+        worker_ok = (
+            worker_status is not None and worker_status.get("alive", False)
+        ) if settings.publish_use_queue else True
+
         checks = {
             "supabase": supabase_ok,
             "vision_provider": vision_ok,
             "listing_llm": listing_llm_ok,
             "llm_fallback": has_llm,
             "publish_credentials": publish_ok,
+            "publish_worker": worker_ok,
         }
         all_ready = all(checks.values())
         return {
@@ -145,6 +153,7 @@ def create_app() -> FastAPI:
                 "active_publishers": active_publishers,
                 "vision_provider": vision_provider,
                 "listing_provider": listing_provider,
+                "worker": worker_status,
             },
         }
 

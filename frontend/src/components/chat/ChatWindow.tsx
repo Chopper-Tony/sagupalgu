@@ -133,7 +133,14 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
             );
           }
           if (item.type === "progress") {
-            return <ProgressCard key={item.id} status={item.status} message={item.message} />;
+            return (
+              <ProgressCard
+                key={item.id}
+                status={item.status}
+                message={item.message}
+                jobProgress={session?.agent_trace?.job_progress}
+              />
+            );
           }
           if (item.type === "error") {
             return (
