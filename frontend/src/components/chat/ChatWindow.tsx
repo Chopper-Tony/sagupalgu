@@ -20,15 +20,13 @@ interface ChatWindowProps {
 
 export function ChatWindow({ items, currentStatus, session, onAction }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const prevItemCount = useRef(items.length);
 
   useEffect(() => {
-    // 새 아이템이 추가될 때만 스크롤 (상태 변경으로 리렌더링 시 스크롤 유지)
-    if (items.length > prevItemCount.current) {
+    // 다음 프레임에서 스크롤 (DOM 업데이트 후)
+    requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-    prevItemCount.current = items.length;
-  }, [items]);
+    });
+  }, [items.length, currentStatus]);
 
   const renderCard = (item: Extract<TimelineItem, { type: "card" }>) => {
     switch (item.cardType) {
