@@ -18,7 +18,8 @@ LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
 - **DB**: Supabase (PostgreSQL + pgvector)
 - **크롤러/게시**: Playwright (웹 자동화)
 - **프론트엔드**: React 18 + TypeScript + Vite
-- **배포**: Docker Compose + GitHub Actions CI/CD
+- **배포**: Docker Compose + Caddy HTTPS + GitHub Actions CI/CD
+- **보조 스토리지**: S3 (게시 증적 스크린샷 아카이빙)
 
 ## 주요 명령어
 
@@ -37,7 +38,8 @@ cd frontend && npm install && npm run dev
 # Docker 풀스택
 docker compose up --build
 
-# 백엔드 테스트 (661개)
+# 백엔드 테스트 (688개)
+pip install -r requirements-dev.txt
 python -m pytest tests/           # 전체
 python -m pytest tests/ -m unit   # unit만 (0.5초)
 
@@ -60,7 +62,7 @@ cd frontend && npm test
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
 - `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 661개 (unit ~380 + integration ~180 + E2E 3 + sync 5)
+- `tests/` — 688개 (unit ~380 + integration ~180 + E2E 3 + sync 5 + infra 6)
 - `frontend/src/lib/__tests__/` — 프론트엔드 21개 (vitest + @testing-library/react)
 
 ## 핵심 코딩 규칙
@@ -107,8 +109,13 @@ cd frontend && npm test
 ## 최근 변경 (이번 세션)
 
 - **M122~M124**: Job Queue 프로덕션 안정화 — Admin API 키 인증(`X-Admin-Key`), 워커 모니터링(status/active_jobs/last_poll), `/health/ready` 워커 상태, 큐 적체 Discord 알림, 게시 진행 SSE(job_progress → ProgressCard 플랫폼별 표시)
-- **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제fail/플랫폼중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
+- **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
 - **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
+- **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)
+- **M118**: except Exception 세분화 — auth/optimization 구체화 2건, 외부 경계 exc_info 로깅 강화 18건
+- **M120**: Caddy healthcheck + Docker rolling restart + named volumes 영속성
+- **M116**: AWS 인프라 최적화 — Caddy HTTPS 리버스 프록시(`docker-compose.prod.yml`), S3 보조 스토리지(게시 증적 스크린샷), EC2 스왑 설정, `deployment.md` 전면 재작성
+- **M115**: 게시 안정성 개선 — 이벤트 루프 블로킹 해소(`asyncio.to_thread`), 번개장터 카테고리 3단계 보완 + 폼 입력 순서 수정, pgvector/Gemini 캐싱, LLM 타임아웃 30초
 - **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
 
 - **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지
@@ -127,4 +134,4 @@ cd frontend && npm test
 
 ## 마일스톤 이력
 
-113+ 마일스톤 완료. 상세: @docs/milestones.md
+116+ 마일스톤 완료. 상세: @docs/milestones.md

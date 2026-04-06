@@ -1,0 +1,44 @@
+# Production override — Caddy HTTPS 리버스 프록시
+#
+# 사용법:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 필수 환경변수 (.env):
+#   DOMAIN_NAME=sagupalgu.example.com
+#
+# Caddy가 Let's Encrypt 인증서를 자동 발급/갱신한다.
+# DOMAIN_NAME 미설정 시 localhost fallback (HTTP only).
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # TLS certificates persist across redeploys
+      - caddy_config:/config
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    ports: !reset []
+    expose:
+      - "80"
+    depends_on:
+      caddy:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

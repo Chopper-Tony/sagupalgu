@@ -62,5 +62,5 @@ async def price_optimization_tool(
         }
         return make_tool_call("price_optimization_tool", tool_input, output, success=True)
 
-    except Exception as e:
+    except (ValueError, TypeError, KeyError) as e:
         return make_tool_call("price_optimization_tool", tool_input, {"suggestion": None}, success=False, error=str(e))

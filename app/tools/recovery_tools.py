@@ -183,7 +183,7 @@ JSON만 반환: {{"title": "string", "description": "string"}}"""
                         text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
                         alt_content = extract_json(text)
                 except Exception as e:
-                    logger.warning(f"[auto_patch_tool] content rewrite failed: {e}")
+                    logger.warning("[auto_patch_tool] content rewrite failed: %s", e, exc_info=True)
 
             patch = {
                 "type": "content_rewrite",
@@ -213,7 +213,7 @@ JSON만 반환: {{"title": "string", "description": "string"}}"""
         return make_tool_call("auto_patch_tool", tool_input, patch, success=True)
 
     except Exception as e:
-        logger.error(f"[auto_patch_tool] failed: {e}")
+        logger.error("[auto_patch_tool] failed: %s", e, exc_info=True)
         return make_tool_call(
             "auto_patch_tool", tool_input,
             {"type": "error", "auto_executable": False, "message": str(e)},
@@ -249,4 +249,5 @@ async def discord_alert_tool(
         return make_tool_call("discord_alert_tool", tool_input, {"sent": True}, success=True)
 
     except Exception as e:
+        logger.warning("[discord_alert_tool] failed: %s", e, exc_info=True)
         return make_tool_call("discord_alert_tool", tool_input, {"sent": False}, success=False, error=str(e))

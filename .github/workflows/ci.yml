@@ -11,6 +11,7 @@ env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key' }}
   SECRET_ENCRYPTION_KEY: ${{ secrets.SECRET_ENCRYPTION_KEY || 'placeholder-encryption-key-32ch' }}
+  PUBLISH_USE_QUEUE: "false"  # CI에서는 publish_jobs 테이블 없으므로 동기 모드
 
 jobs:
   test:
@@ -26,7 +27,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run unit tests
         run: python -m pytest tests/ -m unit --tb=short -q
@@ -66,7 +67,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Check API type sync
         run: python scripts/generate_api_types.py --check
@@ -126,8 +127,21 @@ jobs:
           script: |
             cd ~/sagupalgu
             git pull origin main
-            docker compose down
-            docker compose up -d --build
+            # Rolling restart: rebuild and restart backend first (Caddy keeps serving)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend frontend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d backend
+            # Wait for backend health before restarting frontend
+            echo "Waiting for backend health..."
+            for i in $(seq 1 30); do
+              if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T backend curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+                echo "Backend healthy after ${i}s"
+                break
+              fi
+              sleep 1
+            done
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d frontend
+            # Ensure Caddy picks up any config changes
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d caddy
             echo "Deploy complete: $(date)"
 
       - name: Notify Discord on deploy
