@@ -109,6 +109,8 @@ cd frontend && npm test
 ## 최근 변경 (이번 세션)
 
 - **M125~M129**: 프로덕션 배포 준비 — Worker 프로세스 분리(`RUN_PUBLISH_WORKER`), FastAPI lifespan 전환(on_event deprecated 제거), Worker graceful shutdown(active task drain), Prod readiness gate 강화(admin/queue/JWT 검증), 전달물 위생(.env.example), requirements 완전 고정
+- **Bugfix #114, #116**: Job Queue 워커 버그 6건 수정 — 테이블명/컬럼명 정합화(`sell_sessions`/`status`), `PublishResult` 속성명, `publish_results` 키 일치, legacy 대기시간 30초→3초, stale job 방지, enum `.value`, PublishResultCard 링크 복원, 스크롤 UX
+- **M122~M124**: Job Queue 프로덕션 안정화 — Admin API 키 인증(`X-Admin-Key`), 워커 모니터링(`status()`), `/health/ready` 워커 상태, 큐 적체 Discord 알림, 게시 진행 SSE(`job_progress` → ProgressCard 플랫폼별 뱃지)
 - **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
 - **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
 - **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)

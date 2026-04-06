@@ -172,6 +172,11 @@
 | M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
 | M114: Playwright 동시성 제한 + 로드맵 | ✅ 완료 | `MAX_CONCURRENT_BROWSERS=2` 세마포어 도입(메모리 보호) ✅, `publish_service.py` `_get_semaphore()` lazy 싱글턴 ✅, `architecture.md` 섹션 8 워커/큐 분리 로드맵 ✅, 테스트 5개 추가 ✅, 682 테스트 통과 ✅ |
 | M121: Publish Job Queue 도입 | ✅ 완료 | `publish_jobs` 테이블 설계(7상태·per-account lock 유니크 인덱스) ✅, `PublishJobRepository` CRUD+claim+fail+retry+운영(stuck해제·큐통계·플랫폼중지·사용자비활성화) ✅, `PublishWorker` 백그라운드 폴링+세마포어+structured logging ✅, `PublishOrchestrator` 큐 등록 방식 전환(`_publish_via_queue`)+기존 동기 방식 유지(`publish_session_sync`) ✅, Admin API 7개(stats/list/get/retry/force-fail/pause/disable) ✅, `PUBLISH_USE_QUEUE` feature flag ✅, 단계별 타임아웃(`STEP_TIMEOUTS` 7단계) ✅, 테스트 26개 추가 ✅, 714 테스트 통과 ✅ |
+| M122: Admin 인증 | ✅ 완료 | Admin 엔드포인트 `X-Admin-Key` 헤더 인증 ✅, `ADMIN_API_KEY` 환경변수 ✅, 키 미설정 시 403 차단 ✅ |
+| M123: 워커 모니터링 + 헬스체크 | ✅ 완료 | `PublishWorker.status()` (alive/last_poll_at/active_jobs/total_processed/total_failed) ✅, `/health/ready`에 `publish_worker` 체크 추가 ✅, 큐 적체(pending>=10) Discord 알림 ✅ |
+| M124: 게시 결과 SSE 스트림 | ✅ 완료 | 워커 `_update_job_progress()` → 세션 workflow_meta에 job_progress 기록 ✅, ProgressCard jobProgress prop 추가(플랫폼별 게시중/완료/실패 뱃지) ✅ |
+| Bugfix #114 | ✅ 완료 | 워커 테이블명 `sessions`→`sell_sessions` ✅, `PublishResult` 속성명 수정(`external_listing_id`/`external_url`/`evidence_path`) ✅, legacy 게시 후 대기 30초→3초 ✅, 워커 세션 상태 검증(stale job 중복 게시 방지) ✅, enum `.value` 직렬화 ✅, `.env.example` 업데이트 ✅ |
+| Bugfix #116 | ✅ 완료 | 워커 컬럼명 `session_status`→`status` ✅, `publish_results` 키 정합화(session_ui.py 계약 일치) ✅, PublishResultCard 게시 링크 표시 복원 ✅, ChatWindow 스크롤 UX(requestAnimationFrame + currentStatus 트리거) ✅ |
 | M125: Worker 프로세스 분리 | ✅ 완료 | `RUN_PUBLISH_WORKER` 환경변수 ✅, docker-compose.prod.yml worker 서비스 분리(API=false, Worker=true) ✅ |
 | M126: FastAPI lifespan 전환 | ✅ 완료 | `on_event` deprecated → `lifespan` context manager ✅, Worker graceful shutdown(active task drain) ✅, `_semaphore._value` 직접 참조 제거 → active_tasks set 관리 ✅, deprecation warning 22→2 ✅ |
 | M127: Prod Readiness Gate | ✅ 완료 | `check_prod_readiness.py`에 ADMIN_API_KEY 검증 ✅, PUBLISH_USE_QUEUE+RUN_PUBLISH_WORKER 정합성 검사 ✅ |
