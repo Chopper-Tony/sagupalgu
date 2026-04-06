@@ -134,6 +134,13 @@ class Settings(BaseSettings):
         description="True=Job Queue 비동기, False=직접 실행 (테스트/개발용)",
     )
 
+    # Admin
+    admin_api_key: str | None = Field(
+        default=None,
+        alias="ADMIN_API_KEY",
+        description="Admin API 인증 키. 미설정 시 admin 엔드포인트 접근 차단.",
+    )
+
     # ------------------------------
     # Supabase Storage
     # ------------------------------

@@ -108,6 +108,7 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M122~M124**: Job Queue 프로덕션 안정화 — Admin API 키 인증(`X-Admin-Key`), 워커 모니터링(status/active_jobs/last_poll), `/health/ready` 워커 상태, 큐 적체 Discord 알림, 게시 진행 SSE(job_progress → ProgressCard 플랫폼별 표시)
 - **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
 - **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
 - **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)

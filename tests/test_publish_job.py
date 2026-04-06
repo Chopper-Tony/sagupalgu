@@ -289,3 +289,83 @@ class TestPublishWorker:
         worker = PublishWorker(job_repo=mock_repo, worker_id="test-worker")
         assert worker.worker_id == "test-worker"
         assert worker._running is False
+
+    def test_worker_status_before_start(self):
+        from app.services.publish_worker import PublishWorker
+        mock_repo = MagicMock()
+        worker = PublishWorker(job_repo=mock_repo, worker_id="test-worker")
+        status = worker.status()
+        assert status["alive"] is False
+        assert status["worker_id"] == "test-worker"
+        assert status["active_jobs"] == 0
+        assert status["total_processed"] == 0
+        assert status["total_failed"] == 0
+        assert "semaphore_available" in status
+
+    def test_worker_status_fields(self):
+        from app.services.publish_worker import PublishWorker
+        mock_repo = MagicMock()
+        worker = PublishWorker(job_repo=mock_repo)
+        status = worker.status()
+        required_fields = {"alive", "worker_id", "last_poll_at", "active_jobs",
+                          "total_processed", "total_failed", "semaphore_available"}
+        assert required_fields.issubset(set(status.keys()))
+
+
+# ── M122: Admin 인증 테스트 ─────────────────────────────────────
+
+class TestAdminAuth:
+    def test_verify_admin_key_missing_config(self):
+        """ADMIN_API_KEY 미설정 시 403."""
+        from app.api.admin_router import _verify_admin_key
+        from fastapi import HTTPException
+
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = "some-key"
+
+        mock_settings = MagicMock(admin_api_key=None)
+        with patch("app.core.config.get_settings", return_value=mock_settings):
+            with pytest.raises(HTTPException) as exc_info:
+                _verify_admin_key(mock_request)
+            assert exc_info.value.status_code == 403
+
+    def test_verify_admin_key_wrong_key(self):
+        """잘못된 키 403."""
+        from app.api.admin_router import _verify_admin_key
+        from fastapi import HTTPException
+
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = "wrong-key"
+
+        mock_settings = MagicMock(admin_api_key="correct-key")
+        with patch("app.core.config.get_settings", return_value=mock_settings):
+            with pytest.raises(HTTPException) as exc_info:
+                _verify_admin_key(mock_request)
+            assert exc_info.value.status_code == 403
+
+    def test_verify_admin_key_correct(self):
+        """올바른 키 통과."""
+        from app.api.admin_router import _verify_admin_key
+
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = "my-secret-key"
+
+        mock_settings = MagicMock(admin_api_key="my-secret-key")
+        with patch("app.core.config.get_settings", return_value=mock_settings):
+            _verify_admin_key(mock_request)
+
+
+# ── M124: Job Progress 테스트 ───────────────────────────────────
+
+class TestJobProgress:
+    def test_progress_card_import(self):
+        """ProgressCard에 jobProgress prop 추가 확인 (빌드 테스트)."""
+        import os
+        path = os.path.join("frontend", "src", "components", "cards", "ProgressCard.tsx")
+        assert os.path.exists(path)
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "jobProgress" in content
+        assert "job_started" in content
+        assert "job_completed" in content
+        assert "job_failed" in content

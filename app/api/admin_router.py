@@ -12,11 +12,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _verify_admin_key(request: Request) -> None:
+    """X-Admin-Key 헤더로 admin 인증. 키 미설정 시 접근 차단."""
+    from app.core.config import settings
+    admin_key = settings.admin_api_key
+    if not admin_key:
+        raise HTTPException(status_code=403, detail="Admin API가 비활성화되어 있습니다")
+    provided = request.headers.get("X-Admin-Key", "")
+    if provided != admin_key:
+        raise HTTPException(status_code=403, detail="유효하지 않은 Admin API 키입니다")
 
 
 def _get_job_repo():
@@ -24,13 +35,13 @@ def _get_job_repo():
     return PublishJobRepository()
 
 
-@router.get("/publish-queue/stats")
+@router.get("/publish-queue/stats", dependencies=[Depends(_verify_admin_key)])
 async def queue_stats() -> dict[str, Any]:
     """큐 상태 통계."""
     return _get_job_repo().get_queue_stats()
 
 
-@router.get("/publish-queue/jobs")
+@router.get("/publish-queue/jobs", dependencies=[Depends(_verify_admin_key)])
 async def list_jobs(
     session_id: str | None = None,
     status: str | None = None,
@@ -62,7 +73,7 @@ async def list_jobs(
     return result.data or []
 
 
-@router.get("/publish-queue/jobs/{job_id}")
+@router.get("/publish-queue/jobs/{job_id}", dependencies=[Depends(_verify_admin_key)])
 async def get_job(job_id: str) -> dict[str, Any]:
     """개별 작업 조회."""
     job = _get_job_repo().get_by_id(job_id)
@@ -71,7 +82,7 @@ async def get_job(job_id: str) -> dict[str, Any]:
     return job
 
 
-@router.post("/publish-queue/jobs/{job_id}/retry")
+@router.post("/publish-queue/jobs/{job_id}/retry", dependencies=[Depends(_verify_admin_key)])
 async def retry_job(job_id: str) -> dict[str, Any]:
     """실패한 작업을 재시도 대기열에 넣는다."""
     repo = _get_job_repo()
@@ -98,7 +109,7 @@ async def retry_job(job_id: str) -> dict[str, Any]:
     return {"job_id": job_id, "status": "pending", "message": "재시도 대기열에 추가됨"}
 
 
-@router.post("/publish-queue/jobs/{job_id}/force-fail")
+@router.post("/publish-queue/jobs/{job_id}/force-fail", dependencies=[Depends(_verify_admin_key)])
 async def force_fail_job(job_id: str) -> dict[str, Any]:
     """stuck 작업을 강제 실패 처리."""
     repo = _get_job_repo()
@@ -121,7 +132,7 @@ async def force_fail_job(job_id: str) -> dict[str, Any]:
     return {"job_id": job_id, "status": "failed", "message": "강제 실패 처리됨"}
 
 
-@router.post("/publish-queue/platforms/{platform}/pause")
+@router.post("/publish-queue/platforms/{platform}/pause", dependencies=[Depends(_verify_admin_key)])
 async def pause_platform(platform: str) -> dict[str, Any]:
     """특정 플랫폼의 대기 중 작업을 일시 중지."""
     if platform not in ("bunjang", "joongna", "daangn"):
@@ -130,14 +141,14 @@ async def pause_platform(platform: str) -> dict[str, Any]:
     return {"platform": platform, "cancelled_count": count, "message": f"{platform} 일시중지"}
 
 
-@router.post("/publish-queue/users/{user_id}/disable")
+@router.post("/publish-queue/users/{user_id}/disable", dependencies=[Depends(_verify_admin_key)])
 async def disable_user_publishing(user_id: str) -> dict[str, Any]:
     """특정 사용자의 대기 중 게시 작업을 모두 취소."""
     count = _get_job_repo().disable_user_publishing(user_id)
     return {"user_id": user_id, "cancelled_count": count, "message": "게시 비활성화"}
 
 
-@router.post("/publish-queue/release-stuck")
+@router.post("/publish-queue/release-stuck", dependencies=[Depends(_verify_admin_key)])
 async def release_stuck_jobs() -> dict[str, Any]:
     """stuck 작업 일괄 해제."""
     count = _get_job_repo().release_stuck_jobs()

@@ -41,6 +41,10 @@ class PublishWorker:
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex[:8]}"
         self._running = False
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
+        self._active_jobs: int = 0
+        self._last_poll_at: str | None = None
+        self._total_processed: int = 0
+        self._total_failed: int = 0
 
     async def start(self) -> None:
         """워커 메인 루프. shutdown 신호까지 반복."""
@@ -49,11 +53,19 @@ class PublishWorker:
 
         while self._running:
             try:
+                from datetime import datetime, timezone
+                self._last_poll_at = datetime.now(timezone.utc).isoformat()
+
                 # stuck 작업 해제
                 self.job_repo.release_stuck_jobs()
 
                 # 대기 작업 폴링
                 jobs = self.job_repo.get_pending_jobs(limit=5)
+
+                # 큐 적체 감지
+                if len(jobs) >= 10:
+                    await self._alert_queue_backlog(len(jobs))
+
                 for job in jobs:
                     if not self._running:
                         break
@@ -75,6 +87,29 @@ class PublishWorker:
         """워커 graceful shutdown."""
         self._running = False
 
+    def status(self) -> dict[str, Any]:
+        """워커 상태 조회. /health/ready에서 사용."""
+        return {
+            "alive": self._running,
+            "worker_id": self.worker_id,
+            "last_poll_at": self._last_poll_at,
+            "active_jobs": self._active_jobs,
+            "total_processed": self._total_processed,
+            "total_failed": self._total_failed,
+            "semaphore_available": self._semaphore._value,  # noqa: SLF001
+        }
+
+    async def _alert_queue_backlog(self, pending_count: int) -> None:
+        """큐 적체 시 Discord 알림."""
+        try:
+            from app.tools.agentic_tools import discord_alert_tool
+            await discord_alert_tool(
+                message=f"게시 큐 적체 감지: {pending_count}건 대기 중",
+                session_id="system",
+            )
+        except Exception as e:
+            logger.warning("queue_backlog_alert_failed: %s", e)
+
     async def _process_job(self, job: dict[str, Any]) -> None:
         """단일 작업 처리. 세마포어 + try/finally cleanup."""
         job_id = job["id"]
@@ -85,6 +120,8 @@ class PublishWorker:
         # claim (per-account lock은 DB 유니크 인덱스로 강제)
         if not self.job_repo.claim(job_id, self.worker_id):
             return
+
+        self._active_jobs += 1
 
         log_ctx = {
             "publish_job_id": job_id,
@@ -98,6 +135,9 @@ class PublishWorker:
         async with self._semaphore:
             self.job_repo.start(job_id)
             logger.info("publish_job_started %s", log_ctx)
+            await self._update_job_progress(
+                session_id, job_id, platform, "job_started",
+            )
 
             start_time = time.monotonic()
             evidence_urls: list[str] = []
@@ -115,6 +155,10 @@ class PublishWorker:
                     evidence_urls = result.get("evidence_urls", [])
                     self.job_repo.complete(job_id, evidence_urls=evidence_urls)
                     logger.info("publish_job_success %s", log_ctx)
+                    await self._update_job_progress(
+                        session_id, job_id, platform, "job_completed",
+                        {"listing_id": result.get("listing_id"), "listing_url": result.get("listing_url")},
+                    )
 
                     # 세션 상태 업데이트
                     await self._update_session_on_complete(job, result)
@@ -132,6 +176,10 @@ class PublishWorker:
                     )
                     log_ctx["error_code"] = error_code
                     logger.warning("publish_job_failed_result %s", log_ctx)
+                    await self._update_job_progress(
+                        session_id, job_id, platform, "job_failed",
+                        {"error_code": error_code, "error_message": error_message},
+                    )
 
                     await self._update_session_on_failure(job, result)
 
@@ -160,6 +208,13 @@ class PublishWorker:
                     "publish_job_exception %s error=%s",
                     log_ctx, e, exc_info=True,
                 )
+
+            finally:
+                self._active_jobs = max(0, self._active_jobs - 1)
+                success = log_ctx.get("duration_ms") and "error_code" not in log_ctx
+                self._total_processed += 1
+                if not success:
+                    self._total_failed += 1
 
     async def _execute_publish(
         self,
@@ -199,6 +254,40 @@ class PublishWorker:
             "listing_url": result.listing_url,
             "evidence_urls": [result.screenshot_path] if result.screenshot_path else [],
         }
+
+    async def _update_job_progress(
+        self,
+        session_id: str,
+        job_id: str,
+        platform: str,
+        event: str,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        """세션 workflow_meta에 job 진행 상태를 기록. SSE stream이 변경 감지."""
+        try:
+            from app.db.client import get_supabase
+            session = get_supabase().table("sessions").select(
+                "workflow_meta_jsonb"
+            ).eq("id", session_id).execute()
+
+            if not session.data:
+                return
+
+            meta = dict(session.data[0].get("workflow_meta_jsonb") or {})
+            progress = meta.get("job_progress", {})
+            progress[job_id] = {
+                "platform": platform,
+                "event": event,
+                "timestamp": time.time(),
+                **(detail or {}),
+            }
+            meta["job_progress"] = progress
+
+            get_supabase().table("sessions").update({
+                "workflow_meta_jsonb": meta,
+            }).eq("id", session_id).execute()
+        except Exception as e:
+            logger.warning("job_progress_update_failed session=%s: %s", session_id, e)
 
     async def _update_session_on_complete(
         self,
