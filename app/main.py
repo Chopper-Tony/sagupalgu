@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -33,6 +34,30 @@ _DOMAIN_STATUS_MAP: dict[type, tuple[int, str]] = {
 }
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown lifecycle — on_event deprecated 대체."""
+    from app.core.config import settings
+    _logger = logging.getLogger(__name__)
+
+    # Startup: Worker 시작 (RUN_PUBLISH_WORKER=true인 프로세스에서만)
+    worker = None
+    if settings.run_publish_worker and settings.environment != "test":
+        from app.db.publish_job_repository import PublishJobRepository
+        from app.services.publish_worker import PublishWorker
+        worker = PublishWorker(job_repo=PublishJobRepository())
+        app.state.publish_worker = worker
+        asyncio.create_task(worker.start())
+        _logger.info("publish_worker_launched")
+
+    yield
+
+    # Shutdown: Worker graceful stop
+    if worker:
+        await worker.stop()
+        _logger.info("publish_worker_shutdown")
+
+
 def create_app() -> FastAPI:
     """App factory — 테스트·환경별 앱 생성 분리."""
     from app.api.session_router import router as session_router
@@ -48,6 +73,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title=settings.app_name,
         debug=settings.debug,
+        lifespan=lifespan,
     )
 
     # CORS
@@ -184,24 +210,6 @@ def create_app() -> FastAPI:
     application.include_router(platform_router, prefix=settings.api_v1_prefix)
     from app.api.admin_router import router as admin_router
     application.include_router(admin_router, prefix=settings.api_v1_prefix)
-
-    # Publish Worker (백그라운드)
-    @application.on_event("startup")
-    async def start_publish_worker():
-        if settings.environment != "test":
-            from app.db.publish_job_repository import PublishJobRepository
-            from app.services.publish_worker import PublishWorker
-            worker = PublishWorker(job_repo=PublishJobRepository())
-            application.state.publish_worker = worker
-            asyncio.create_task(worker.start())
-            logger.info("publish_worker_launched")
-
-    @application.on_event("shutdown")
-    async def stop_publish_worker():
-        worker = getattr(application.state, "publish_worker", None)
-        if worker:
-            await worker.stop()
-            logger.info("publish_worker_shutdown")
 
     # 업로드 이미지 정적 서빙
     if os.path.isdir("uploads"):

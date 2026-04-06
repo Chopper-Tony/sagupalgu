@@ -172,6 +172,11 @@
 | M113: copywriting_agent 슬림화 | ✅ 완료 | `_resolve_final_listing()` 정책 함수 분리(정책 매트릭스 주석 포함) ✅, copywriting_node 단순화(3단계 흐름) ✅, 677 테스트 통과 ✅ |
 | M114: Playwright 동시성 제한 + 로드맵 | ✅ 완료 | `MAX_CONCURRENT_BROWSERS=2` 세마포어 도입(메모리 보호) ✅, `publish_service.py` `_get_semaphore()` lazy 싱글턴 ✅, `architecture.md` 섹션 8 워커/큐 분리 로드맵 ✅, 테스트 5개 추가 ✅, 682 테스트 통과 ✅ |
 | M121: Publish Job Queue 도입 | ✅ 완료 | `publish_jobs` 테이블 설계(7상태·per-account lock 유니크 인덱스) ✅, `PublishJobRepository` CRUD+claim+fail+retry+운영(stuck해제·큐통계·플랫폼중지·사용자비활성화) ✅, `PublishWorker` 백그라운드 폴링+세마포어+structured logging ✅, `PublishOrchestrator` 큐 등록 방식 전환(`_publish_via_queue`)+기존 동기 방식 유지(`publish_session_sync`) ✅, Admin API 7개(stats/list/get/retry/force-fail/pause/disable) ✅, `PUBLISH_USE_QUEUE` feature flag ✅, 단계별 타임아웃(`STEP_TIMEOUTS` 7단계) ✅, 테스트 26개 추가 ✅, 714 테스트 통과 ✅ |
+| M125: Worker 프로세스 분리 | ✅ 완료 | `RUN_PUBLISH_WORKER` 환경변수 ✅, docker-compose.prod.yml worker 서비스 분리(API=false, Worker=true) ✅ |
+| M126: FastAPI lifespan 전환 | ✅ 완료 | `on_event` deprecated → `lifespan` context manager ✅, Worker graceful shutdown(active task drain) ✅, `_semaphore._value` 직접 참조 제거 → active_tasks set 관리 ✅, deprecation warning 22→2 ✅ |
+| M127: Prod Readiness Gate | ✅ 완료 | `check_prod_readiness.py`에 ADMIN_API_KEY 검증 ✅, PUBLISH_USE_QUEUE+RUN_PUBLISH_WORKER 정합성 검사 ✅ |
+| M128: 전달물 위생 | ✅ 완료 | `.env.example`에 RUN_PUBLISH_WORKER 추가 ✅ |
+| M129: requirements 완전 고정 | ✅ 완료 | `langchain-google-genai>=2.0.0`→`==4.2.1` ✅, `pytest-cov>=5.0.0`→`==7.1.0` ✅, 느슨한 핀 0건 ✅ |
 | M120: Caddy healthcheck + Docker 안정화 | ✅ 완료 | Caddy healthcheck(`wget --spider`) ✅, named volumes 영속성 확보(TLS 인증서 유지) ✅, frontend depends_on caddy service_healthy ✅, CI deploy rolling restart(backend→health wait→frontend→caddy 순차) ✅ |
 | M118: except Exception 세분화 | ✅ 완료 | `auth.py` except→`(ValueError, KeyError)` ✅, `optimization_tools.py` except→`(ValueError, TypeError, KeyError)` ✅, 외부 경계 18곳 `exc_info=True` 로깅 강화(listing_tools 3·market_tools 7·recovery_tools 3·기타 5) ✅, f-string→`%s` 포맷 전환 ✅, 688 테스트 통과 ✅ |
 | M117: requirements.txt 버전 고정 | ✅ 완료 | 18개 패키지 `>=`→`==` 정확한 버전 고정 ✅, `requirements-dev.txt` 신규 생성(pytest 3종 분리) ✅, CI `requirements-dev.txt` 사용 전환 ✅, 688 테스트 통과 ✅ |
