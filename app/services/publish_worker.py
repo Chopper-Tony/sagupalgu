@@ -132,7 +132,6 @@ class PublishWorker:
                         session_id, sess.data[0].get("status"), job_id,
                     )
                     self.job_repo.cancel(job_id)
-                    self._active_jobs = max(0, self._active_jobs - 1)
                     return
             except Exception as e:
                 logger.warning("session_state_check_failed job_id=%s: %s", job_id, e)
