@@ -65,7 +65,7 @@ async def start_connect(user: AuthenticatedUser = Depends(get_current_user)):
     _connect_tokens[token] = {
         "user_id": user.user_id,
         "expires_at": time.time() + _TOKEN_TTL_SECONDS,
-        "used": False,
+        "used_platforms": set(),
     }
     logger.info("connect_token_issued user=%s", user.user_id)
     return {
@@ -80,20 +80,21 @@ async def connect_platform(platform: str, body: ConnectSessionRequest):
     if platform not in ("bunjang", "joongna"):
         raise HTTPException(status_code=400, detail=f"지원하지 않는 플랫폼: {platform}")
 
-    # 1. Token 검증 (1회용 강제)
+    # 1. Token 검증 (플랫폼별 1회용 — 같은 토큰으로 번장+중나 각 1회 가능)
     _cleanup_expired_tokens()
     token_data = _connect_tokens.get(body.connect_token)
     if not token_data:
         raise HTTPException(status_code=401, detail="유효하지 않거나 만료된 연결 토큰")
-    if token_data["used"]:
-        del _connect_tokens[body.connect_token]
-        raise HTTPException(status_code=401, detail="이미 사용된 연결 토큰")
     if token_data["expires_at"] < time.time():
         del _connect_tokens[body.connect_token]
         raise HTTPException(status_code=401, detail="만료된 연결 토큰")
+    used_platforms = token_data.get("used_platforms", set())
+    if platform in used_platforms:
+        raise HTTPException(status_code=401, detail=f"{platform}은 이미 이 토큰으로 연결됨")
 
-    # 즉시 사용 처리 (1회용)
-    token_data["used"] = True
+    # 해당 플랫폼 사용 처리
+    used_platforms.add(platform)
+    token_data["used_platforms"] = used_platforms
     user_id = token_data["user_id"]
 
     # 2. storage_state 검증
@@ -113,8 +114,9 @@ async def connect_platform(platform: str, body: ConnectSessionRequest):
     # 4. 즉시 검증 (retry 1회)
     verified, reason = await verify_platform_session(user_id, platform)
 
-    # 5. 토큰 정리
-    del _connect_tokens[body.connect_token]
+    # 5. 모든 플랫폼 연결 완료 시 토큰 정리
+    if len(token_data.get("used_platforms", set())) >= 2:
+        _connect_tokens.pop(body.connect_token, None)
 
     status = "connected" if verified else "reconnect_required"
     logger.info("platform_connect user=%s platform=%s status=%s reason=%s",
