@@ -118,7 +118,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check deploy prerequisites
+        id: check
+        run: |
+          if [ -z "${{ secrets.EC2_HOST }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "EC2_HOST not configured — skipping deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to EC2
+        if: steps.check.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -145,7 +156,7 @@ jobs:
             echo "Deploy complete: $(date)"
 
       - name: Notify Discord on deploy
-        if: always()
+        if: always() && steps.check.outputs.skip != 'true'
         run: |
           STATUS="${{ job.status }}"
           EMOJI="✅"
