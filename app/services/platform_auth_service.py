@@ -137,50 +137,21 @@ def store_platform_session(
 async def verify_platform_session(
     user_id: str,
     platform: str,
-    max_retries: int = 2,
 ) -> tuple[bool, str]:
-    """저장된 세션으로 실제 로그인 상태를 검증한다. (retry 1회 포함)"""
-    config = PLATFORM_CONFIG.get(platform)
-    if not config:
-        return False, "unknown_platform"
+    """저장된 세션의 유효성을 검증한다.
 
+    서버 IP와 사용자 IP가 다르면(미국 EC2 vs 한국) Playwright 검증이
+    실패할 수 있으므로, 쿠키 존재 + 만료 여부로 판정한다.
+    실제 로그인 유효성은 게시 시점에 확인된다.
+    """
     path = _get_session_path(platform, user_id)
     if not os.path.exists(path):
         return False, "session_not_found"
 
-    for attempt in range(max_retries):
-        try:
-            from playwright.async_api import async_playwright
+    if not _check_session_freshness(path):
+        return False, "cookie_expired"
 
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                context = await browser.new_context(storage_state=path)
-                page = await context.new_page()
-
-                await page.goto(config["login_url"], wait_until="domcontentloaded", timeout=15000)
-                await page.wait_for_timeout(2000)
-
-                url = page.url
-                # 로그인 페이지로 리다이렉트되면 실패
-                if "login" in url.lower() or "signin" in url.lower():
-                    await browser.close()
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(3)
-                        continue
-                    return False, "login_required"
-
-                await browser.close()
-                return True, "ok"
-
-        except Exception as e:
-            logger.warning("session_verify_failed user=%s platform=%s attempt=%d error=%s",
-                          user_id, platform, attempt + 1, e)
-            if attempt < max_retries - 1:
-                await asyncio.sleep(3)
-                continue
-            return False, "unknown"
-
-    return False, "unknown"
+    return True, "ok"
 
 
 async def _bunjang_login(config: dict) -> dict[str, Any]:
