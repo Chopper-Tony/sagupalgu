@@ -77,4 +77,8 @@ export const api = {
   platformLogin: (platform: string) =>
     client.post<{ success: boolean; platform?: string; name?: string; error?: string }>(`/platforms/${platform}/login`, {}, { timeout: 360000 })
       .then((r) => r.data),
+
+  startPlatformConnect: () =>
+    client.post<{ connect_token: string; expires_at: number }>("/platforms/connect/start")
+      .then((r) => r.data),
 };

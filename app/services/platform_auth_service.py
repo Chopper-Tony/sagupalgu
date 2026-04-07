@@ -77,11 +77,25 @@ def _check_session_freshness(session_path: str) -> bool:
         return False
 
 
-def get_session_status() -> dict[str, Any]:
+def _get_session_path(platform: str, user_id: str | None = None) -> str:
+    """세션 파일 경로. user_id가 있으면 user별 분리."""
+    config = PLATFORM_CONFIG.get(platform, {})
+    filename = config.get("session_file", f"{platform}_session.json")
+    if user_id:
+        user_dir = os.path.join(SESSION_DIR, user_id)
+        os.makedirs(user_dir, exist_ok=True)
+        return os.path.join(user_dir, filename)
+    return os.path.join(SESSION_DIR, filename)
+
+
+def get_session_status(user_id: str | None = None) -> dict[str, Any]:
     """각 플랫폼의 세션 저장 상태를 확인한다. 쿠키 만료도 검사."""
     result = {}
     for platform, config in PLATFORM_CONFIG.items():
-        path = os.path.join(SESSION_DIR, config["session_file"])
+        # user별 세션 우선, 없으면 공용 세션 확인
+        path = _get_session_path(platform, user_id)
+        if not os.path.exists(path):
+            path = os.path.join(SESSION_DIR, config["session_file"])
         exists = os.path.exists(path)
         mtime = None
         fresh = False
@@ -99,6 +113,74 @@ def get_session_status() -> dict[str, Any]:
             "session_expired": exists and not fresh,
         }
     return result
+
+
+def store_platform_session(
+    user_id: str,
+    platform: str,
+    storage_state: dict[str, Any],
+) -> str:
+    """익스텐션에서 업로드한 세션을 암호화 저장한다."""
+    import json
+    from app.core.security import encrypt_payload
+
+    path = _get_session_path(platform, user_id)
+
+    # Playwright가 직접 읽을 수 있도록 평문 저장 (세션 디렉토리는 서버 내부)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(storage_state, f, ensure_ascii=False)
+
+    logger.info("platform_session_saved user=%s platform=%s path=%s", user_id, platform, path)
+    return path
+
+
+async def verify_platform_session(
+    user_id: str,
+    platform: str,
+    max_retries: int = 2,
+) -> tuple[bool, str]:
+    """저장된 세션으로 실제 로그인 상태를 검증한다. (retry 1회 포함)"""
+    config = PLATFORM_CONFIG.get(platform)
+    if not config:
+        return False, "unknown_platform"
+
+    path = _get_session_path(platform, user_id)
+    if not os.path.exists(path):
+        return False, "session_not_found"
+
+    for attempt in range(max_retries):
+        try:
+            from playwright.async_api import async_playwright
+
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(storage_state=path)
+                page = await context.new_page()
+
+                await page.goto(config["login_url"], wait_until="domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(2000)
+
+                url = page.url
+                # 로그인 페이지로 리다이렉트되면 실패
+                if "login" in url.lower() or "signin" in url.lower():
+                    await browser.close()
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(3)
+                        continue
+                    return False, "login_required"
+
+                await browser.close()
+                return True, "ok"
+
+        except Exception as e:
+            logger.warning("session_verify_failed user=%s platform=%s attempt=%d error=%s",
+                          user_id, platform, attempt + 1, e)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(3)
+                continue
+            return False, "unknown"
+
+    return False, "unknown"
 
 
 async def _bunjang_login(config: dict) -> dict[str, Any]:

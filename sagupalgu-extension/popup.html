@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>사구팔구 연동</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 16px;
+    }
+    h1 { font-size: 16px; margin-bottom: 12px; color: #fff; }
+    .section { margin-bottom: 16px; }
+    .section-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #16213e;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    input:focus { border-color: #2563eb; }
+    .platform-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+    }
+    .platform-name { font-size: 14px; }
+    .platform-status {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .status-connected { background: #064e3b; color: #6ee7b7; }
+    .status-expired { background: #78350f; color: #fbbf24; }
+    .status-disconnected { background: #333; color: #888; }
+    .connect-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .connect-btn:hover { background: #1d4ed8; }
+    .connect-btn:disabled { background: #444; cursor: not-allowed; }
+    .message {
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+    }
+    .message-success { background: #064e3b; color: #6ee7b7; }
+    .message-error { background: #7f1d1d; color: #fca5a5; }
+    .message-info { background: #1e3a5f; color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <h1>사구팔구 플랫폼 연동</h1>
+
+  <div class="section">
+    <div class="section-label">연결 토큰 (웹앱에서 복사)</div>
+    <input type="text" id="token-input" placeholder="웹앱에서 발급받은 토큰을 붙여넣으세요">
+  </div>
+
+  <div class="section">
+    <div class="section-label">플랫폼</div>
+    <div class="platform-row">
+      <span class="platform-name">번개장터</span>
+      <span id="status-bunjang" class="platform-status status-disconnected">미연동</span>
+      <button class="connect-btn" id="btn-bunjang" onclick="connect('bunjang')">연결</button>
+    </div>
+    <div class="platform-row">
+      <span class="platform-name">중고나라</span>
+      <span id="status-joongna" class="platform-status status-disconnected">미연동</span>
+      <button class="connect-btn" id="btn-joongna" onclick="connect('joongna')">연결</button>
+    </div>
+  </div>
+
+  <div id="message-area"></div>
+
+  <div class="section" style="margin-top: 12px;">
+    <div class="section-label">서버 URL (고급)</div>
+    <input type="text" id="server-url" value="http://3.239.43.21">
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

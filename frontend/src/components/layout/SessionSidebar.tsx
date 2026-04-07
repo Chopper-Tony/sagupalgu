@@ -24,6 +24,8 @@ interface SessionSidebarProps {
 export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionSidebarProps) {
   const [platforms, setPlatforms] = useState<Record<string, PlatformInfo>>({});
   const [loginLoading, setLoginLoading] = useState<string | null>(null);
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
     api.getPlatformStatus()
@@ -36,7 +38,6 @@ export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionS
     try {
       const result = await api.platformLogin(platform);
       if (result.success) {
-        // 상태 갱신
         const updated = await api.getPlatformStatus();
         setPlatforms(updated.platforms);
       } else {
@@ -46,6 +47,24 @@ export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionS
       alert("로그인 중 오류가 발생했습니다");
     } finally {
       setLoginLoading(null);
+    }
+  };
+
+  const handleGenerateToken = async () => {
+    try {
+      const result = await api.startPlatformConnect();
+      setConnectToken(result.connect_token);
+      setTokenCopied(false);
+    } catch {
+      alert("토큰 발급에 실패했습니다");
+    }
+  };
+
+  const handleCopyToken = () => {
+    if (connectToken) {
+      navigator.clipboard.writeText(connectToken);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 3000);
     }
   };
 
@@ -105,6 +124,53 @@ export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionS
         {Object.keys(platforms).length === 0 && (
           <p className="session-sidebar__platform-empty">로딩 중...</p>
         )}
+
+        <div style={{ marginTop: "12px", borderTop: "1px solid #333", paddingTop: "10px" }}>
+          <p style={{ fontSize: "11px", color: "#888", marginBottom: "6px" }}>
+            크롬 익스텐션으로 연결
+          </p>
+          <button
+            className="session-sidebar__platform-login-btn"
+            onClick={handleGenerateToken}
+            style={{ width: "100%", marginBottom: "6px" }}
+          >
+            연결 토큰 발급
+          </button>
+          {connectToken && (
+            <div style={{ fontSize: "11px" }}>
+              <input
+                type="text"
+                value={connectToken}
+                readOnly
+                style={{
+                  width: "100%",
+                  padding: "4px 6px",
+                  background: "#16213e",
+                  border: "1px solid #333",
+                  borderRadius: "4px",
+                  color: "#fff",
+                  fontSize: "10px",
+                  marginBottom: "4px",
+                }}
+              />
+              <button
+                onClick={handleCopyToken}
+                style={{
+                  width: "100%",
+                  padding: "4px",
+                  background: tokenCopied ? "#064e3b" : "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                }}
+              >
+                {tokenCopied ? "복사됨!" : "토큰 복사"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
