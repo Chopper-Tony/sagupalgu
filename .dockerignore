@@ -42,6 +42,6 @@ frontend/.next/
 frontend/dist/
 
 # 문서/스크립트 (런타임 불필요)
-legacy_spikes/
+legacy_spikes/dead_code/
 scripts/manual/
 *.md
