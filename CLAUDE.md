@@ -108,6 +108,8 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M128**: EC2 배포 + 크롬 익스텐션 플랫폼 연동 — EC2(us-east-1) 배포 완료, 크롬 익스텐션(Manifest V3) 구현(쿠키 수집+storage_state 변환+connect_token 인증), 번개장터 자동 게시 E2E 성공, 세션 user별 분리 저장+공용 경로 동기, API baseURL 상대 경로 전환, nginx CORS preflight 처리, Dockerfile legacy_spikes 복사, DraftCard 이미지 섹션 제거
+- **M127**: 크롬 익스텐션 설계 — CTO 3명 합의(하이브리드: 로그인은 클라이언트, 게시는 서버), connect_token 플랫폼별 재사용, 쿠키 endsWith 필터링, sameSite 변환, 사전 체크, 즉시 검증(쿠키 기반)
 - **M126**: 배포 문서 + 운영 안전장치 — deployment.md 전면 재작성(장애 대응·스케일 한계·로그/모니터링), docker-compose.prod.yml worker 메모리 제한(1536M)+MAX_CONCURRENT_BROWSERS=1, .env.example S3/도메인 설정 추가, check_prod_readiness.py DOMAIN_NAME 검증, _active_jobs 완전 제거(단일 진실 _active_tasks)
 - **M125**: 테스트 정합성 복구 — test_e2e_recovery 14개 green(Queue→동기 경로 격리), test_s3_auxiliary 6개 green(boto3 미설치 환경 호환), 실패 테스트 0건 달성, 714 테스트 통과
 - **M123**: 배포 블로커 제거 — Admin API `X-Admin-Key` 인증(P0), Worker task set 추적+graceful shutdown(P0), `_active_jobs` 유령 버그 제거, `_semaphore._value` 직접 접근 제거, `on_event`→`lifespan` 전환, `RUN_PUBLISH_WORKER` 플래그(API/Worker 역할 분리), `admin_router` repo private 접근 제거(`list_jobs`/`reset_to_pending` 정식 메서드), 테스트 8개 추가
