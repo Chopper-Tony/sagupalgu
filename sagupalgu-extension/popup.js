@@ -77,8 +77,15 @@ async function connect(platform) {
   );
 }
 
-// 초기화: 상태 조회
+// 초기화: 버튼 바인딩 + 상태 조회
 document.addEventListener("DOMContentLoaded", () => {
+  // 인라인 onclick 대신 addEventListener (Manifest V3 CSP 준수)
+  document.querySelectorAll(".connect-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const platform = btn.dataset.platform;
+      if (platform) connect(platform);
+    });
+  });
   const serverUrl = document.getElementById("server-url").value.trim();
 
   chrome.runtime.sendMessage(
