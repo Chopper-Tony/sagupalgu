@@ -41,6 +41,11 @@ class PublishWorker:
         self.worker_id = worker_id or f"worker-{uuid.uuid4().hex[:8]}"
         self._running = False
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
+        self._active_tasks: set[asyncio.Task] = set()
+        self._active_jobs: int = 0
+        self._total_processed: int = 0
+        self._total_failed: int = 0
+        self._last_poll_at: str | None = None
 
     async def start(self) -> None:
         """워커 메인 루프. shutdown 신호까지 반복."""
@@ -57,9 +62,11 @@ class PublishWorker:
                 for job in jobs:
                     if not self._running:
                         break
-                    # 세마포어 획득 가능한 경우에만 처리
-                    if self._semaphore._value > 0:  # noqa: SLF001
-                        asyncio.create_task(self._process_job(job))
+                    # 동시 실행 수 체크 (active task 기준)
+                    if len(self._active_tasks) < MAX_CONCURRENT_BROWSERS:
+                        task = asyncio.create_task(self._process_job(job))
+                        self._active_tasks.add(task)
+                        task.add_done_callback(self._active_tasks.discard)
 
             except Exception as e:
                 logger.error(
@@ -71,9 +78,26 @@ class PublishWorker:
 
         logger.info("publish_worker_stopped worker_id=%s", self.worker_id)
 
+    def status(self) -> dict[str, Any]:
+        """워커 상태 조회. /health/ready에서 사용."""
+        return {
+            "alive": self._running,
+            "worker_id": self.worker_id,
+            "last_poll_at": self._last_poll_at,
+            "active_jobs": self._active_jobs,
+            "active_tasks": len(self._active_tasks),
+            "total_processed": self._total_processed,
+            "total_failed": self._total_failed,
+        }
+
     async def stop(self) -> None:
-        """워커 graceful shutdown."""
+        """워커 graceful shutdown — in-flight 작업 완료 대기."""
         self._running = False
+        if self._active_tasks:
+            logger.info(
+                "publish_worker_draining active_tasks=%d", len(self._active_tasks),
+            )
+            await asyncio.gather(*self._active_tasks, return_exceptions=True)
 
     async def _process_job(self, job: dict[str, Any]) -> None:
         """단일 작업 처리. 세마포어 + try/finally cleanup."""

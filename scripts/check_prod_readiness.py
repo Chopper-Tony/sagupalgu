@@ -86,7 +86,25 @@ def check_prod_readiness(env: str = "prod") -> list[dict]:
             "message": "LLM API 키가 하나도 설정되지 않았습니다.",
         })
 
-    # 7. Publisher credentials 검사
+    # 7. Admin API 키 검사
+    admin_key = getattr(settings, "admin_api_key", None)
+    if not admin_key and env == "prod":
+        issues.append({
+            "level": "error",
+            "check": "admin_api_key",
+            "message": "ADMIN_API_KEY가 설정되지 않았습니다. admin 엔드포인트가 보호되지 않습니다.",
+        })
+
+    # 8. Queue 모드 검사
+    if getattr(settings, "publish_use_queue", False) and env == "prod":
+        if not getattr(settings, "run_publish_worker", False):
+            issues.append({
+                "level": "warning",
+                "check": "publish_worker",
+                "message": "PUBLISH_USE_QUEUE=true인데 RUN_PUBLISH_WORKER=false입니다. 별도 워커 컨테이너가 필요합니다.",
+            })
+
+    # 9. Publisher credentials 검사
     publishers = []
     if settings.bunjang_username:
         publishers.append("bunjang")

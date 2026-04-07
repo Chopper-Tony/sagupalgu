@@ -133,6 +133,11 @@ class Settings(BaseSettings):
         alias="PUBLISH_USE_QUEUE",
         description="True=Job Queue 비동기, False=직접 실행 (테스트/개발용)",
     )
+    run_publish_worker: bool = Field(
+        default=True,
+        alias="RUN_PUBLISH_WORKER",
+        description="True=이 프로세스에서 워커 실행. API전용 컨테이너에서는 False.",
+    )
 
     # ------------------------------
     # Supabase Storage
