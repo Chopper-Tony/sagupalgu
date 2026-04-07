@@ -93,12 +93,15 @@ class TestWorkerTaskTracking:
         assert isinstance(worker._active_tasks, set)
         assert len(worker._active_tasks) == 0
 
-    def test_worker_init_active_jobs_zero(self):
-        """워커 초기화 시 _active_jobs가 0이다."""
+    def test_worker_status_active_tasks_zero(self):
+        """워커 초기화 시 status()의 active_tasks가 0이다."""
         from app.services.publish_worker import PublishWorker
         mock_repo = MagicMock()
         worker = PublishWorker(job_repo=mock_repo)
-        assert worker._active_jobs == 0
+        worker._running = True
+        status = worker.status()
+        assert status["active_tasks"] == 0
+        assert status["alive"] is True
 
     @pytest.mark.asyncio
     async def test_worker_stop_is_graceful(self):

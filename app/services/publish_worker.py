@@ -42,7 +42,6 @@ class PublishWorker:
         self._running = False
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
         self._active_tasks: set[asyncio.Task] = set()
-        self._active_jobs: int = 0
         self._total_processed: int = 0
         self._total_failed: int = 0
         self._last_poll_at: str | None = None
@@ -84,7 +83,6 @@ class PublishWorker:
             "alive": self._running,
             "worker_id": self.worker_id,
             "last_poll_at": self._last_poll_at,
-            "active_jobs": self._active_jobs,
             "active_tasks": len(self._active_tasks),
             "total_processed": self._total_processed,
             "total_failed": self._total_failed,
