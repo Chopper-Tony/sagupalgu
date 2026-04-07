@@ -44,8 +44,8 @@ async function collectCookies(platform) {
     cookies: filtered.map((c) => ({
       name: c.name,
       value: c.value,
-      // domain normalization: Playwright는 선행 dot에 민감
-      domain: c.domain.startsWith(".") ? c.domain.substring(1) : c.domain,
+      // Chrome 쿠키 domain을 그대로 유지 (Playwright가 서브도메인 매칭에 dot 필요)
+      domain: c.domain,
       path: c.path,
       // Chrome float → Playwright int 변환
       expires: c.expirationDate ? Math.floor(c.expirationDate) : -1,
