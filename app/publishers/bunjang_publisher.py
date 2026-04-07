@@ -201,20 +201,26 @@ class PatchedBunjangPublisher(LegacyBunjangPublisher):
                     raise Exception(f"등록 후에도 번개장터 글쓰기 페이지에 머뭄 - 검증메시지: {form_errors}")
                 raise Exception("등록 후에도 여전히 번개장터 글쓰기 페이지에 머뭄")
 
-            try:
-                await page.wait_for_url("**/products/**", timeout=10000)
-            except PlaywrightTimeoutError:
-                pass
+            # 게시 후 상품 페이지로 리다이렉트 대기 (최대 30초, 3초 간격 폴링)
+            listing_id = None
+            for _ in range(10):
+                try:
+                    await page.wait_for_url("**/products/**", timeout=3000)
+                except PlaywrightTimeoutError:
+                    pass
+                current_url = page.url
+                match = re.search(r"/products/(\d+)", current_url)
+                if match:
+                    listing_id = match.group(1)
+                    break
+                await page.wait_for_timeout(1000)
 
-            current_url = page.url
-            match = re.search(r"/products/(\d+)", current_url)
-            if not match:
+            if not listing_id:
                 raise Exception(f"등록 성공 URL 검증 실패. 현재 URL: {current_url}")
 
-            listing_id = match.group(1)
             shot = await self.screenshot(page, "publish_success")
 
-            await page.wait_for_timeout(5000)
+            await page.wait_for_timeout(3000)
 
             return PublishResult(
                 platform=self.platform,
@@ -271,11 +277,19 @@ class BunjangPublisher(PlatformPublisher):
             password=account.secret_payload.get("password", ""),
         )
 
+        # legacy 결과에서 상품 ID 추출 후 정규 URL 보정
+        product_id = result.listing_id
+        if not product_id and result.listing_url:
+            m = re.search(r"/products/(\d+)", result.listing_url)
+            if m:
+                product_id = m.group(1)
+        canonical_url = f"https://m.bunjang.co.kr/products/{product_id}" if product_id else result.listing_url
+
         return AppPublishResult(
             success=result.success,
             platform="bunjang",
-            external_listing_id=result.listing_id,
-            external_url=result.listing_url,
+            external_listing_id=product_id,
+            external_url=canonical_url,
             error_message=result.error_message,
             evidence_path=str(result.screenshot_path)
             if result.screenshot_path

@@ -187,6 +187,7 @@
 | M117: requirements.txt 버전 고정 | ✅ 완료 | 18개 패키지 `>=`→`==` 정확한 버전 고정 ✅, `requirements-dev.txt` 신규 생성(pytest 3종 분리) ✅, CI `requirements-dev.txt` 사용 전환 ✅, 688 테스트 통과 ✅ |
 | M116: AWS 인프라 최적화 | ✅ 완료 | Caddy HTTPS 리버스 프록시(`Caddyfile`+`docker-compose.prod.yml`) ✅, S3 보조 스토리지(`s3_auxiliary.py` 게시 증적 스크린샷 fire-and-forget) ✅, Publisher S3 아카이빙 연동(bunjang/joongna 각 3줄) ✅, EC2 1GB 스왑 설정(`setup_ec2.sh`) ✅, `deployment.md` 전면 재작성(Caddy·S3·스케일링·메모리 예산) ✅, CI/CD prod compose 명령 전환 ✅, config.py S3 설정 3필드 ✅, nginx X-Forwarded-Proto 헤더 ✅, 테스트 6개 추가 ✅, 688 테스트 통과 ✅ |
 | M115: 게시 안정성 개선 | ✅ 완료 | `_run_graph()` → `asyncio.to_thread()` 래핑(이벤트 루프 블로킹 해소, 서버 먹통 방지) ✅, 번개장터 카테고리→이미지→상품명 순서 변경(폼 리셋 방지) ✅, `_CATEGORY_DEPTH_FIX` 3단계 보완 맵 11개(태블릿→디지털>태블릿>태블릿PC 등) ✅, pgvector `is_table_ready()` 캐싱(매 요청 DB 쿼리 제거) ✅, Gemini 429 시 프로세스 내 비활성화(OpenAI 전환) ✅, LLM HTTP 타임아웃 60→30초·`_run_async` 60초(빠른 fallback) ✅, `batch_publish_test.py` 배치 테스트 스크립트 ✅, 파이프라인 100%·게시 60%→개선 중 ✅, 682 테스트 통과 ✅ |
+| M122: 게시 링크 정합성 + UX 개선 | ✅ 완료 | publish_worker 결과 누적 저장(먼저 완료된 플랫폼 URL 소실 방지) ✅, 번개장터 PatchedBunjangPublisher 리다이렉트 폴링 30초(3초 간격) ✅, 중고나라 PatchedJoongnaPublisher completeSeq URL 파싱 ✅, URL 키 이름 통일(listing_url→external_url) ✅, 프론트 확정 메시지 카테고리 포함 ✅, 스크롤 튐 방지(300ms debounce) ✅, PublishResultCard 성공 시 항상 링크 표시 ✅ |
 
 ## 에이전틱 점수 이력
 

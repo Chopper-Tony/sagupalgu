@@ -7,6 +7,12 @@ interface PublishResultCardProps {
   onUpdateSaleStatus: () => void;
 }
 
+const PLATFORM_HOME: Record<string, string> = {
+  bunjang: "https://m.bunjang.co.kr",
+  joongna: "https://web.joongna.com",
+  daangn: "https://www.daangn.com",
+};
+
 export function PublishResultCard({ results, onUpdateSaleStatus }: PublishResultCardProps) {
   const successCount = results.filter((r) => r.success).length;
 
@@ -35,9 +41,9 @@ export function PublishResultCard({ results, onUpdateSaleStatus }: PublishResult
               <span className={`publish-result-card__result-dot${r.success ? " publish-result-card__result-dot--success" : " publish-result-card__result-dot--fail"}`} />
               <span className="publish-result-card__result-platform">{platformLabel(r.platform)}</span>
             </div>
-            {r.success && r.url ? (
+            {r.success ? (
               <a
-                href={r.url}
+                href={r.url || PLATFORM_HOME[r.platform] || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="publish-result-card__result-link"
