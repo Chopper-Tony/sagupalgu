@@ -108,6 +108,7 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M126**: 배포 문서 + 운영 안전장치 — deployment.md 전면 재작성(장애 대응·스케일 한계·로그/모니터링), docker-compose.prod.yml worker 메모리 제한(1536M)+MAX_CONCURRENT_BROWSERS=1, .env.example S3/도메인 설정 추가, check_prod_readiness.py DOMAIN_NAME 검증, _active_jobs 완전 제거(단일 진실 _active_tasks)
 - **M125**: 테스트 정합성 복구 — test_e2e_recovery 14개 green(Queue→동기 경로 격리), test_s3_auxiliary 6개 green(boto3 미설치 환경 호환), 실패 테스트 0건 달성, 714 테스트 통과
 - **M123**: 배포 블로커 제거 — Admin API `X-Admin-Key` 인증(P0), Worker task set 추적+graceful shutdown(P0), `_active_jobs` 유령 버그 제거, `_semaphore._value` 직접 접근 제거, `on_event`→`lifespan` 전환, `RUN_PUBLISH_WORKER` 플래그(API/Worker 역할 분리), `admin_router` repo private 접근 제거(`list_jobs`/`reset_to_pending` 정식 메서드), 테스트 8개 추가
 - **M122**: 게시 링크 정합성 — publish_worker 결과 누적 저장(먼저 완료된 플랫폼 URL 소실 방지), 번개장터 리다이렉트 폴링 30초, 중고나라 completeSeq URL 파싱, 프론트 확정 메시지/스크롤/게시결과 카드 개선
