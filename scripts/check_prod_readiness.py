@@ -104,7 +104,16 @@ def check_prod_readiness(env: str = "prod") -> list[dict]:
                 "message": "PUBLISH_USE_QUEUE=true인데 RUN_PUBLISH_WORKER=false입니다. 별도 워커 컨테이너가 필요합니다.",
             })
 
-    # 9. Publisher credentials 검사
+    # 9. DOMAIN_NAME 검사
+    domain = os.environ.get("DOMAIN_NAME", "localhost")
+    if domain == "localhost" and env == "prod":
+        issues.append({
+            "level": "warning",
+            "check": "domain_name",
+            "message": "DOMAIN_NAME이 localhost입니다. prod에서는 실제 도메인을 설정하세요.",
+        })
+
+    # 10. Publisher credentials 검사
     publishers = []
     if settings.bunjang_username:
         publishers.append("bunjang")
