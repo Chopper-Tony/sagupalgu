@@ -44,9 +44,11 @@ async function collectCookies(platform) {
     cookies: filtered.map((c) => ({
       name: c.name,
       value: c.value,
-      domain: c.domain,
+      // domain normalization: Playwright는 선행 dot에 민감
+      domain: c.domain.startsWith(".") ? c.domain.substring(1) : c.domain,
       path: c.path,
-      expires: c.expirationDate || -1,
+      // Chrome float → Playwright int 변환
+      expires: c.expirationDate ? Math.floor(c.expirationDate) : -1,
       httpOnly: c.httpOnly,
       secure: c.secure,
       sameSite: convertSameSite(c.sameSite),

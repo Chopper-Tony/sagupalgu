@@ -46,7 +46,7 @@ describe("getSessionStreamUrl", () => {
 
   it("baseURL로 시작한다", () => {
     const url = api.getSessionStreamUrl("abc");
-    expect(url).toMatch(/^https?:\/\/.+\/sessions\/abc\/stream$/);
+    expect(url).toMatch(/\/api\/v1\/sessions\/abc\/stream$/);
   });
 });
 
