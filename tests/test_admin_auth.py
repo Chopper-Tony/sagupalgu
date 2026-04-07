@@ -1,6 +1,8 @@
-"""Admin API 인증 테스트."""
+"""Admin API 인증 + Worker 안정성 테스트."""
+import asyncio
+
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 
@@ -109,3 +111,96 @@ class TestWorkerTaskTracking:
         worker._running = True
         await worker.stop()
         assert worker._running is False
+
+    @pytest.mark.asyncio
+    async def test_worker_crash_isolation(self):
+        """_process_job 내부 예외가 워커 전체를 죽이지 않는다."""
+        from app.services.publish_worker import PublishWorker
+        mock_repo = MagicMock()
+        mock_repo.claim.side_effect = RuntimeError("DB 연결 실패")
+        worker = PublishWorker(job_repo=mock_repo)
+
+        # 예외가 발생해도 _process_job은 조용히 로깅하고 종료
+        job = {"id": "j1", "session_id": "s1", "platform": "bunjang", "user_id": "u1"}
+        await worker._process_job(job)  # 예외 안 터짐
+
+
+class TestQueuePathE2E:
+    """Queue 모드 happy path + failure/retry 시나리오."""
+
+    @pytest.mark.asyncio
+    async def test_queue_happy_path(self):
+        """enqueue → claim → execute → complete → session update."""
+        from app.services.publish_worker import PublishWorker
+        from app.publishers.publisher_interface import PublishResult
+
+        mock_repo = MagicMock()
+        mock_repo.claim.return_value = True
+        worker = PublishWorker(job_repo=mock_repo)
+
+        mock_result = PublishResult(
+            success=True,
+            platform="bunjang",
+            external_listing_id="ext-123",
+            external_url="https://m.bunjang.co.kr/products/ext-123",
+        )
+
+        job = {
+            "id": "j-happy",
+            "session_id": "s-happy",
+            "platform": "bunjang",
+            "user_id": "u1",
+            "attempt_count": 0,
+        }
+
+        with patch.object(worker, "_execute_publish", new_callable=AsyncMock) as mock_exec, \
+             patch.object(worker, "_update_session_on_complete", new_callable=AsyncMock) as mock_update:
+            mock_exec.return_value = {
+                "success": True,
+                "external_listing_id": "ext-123",
+                "external_url": "https://m.bunjang.co.kr/products/ext-123",
+                "evidence_urls": [],
+                "error_code": "",
+                "error_message": "",
+            }
+            await worker._process_job(job)
+
+        mock_repo.claim.assert_called_once_with("j-happy", worker.worker_id)
+        mock_repo.start.assert_called_once()
+        mock_repo.complete.assert_called_once()
+        mock_update.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_queue_failure_retry_path(self):
+        """실패 → fail 기록 → _update_session_on_failure 호출."""
+        from app.services.publish_worker import PublishWorker
+
+        mock_repo = MagicMock()
+        mock_repo.claim.return_value = True
+        worker = PublishWorker(job_repo=mock_repo)
+
+        job = {
+            "id": "j-fail",
+            "session_id": "s-fail",
+            "platform": "joongna",
+            "user_id": "u1",
+            "attempt_count": 0,
+        }
+
+        with patch.object(worker, "_execute_publish", new_callable=AsyncMock) as mock_exec, \
+             patch.object(worker, "_update_session_on_failure", new_callable=AsyncMock) as mock_fail_update:
+            mock_exec.return_value = {
+                "success": False,
+                "error_code": "timeout",
+                "error_message": "게시 180초 타임아웃 초과",
+                "evidence_urls": [],
+                "external_listing_id": None,
+                "external_url": None,
+            }
+            await worker._process_job(job)
+
+        mock_repo.fail.assert_called_once()
+        fail_kwargs = mock_repo.fail.call_args
+        assert fail_kwargs[1]["error_code"] == "timeout"
+        assert fail_kwargs[1]["auto_recoverable"] is True
+        mock_fail_update.assert_called_once()

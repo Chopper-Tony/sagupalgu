@@ -100,7 +100,17 @@ class PublishWorker:
             await asyncio.gather(*self._active_tasks, return_exceptions=True)
 
     async def _process_job(self, job: dict[str, Any]) -> None:
-        """단일 작업 처리. 세마포어 + try/finally cleanup."""
+        """단일 작업 처리. 최외곽 try/except로 워커 전체 죽지 않도록 보호."""
+        try:
+            await self._process_job_inner(job)
+        except Exception as e:
+            logger.error(
+                "publish_job_unhandled_crash job_id=%s error=%s",
+                job.get("id"), e, exc_info=True,
+            )
+
+    async def _process_job_inner(self, job: dict[str, Any]) -> None:
+        """단일 작업 실제 처리. 세마포어 + try/finally cleanup."""
         job_id = job["id"]
         session_id = job["session_id"]
         platform = job["platform"]
