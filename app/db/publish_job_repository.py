@@ -345,3 +345,28 @@ class PublishJobRepository:
         count = len(result.data) if result.data else 0
         logger.info("user_publishing_disabled user=%s cancelled=%d", user_id, count)
         return count
+
+    # ── Admin 조회 ────────────────────────────────────────────────
+
+    def list_jobs(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """작업 목록 조회 (admin)."""
+        query = self._get_client().table(TABLE).select("*")
+        if status:
+            query = query.eq("status", status)
+        return query.order("created_at", desc=True).limit(limit).execute().data or []
+
+    def reset_to_pending(self, job_id: str) -> None:
+        """실패/취소된 작업을 대기열로 복원 (admin 재시도)."""
+        self._get_client().table(TABLE).update({
+            "status": PublishJobStatus.PENDING.value,
+            "error_code": None,
+            "error_message": None,
+            "locked_by": None,
+            "locked_at": None,
+            "next_retry_at": None,
+        }).eq("id", job_id).execute()
+        logger.info("publish_job_reset_to_pending job_id=%s", job_id)

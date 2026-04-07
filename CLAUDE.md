@@ -108,9 +108,8 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M123**: 배포 블로커 제거 — Admin API `X-Admin-Key` 인증(P0), Worker task set 추적+graceful shutdown(P0), `_active_jobs` 유령 버그 제거, `_semaphore._value` 직접 접근 제거, `on_event`→`lifespan` 전환, `RUN_PUBLISH_WORKER` 플래그(API/Worker 역할 분리), `admin_router` repo private 접근 제거(`list_jobs`/`reset_to_pending` 정식 메서드), 테스트 8개 추가
 - **M122**: 게시 링크 정합성 — publish_worker 결과 누적 저장(먼저 완료된 플랫폼 URL 소실 방지), 번개장터 리다이렉트 폴링 30초, 중고나라 completeSeq URL 파싱, 프론트 확정 메시지/스크롤/게시결과 카드 개선
-- **M122~M124**: Job Queue 프로덕션 안정화 — Admin API 키 인증(`X-Admin-Key`), 워커 모니터링(`status()`), `/health/ready` 워커 상태, 큐 적체 Discord 알림, 게시 진행 SSE(`job_progress` → ProgressCard 플랫폼별 뱃지)
-- **M125~M129**: 프로덕션 배포 준비 — Worker 프로세스 분리(`RUN_PUBLISH_WORKER`), FastAPI lifespan 전환(on_event deprecated 제거), Worker graceful shutdown(active task drain), Prod readiness gate 강화(admin/queue/JWT 검증), 전달물 위생(.env.example), requirements 완전 고정
 - **Bugfix #114, #116**: Job Queue 워커 버그 6건 수정 — 테이블명/컬럼명 정합화(`sell_sessions`/`status`), `PublishResult` 속성명, `publish_results` 키 일치, legacy 대기시간 30초→3초, stale job 방지, enum `.value`, PublishResultCard 링크 복원, 스크롤 UX
 - **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
 - **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
