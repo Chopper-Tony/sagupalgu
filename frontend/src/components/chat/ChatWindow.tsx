@@ -21,11 +21,18 @@ interface ChatWindowProps {
 export function ChatWindow({ items, currentStatus, session, onAction }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const prevItemsLength = useRef(items.length);
+
   useEffect(() => {
-    // 다음 프레임에서 스크롤 (DOM 업데이트 후)
-    requestAnimationFrame(() => {
+    const added = items.length > prevItemsLength.current;
+    prevItemsLength.current = items.length;
+    if (!added && !currentStatus) return;
+
+    // 카드 렌더링 완료 대기 후 최하단 스크롤 (DraftCard 등 큰 컴포넌트 고려)
+    const timer = setTimeout(() => {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    });
+    }, 300);
+    return () => clearTimeout(timer);
   }, [items.length, currentStatus]);
 
   const renderCard = (item: Extract<TimelineItem, { type: "card" }>) => {

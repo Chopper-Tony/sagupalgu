@@ -136,7 +136,7 @@ export default function App() {
           break;
         case "confirm_product": {
           const product = payload as ConfirmedProduct;
-          pushItem({ type: "assistant_message", text: `${product.brand} ${product.model} (${product.category})로 확정했습니다.` });
+          pushItem({ type: "assistant_message", text: `${[product.brand, product.model, product.category].filter(Boolean).join(" ")}로 확정했습니다.` });
           pushItem({ type: "progress", status: "product_confirmed", message: "시세를 분석하고 판매글을 생성하고 있습니다..." });
           await api.provideProductInfo(activeId, {
             model: product.model,

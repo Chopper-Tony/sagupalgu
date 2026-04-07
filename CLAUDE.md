@@ -108,6 +108,7 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M122**: 게시 링크 정합성 — publish_worker 결과 누적 저장(먼저 완료된 플랫폼 URL 소실 방지), 번개장터 리다이렉트 폴링 30초, 중고나라 completeSeq URL 파싱, 프론트 확정 메시지/스크롤/게시결과 카드 개선
 - **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
 - **M117~M120**: 프로덕션 안정성 Phase 1 — requirements 버전 고정, except 세분화, Caddy healthcheck
 - **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)

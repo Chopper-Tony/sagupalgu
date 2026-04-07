@@ -212,8 +212,8 @@ class PublishWorker:
             "success": result.success,
             "error_code": result.error_code or "",
             "error_message": result.error_message or "",
-            "listing_id": result.external_listing_id,
-            "listing_url": result.external_url,
+            "external_listing_id": result.external_listing_id,
+            "external_url": result.external_url,
             "evidence_urls": [result.evidence_path] if result.evidence_path else [],
         }
 
@@ -222,54 +222,56 @@ class PublishWorker:
         job: dict[str, Any],
         result: dict[str, Any],
     ) -> None:
-        """게시 성공 시 세션 상태 업데이트. 모든 플랫폼 완료 확인."""
+        """게시 성공 시 세션 상태 업데이트. 매 job 완료마다 결과를 누적 저장."""
         session_id = job["session_id"]
         platform = job["platform"]
 
-        # 해당 세션의 모든 job 조회
-        all_jobs = self.job_repo.get_by_session(session_id)
-        all_done = all(
-            j["status"] in ("completed", "failed", "cancelled")
-            or j["id"] == job["id"]  # 현재 작업은 방금 완료
-            for j in all_jobs
-        )
+        try:
+            from app.db.client import get_supabase
 
-        if all_done:
-            # 모든 플랫폼 완료 → 세션 상태 업데이트
-            any_failure = any(
-                j["status"] == "failed" for j in all_jobs if j["id"] != job["id"]
+            # 현재 workflow_meta 가져오기
+            existing = get_supabase().table("sell_sessions").select(
+                "workflow_meta_jsonb"
+            ).eq("id", session_id).execute()
+            meta = {}
+            if existing.data:
+                meta = dict(existing.data[0].get("workflow_meta_jsonb") or {})
+
+            # 기존 결과에 현재 플랫폼 결과 병합 (먼저 완료된 플랫폼 결과 보존)
+            publish_results = dict(meta.get("publish_results") or {})
+            publish_results[platform] = {
+                "success": True,
+                "external_listing_id": result.get("external_listing_id"),
+                "external_url": result.get("external_url"),
+            }
+            meta["publish_results"] = publish_results
+
+            # 모든 job 완료 여부 확인
+            all_jobs = self.job_repo.get_by_session(session_id)
+            all_done = all(
+                j["status"] in ("completed", "failed", "cancelled")
+                or j["id"] == job["id"]
+                for j in all_jobs
             )
-            try:
-                from app.db.client import get_supabase
-                publish_results = {}
+
+            if all_done:
+                any_failure = any(
+                    j["status"] == "failed" for j in all_jobs if j["id"] != job["id"]
+                )
+                # 실패한 job도 반영
                 for j in all_jobs:
                     p = j["platform"]
-                    if j["id"] == job["id"]:
+                    if p not in publish_results and j["status"] == "failed":
                         publish_results[p] = {
-                            "success": True,
-                            "external_listing_id": result.get("listing_id"),
-                            "external_url": result.get("listing_url"),
-                        }
-                    else:
-                        publish_results[p] = {
-                            "success": j["status"] == "completed",
+                            "success": False,
                             "error_code": j.get("error_code"),
                         }
-
-                new_status = "publishing_failed" if any_failure else "completed"
-                # session_ui.py는 workflow_meta["publish_results"]를 읽으므로
-                # 기존 오케스트레이터(set_publish_complete)와 동일한 키 사용
-                existing = get_supabase().table("sell_sessions").select(
-                    "workflow_meta_jsonb"
-                ).eq("id", session_id).execute()
-                meta = {}
-                if existing.data:
-                    meta = dict(existing.data[0].get("workflow_meta_jsonb") or {})
                 meta["publish_results"] = publish_results
                 meta["publish_complete"] = {
                     "results": publish_results,
                     "any_failure": any_failure,
                 }
+                new_status = "publishing_failed" if any_failure else "completed"
 
                 get_supabase().table("sell_sessions").update({
                     "status": new_status,
@@ -280,11 +282,21 @@ class PublishWorker:
                     "session_publish_complete session=%s status=%s",
                     session_id, new_status,
                 )
-            except Exception as e:
-                logger.error(
-                    "session_update_failed session=%s error=%s",
-                    session_id, e, exc_info=True,
+            else:
+                # 아직 다른 플랫폼 진행 중 → 결과만 저장 (상태는 유지)
+                get_supabase().table("sell_sessions").update({
+                    "workflow_meta_jsonb": meta,
+                }).eq("id", session_id).execute()
+
+                logger.info(
+                    "session_publish_partial session=%s platform=%s",
+                    session_id, platform,
                 )
+        except Exception as e:
+            logger.error(
+                "session_update_failed session=%s error=%s",
+                session_id, e, exc_info=True,
+            )
 
     async def _update_session_on_failure(
         self,
