@@ -44,6 +44,10 @@ services:
       - MAX_CONCURRENT_BROWSERS=1  # 초기 안전값 (t3.small 2GB 기준)
     env_file:
       - .env
+    volumes:
+      - ./sessions:/app/sessions
+      - ./screenshots:/app/screenshots
+      - ./uploads:/app/uploads
     depends_on:
       backend:
         condition: service_healthy
