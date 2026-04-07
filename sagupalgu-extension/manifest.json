@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "사구팔구 플랫폼 연동",
+  "version": "1.0.0",
+  "description": "번개장터/중고나라 계정을 사구팔구 서비스에 연결합니다.",
+  "permissions": ["cookies"],
+  "host_permissions": [
+    "*://*.bunjang.co.kr/*",
+    "*://*.joongna.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "사구팔구 연동"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {}
+}
