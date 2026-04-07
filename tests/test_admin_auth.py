@@ -85,20 +85,20 @@ class TestAdminAuth:
 class TestWorkerTaskTracking:
     """PublishWorker task 추적 검증."""
 
-    def test_worker_init_has_tasks_set(self):
-        """워커 초기화 시 _tasks set이 존재한다."""
+    def test_worker_init_has_active_tasks_set(self):
+        """워커 초기화 시 _active_tasks set이 존재한다."""
         from app.services.publish_worker import PublishWorker
         mock_repo = MagicMock()
         worker = PublishWorker(job_repo=mock_repo)
-        assert isinstance(worker._tasks, set)
-        assert len(worker._tasks) == 0
+        assert isinstance(worker._active_tasks, set)
+        assert len(worker._active_tasks) == 0
 
-    def test_worker_active_task_count_property(self):
-        """active_task_count 프로퍼티가 정상 동작한다."""
+    def test_worker_init_active_jobs_zero(self):
+        """워커 초기화 시 _active_jobs가 0이다."""
         from app.services.publish_worker import PublishWorker
         mock_repo = MagicMock()
         worker = PublishWorker(job_repo=mock_repo)
-        assert worker.active_task_count == 0
+        assert worker._active_jobs == 0
 
     @pytest.mark.asyncio
     async def test_worker_stop_is_graceful(self):
