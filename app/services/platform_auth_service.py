@@ -130,7 +130,14 @@ def store_platform_session(
     with open(path, "w", encoding="utf-8") as f:
         json.dump(storage_state, f, ensure_ascii=False)
 
-    logger.info("platform_session_saved user=%s platform=%s path=%s", user_id, platform, path)
+    # legacy publisher가 읽는 공용 경로에도 저장 (sessions/{platform}_session.json)
+    config = PLATFORM_CONFIG.get(platform, {})
+    shared_path = os.path.join(SESSION_DIR, config.get("session_file", f"{platform}_session.json"))
+    with open(shared_path, "w", encoding="utf-8") as f:
+        json.dump(storage_state, f, ensure_ascii=False)
+
+    logger.info("platform_session_saved user=%s platform=%s path=%s shared=%s",
+                user_id, platform, path, shared_path)
     return path
 
 
