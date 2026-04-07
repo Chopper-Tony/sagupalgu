@@ -3,6 +3,7 @@ M95: 에러 복구 E2E 시나리오 테스트
 
 게시 실패 → recovery 진단 → 재시도 → Discord 알림까지의 전체 흐름을 검증.
 모든 외부 서비스(publisher, LLM, Discord)는 mock 처리.
+동기 게시 모드(PUBLISH_USE_QUEUE=False)로 테스트하여 DB 의존성 격리.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,6 +18,18 @@ from app.services.publish_orchestrator import PublishOrchestrator
 from app.services.recovery_service import RecoveryService
 from app.services.sale_tracker import SaleTracker
 from app.services.session_service import SessionService
+
+
+# Queue 경로가 아닌 동기 실행 경로로 테스트 (DB 의존성 격리)
+pytestmark = pytest.mark.usefixtures("_force_sync_publish")
+
+
+@pytest.fixture(autouse=True)
+def _force_sync_publish():
+    """PUBLISH_USE_QUEUE=False로 강제하여 동기 게시 경로를 사용."""
+    with patch("app.core.config.get_settings") as mock_gs:
+        mock_gs.return_value.publish_use_queue = False
+        yield
 
 
 # ── 헬퍼 ──────────────────────────────────────────────────────────
