@@ -4,6 +4,7 @@ import "./PublishResultCard.css";
 
 interface PublishResultCardProps {
   results: PlatformResult[];
+  sessionId?: string;
   onUpdateSaleStatus: () => void;
 }
 
@@ -13,8 +14,15 @@ const PLATFORM_HOME: Record<string, string> = {
   daangn: "https://www.daangn.com",
 };
 
-export function PublishResultCard({ results, onUpdateSaleStatus }: PublishResultCardProps) {
+function isAccessBlocked(error: string | undefined): boolean {
+  if (!error) return false;
+  const msg = error.toLowerCase();
+  return msg.includes("차단") || msg.includes("403") || msg.includes("cloudfront");
+}
+
+export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: PublishResultCardProps) {
   const successCount = results.filter((r) => r.success).length;
+  const blockedResults = results.filter((r) => !r.success && isAccessBlocked(r.error));
 
   return (
     <div className="publish-result-card">
@@ -56,6 +64,30 @@ export function PublishResultCard({ results, onUpdateSaleStatus }: PublishResult
           </div>
         ))}
       </div>
+
+      {blockedResults.length > 0 && (
+        <div className="publish-result-card__extension-notice">
+          <p style={{ fontSize: "12px", color: "#fbbf24", marginBottom: "6px" }}>
+            {blockedResults.map((r) => platformLabel(r.platform)).join(", ")}는 서버에서 접속이 차단됩니다.
+          </p>
+          <p style={{ fontSize: "12px", color: "#93c5fd" }}>
+            크롬 익스텐션을 열어 아래 세션 ID를 입력한 후 "자동 게시 시작"을 눌러주세요.
+          </p>
+          {sessionId && (
+            <code
+              style={{
+                display: "block", fontSize: "11px", color: "#e0e0e0",
+                background: "#1e293b", padding: "6px 8px", borderRadius: "4px",
+                marginTop: "4px", cursor: "pointer", wordBreak: "break-all",
+              }}
+              onClick={() => navigator.clipboard.writeText(sessionId)}
+              title="클릭하여 복사"
+            >
+              {sessionId}
+            </code>
+          )}
+        </div>
+      )}
 
       <button className="publish-result-card__status-btn" onClick={onUpdateSaleStatus}>
         판매 상태 업데이트

@@ -98,6 +98,7 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
         return (
           <PublishResultCard
             results={session?.platform_results ?? []}
+            sessionId={session?.session_id}
             onUpdateSaleStatus={() => onAction("update_sale_status")}
           />
         );

@@ -13,6 +13,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.dependencies import get_session_service
@@ -424,3 +425,72 @@ async def update_sale_status(
         session_id=session_id, sale_status=request.sale_status, user_id=user.user_id,
     )
     return SaleStatusResponse(**result)
+
+
+# ── 익스텐션 게시 지원 ─────────────────────────────────────────────
+
+
+@router.get("/{session_id}/publish-data")
+async def get_publish_data(
+    session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service),
+):
+    """익스텐션이 게시할 listing 데이터를 조회한다."""
+    session = session_service._get_or_raise(session_id, user_id=user.user_id)
+    listing_data = session.get("listing_data_jsonb") or {}
+    canonical = listing_data.get("canonical_listing") or {}
+    image_urls = (session.get("product_data_jsonb") or {}).get("image_urls") or []
+    packages = listing_data.get("platform_packages") or {}
+
+    return {
+        "session_id": session_id,
+        "title": canonical.get("title", ""),
+        "description": canonical.get("description", ""),
+        "price": canonical.get("price", 0),
+        "image_urls": image_urls,
+        "category": canonical.get("category", ""),
+        "platform_packages": packages,
+    }
+
+
+class ExtensionPublishResultRequest(BaseModel):
+    platform: str
+    success: bool
+    listing_url: str | None = None
+    listing_id: str | None = None
+    error: str | None = None
+
+
+@router.post("/{session_id}/extension-publish-result")
+async def receive_extension_publish_result(
+    session_id: str,
+    body: ExtensionPublishResultRequest,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """익스텐션에서 게시 결과를 수신하여 세션에 반영한다."""
+    session = session_service._get_or_raise(session_id)
+    workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+    publish_results = dict(workflow_meta.get("publish_results") or {})
+
+    publish_results[body.platform] = {
+        "success": body.success,
+        "external_url": body.listing_url,
+        "external_listing_id": body.listing_id,
+        "error_message": body.error,
+        "source": "extension",
+    }
+    workflow_meta["publish_results"] = publish_results
+
+    # 모든 플랫폼 결과가 도착했는지 확인
+    selected = session.get("selected_platforms_jsonb") or []
+    all_done = all(p in publish_results for p in selected)
+
+    payload: dict = {"workflow_meta_jsonb": workflow_meta}
+    if all_done:
+        any_success = any(r.get("success") for r in publish_results.values())
+        payload["status"] = "completed" if any_success else "publishing_failed"
+
+    session_service.repo.update(session_id=session_id, payload=payload)
+
+    return {"received": True, "all_done": all_done}
