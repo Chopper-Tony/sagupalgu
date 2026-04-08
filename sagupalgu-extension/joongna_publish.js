@@ -75,6 +75,9 @@
   /**
    * data URL 배열을 File 객체로 변환 후 input[type=file]에 주입.
    * background script에서 미리 다운로드한 data URL을 사용 (CORS 우회).
+   *
+   * 중고나라는 input[type=file]이 hidden이고 카메라 아이콘 클릭으로 트리거됨.
+   * React 앱이므로 native setter + 여러 이벤트를 발생시켜야 감지됨.
    */
   async function uploadImages(imageDataUrls) {
     if (!imageDataUrls || imageDataUrls.length === 0) {
@@ -82,14 +85,7 @@
       return;
     }
 
-    const fileInput = document.querySelector(
-      "input[type='file'][accept*='image'], input[type='file'][multiple], input[type='file']"
-    );
-    if (!fileInput) {
-      console.warn("[사구팔구] 이미지 업로드 input을 찾지 못함");
-      return;
-    }
-
+    // File 객체 생성
     const files = [];
     for (let i = 0; i < imageDataUrls.length; i++) {
       try {
@@ -108,11 +104,83 @@
       return;
     }
 
+    // input[type=file] 찾기 (hidden 포함, 여러 셀렉터 시도)
+    const selectors = [
+      "input[type='file'][accept*='image']",
+      "input[type='file'][multiple]",
+      "input[type='file']",
+    ];
+
+    let fileInput = null;
+    for (const sel of selectors) {
+      const inputs = document.querySelectorAll(sel);
+      for (const inp of inputs) {
+        fileInput = inp;
+        break;
+      }
+      if (fileInput) break;
+    }
+
+    if (!fileInput) {
+      console.warn("[사구팔구] 이미지 업로드 input을 찾지 못함");
+      return;
+    }
+
+    // DataTransfer로 파일 설정
     const dt = new DataTransfer();
     files.forEach((f) => dt.items.add(f));
-    fileInput.files = dt.files;
+
+    // React 앱이 감지하도록 native setter 사용 + 다양한 이벤트 발생
+    Object.defineProperty(fileInput, "files", {
+      value: dt.files,
+      writable: true,
+      configurable: true,
+    });
+
+    fileInput.dispatchEvent(new Event("input", { bubbles: true }));
     fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-    console.log(`[사구팔구] 이미지 ${files.length}개 업로드 완료`);
+
+    console.log(`[사구팔구] 이미지 ${files.length}개 업로드 시도 완료`);
+
+    // 업로드 반영 대기 후 확인
+    await sleep(2000);
+
+    // 이미지가 반영되지 않았으면 카메라 버튼 클릭 방식 시도
+    const imageCount = document.querySelectorAll(
+      "img[src*='blob:'], img[src*='data:'], .image-item, [class*='image'] img, [class*='photo'] img"
+    ).length;
+
+    if (imageCount === 0) {
+      console.warn("[사구팔구] input 직접 주입 실패, 카메라 버튼 클릭 방식 시도");
+      // 카메라 아이콘/버튼을 클릭하여 파일 선택 다이얼로그 대신 파일 주입
+      const cameraBtn = document.querySelector(
+        "[class*='camera'], [class*='photo'], [class*='image'] button, label[for] img"
+      );
+      if (cameraBtn) {
+        // 클릭 시 file input이 트리거되므로, input의 click을 가로채서 파일 주입
+        const origClick = HTMLInputElement.prototype.click;
+        let intercepted = false;
+        HTMLInputElement.prototype.click = function () {
+          if (this.type === "file" && !intercepted) {
+            intercepted = true;
+            const dt2 = new DataTransfer();
+            files.forEach((f) => dt2.items.add(f));
+            Object.defineProperty(this, "files", {
+              value: dt2.files,
+              writable: true,
+              configurable: true,
+            });
+            this.dispatchEvent(new Event("change", { bubbles: true }));
+            console.log("[사구팔구] 카메라 클릭 인터셉트로 이미지 주입 성공");
+          } else {
+            origClick.call(this);
+          }
+        };
+        cameraBtn.click();
+        await sleep(1000);
+        HTMLInputElement.prototype.click = origClick;
+      }
+    }
   }
 
   // ── 카테고리 선택 ────────────────────────────────────────
