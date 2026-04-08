@@ -11,6 +11,7 @@ cryptography==46.0.5
 
 # LangGraph / LangChain
 langgraph==1.0.8
+langgraph-prebuilt==1.0.7
 langchain==1.2.10
 langchain-core==1.2.11
 langchain-google-genai==4.2.1
