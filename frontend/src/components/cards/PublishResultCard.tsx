@@ -14,6 +14,10 @@ const PLATFORM_HOME: Record<string, string> = {
   daangn: "https://www.daangn.com",
 };
 
+function isExtensionRequired(r: PlatformResult): boolean {
+  return r.source === "extension_required";
+}
+
 function isAccessBlocked(error: string | undefined): boolean {
   if (!error) return false;
   const msg = error.toLowerCase();
@@ -21,21 +25,40 @@ function isAccessBlocked(error: string | undefined): boolean {
 }
 
 export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: PublishResultCardProps) {
-  const successCount = results.filter((r) => r.success).length;
-  const blockedResults = results.filter((r) => !r.success && isAccessBlocked(r.error));
+  // extension_required는 실패로 카운트하지 않음
+  const serverResults = results.filter((r) => !isExtensionRequired(r));
+  const extensionResults = results.filter((r) => isExtensionRequired(r));
+
+  const successCount = serverResults.filter((r) => r.success).length;
+  const blockedResults = serverResults.filter((r) => !r.success && isAccessBlocked(r.error));
+
+  // 헤더 메시지 결정
+  const allServerSuccess = serverResults.length > 0 && successCount === serverResults.length;
+  const noServerPlatforms = serverResults.length === 0;
+
+  let headerIcon: string;
+  let headerTitle: string;
+
+  if (noServerPlatforms && extensionResults.length > 0) {
+    headerIcon = "📎";
+    headerTitle = "크롬 익스텐션에서 게시해주세요";
+  } else if (allServerSuccess && extensionResults.length === 0) {
+    headerIcon = "✅";
+    headerTitle = "게시가 완료됐습니다";
+  } else if (allServerSuccess && extensionResults.length > 0) {
+    headerIcon = "✅";
+    headerTitle = `서버 게시 완료 (${extensionResults.length}개는 익스텐션 필요)`;
+  } else {
+    headerIcon = "⚠️";
+    headerTitle = `${successCount}/${serverResults.length}개 플랫폼에 게시됐습니다`;
+  }
 
   return (
     <div className="publish-result-card">
       <div className="publish-result-card__header">
-        <span className="publish-result-card__icon">
-          {successCount === results.length ? "✅" : "⚠️"}
-        </span>
+        <span className="publish-result-card__icon">{headerIcon}</span>
         <div>
-          <p className="publish-result-card__title">
-            {successCount === results.length
-              ? "게시가 완료됐습니다"
-              : `${successCount}/${results.length}개 플랫폼에 게시됐습니다`}
-          </p>
+          <p className="publish-result-card__title">{headerTitle}</p>
           <p className="publish-result-card__subtitle">
             판매 현황을 주기적으로 확인해 드릴게요.
           </p>
@@ -43,7 +66,8 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
       </div>
 
       <div className="publish-result-card__results">
-        {results.map((r) => (
+        {/* 서버 게시 결과 */}
+        {serverResults.map((r) => (
           <div key={r.platform} className="publish-result-card__result">
             <div className="publish-result-card__result-left">
               <span className={`publish-result-card__result-dot${r.success ? " publish-result-card__result-dot--success" : " publish-result-card__result-dot--fail"}`} />
@@ -63,15 +87,31 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
             )}
           </div>
         ))}
+
+        {/* 익스텐션 전용 플랫폼 */}
+        {extensionResults.map((r) => (
+          <div key={r.platform} className="publish-result-card__result">
+            <div className="publish-result-card__result-left">
+              <span className="publish-result-card__result-dot publish-result-card__result-dot--extension" />
+              <span className="publish-result-card__result-platform">{platformLabel(r.platform)}</span>
+            </div>
+            <span style={{ fontSize: "12px", color: "#93c5fd" }}>익스텐션에서 게시 가능</span>
+          </div>
+        ))}
       </div>
 
-      {blockedResults.length > 0 && (
+      {/* 익스텐션 안내 (extension_required 또는 차단된 플랫폼) */}
+      {(extensionResults.length > 0 || blockedResults.length > 0) && (
         <div className="publish-result-card__extension-notice">
-          <p style={{ fontSize: "12px", color: "#fbbf24", marginBottom: "6px" }}>
-            {blockedResults.map((r) => platformLabel(r.platform)).join(", ")}는 서버에서 접속이 차단됩니다.
+          <p style={{ fontSize: "12px", color: "#93c5fd", marginBottom: "6px" }}>
+            {[...extensionResults, ...blockedResults]
+              .map((r) => platformLabel(r.platform))
+              .filter((v, i, a) => a.indexOf(v) === i)
+              .join(", ")}
+            는 크롬 익스텐션에서 게시해주세요.
           </p>
-          <p style={{ fontSize: "12px", color: "#93c5fd" }}>
-            크롬 익스텐션을 열어 아래 세션 ID를 입력한 후 "자동 게시 시작"을 눌러주세요.
+          <p style={{ fontSize: "11px", color: "#94a3b8" }}>
+            익스텐션을 열어 아래 세션 ID를 입력한 후 "자동 게시 시작"을 눌러주세요.
           </p>
           {sessionId && (
             <code

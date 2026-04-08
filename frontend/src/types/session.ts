@@ -67,6 +67,7 @@ export interface PlatformResult {
   success: boolean;
   url?: string;
   error?: string;
+  source?: string;
 }
 
 // ─────────────────────────────────────────────

@@ -24,12 +24,15 @@ def build_session_ui_response(session: dict[str, Any]) -> dict[str, Any]:
     platform_results = []
     for platform, detail in raw_publish.items():
         if isinstance(detail, dict):
-            platform_results.append({
+            entry: dict[str, Any] = {
                 "platform": platform,
                 "success": detail.get("success", False),
                 "url": detail.get("external_url"),
                 "error": detail.get("error_message"),
-            })
+            }
+            if detail.get("source"):
+                entry["source"] = detail["source"]
+            platform_results.append(entry)
 
     return {
         "session_id": session.get("id") or session.get("session_id"),

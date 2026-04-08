@@ -205,10 +205,27 @@ class PublishWorker:
         log_ctx: dict[str, Any],
     ) -> dict[str, Any]:
         """플랫폼별 게시 실행. PublishService에 위임."""
+        from app.services.publish_orchestrator import EXTENSION_ONLY_PLATFORMS
         from app.services.publish_service import PublishService
 
-        svc = PublishService()
         platform = job["platform"]
+
+        # 익스텐션 전용 플랫폼은 서버 게시 스킵
+        if platform in EXTENSION_ONLY_PLATFORMS:
+            logger.info(
+                "publish_job_skipped_extension_only platform=%s job_id=%s",
+                platform, job["id"],
+            )
+            return {
+                "success": False,
+                "error_code": "extension_required",
+                "error_message": "크롬 익스텐션에서 게시해주세요.",
+                "external_listing_id": None,
+                "external_url": None,
+                "evidence_urls": [],
+            }
+
+        svc = PublishService()
         payload = job.get("payload_jsonb", {})
 
         # 단계별 로깅

@@ -23,6 +23,9 @@ from app.services.session_ui import build_session_ui_response
 
 logger = logging.getLogger(__name__)
 
+# 서버 Playwright 게시 불가 → 크롬 익스텐션 전용 플랫폼
+EXTENSION_ONLY_PLATFORMS = {"joongna"}
+
 
 class PublishOrchestrator:
     def __init__(
@@ -100,22 +103,48 @@ class PublishOrchestrator:
             raise InvalidUserInputError("선택된 플랫폼이 없습니다")
 
         workflow_meta = dict(session.get("workflow_meta_jsonb") or {})
+
+        # 익스텐션 전용 플랫폼 분리
+        server_platforms = [p for p in selected if p not in EXTENSION_ONLY_PLATFORMS]
+        extension_platforms = [p for p in selected if p in EXTENSION_ONLY_PLATFORMS]
+
+        # 익스텐션 전용 플랫폼은 즉시 결과 기록
+        if extension_platforms:
+            publish_results = dict(workflow_meta.get("publish_results") or {})
+            for p in extension_platforms:
+                publish_results[p] = {
+                    "success": False,
+                    "source": "extension_required",
+                    "error_message": "크롬 익스텐션에서 게시해주세요.",
+                }
+            workflow_meta["publish_results"] = publish_results
+
+        # 서버 게시 플랫폼이 없으면 바로 completed
+        if not server_platforms:
+            self._update_or_raise(
+                session_id,
+                {"status": "completed", "workflow_meta_jsonb": workflow_meta},
+                expected_status=current_status,
+            )
+            updated = self.repo.get_by_id(session_id)
+            return build_session_ui_response(updated or session)
+
         self._update_or_raise(
             session_id,
             {"status": "publishing", "workflow_meta_jsonb": workflow_meta},
             expected_status=current_status,
         )
 
-        # Job Queue에 등록 (워커가 비동기 처리)
+        # 서버 플랫폼만 Job Queue에 등록
         jobs = self.job_repo.create_batch(
             session_id=session_id,
             user_id=user_id or session.get("user_id", ""),
-            platforms=selected,
+            platforms=server_platforms,
             packages=packages,
         )
         logger.info(
             "publish_jobs_enqueued session=%s platforms=%s job_count=%d",
-            session_id, selected, len(jobs),
+            session_id, server_platforms, len(jobs),
         )
 
         updated = self.repo.get_by_id(session_id)
@@ -143,16 +172,46 @@ class PublishOrchestrator:
             expected_status=current_status,
         )
 
-        publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
+        # 익스텐션 전용 플랫폼 분리
+        server_platforms = [p for p in selected if p not in EXTENSION_ONLY_PLATFORMS]
+        extension_platforms = [p for p in selected if p in EXTENSION_ONLY_PLATFORMS]
+
+        publish_results: dict[str, Any] = {}
+
+        # 익스텐션 전용 플랫폼은 서버 게시 스킵 → 안내 메시지
+        for p in extension_platforms:
+            publish_results[p] = {
+                "success": False,
+                "source": "extension_required",
+                "error_message": "크롬 익스텐션에서 게시해주세요.",
+            }
+
+        # 서버 게시 대상만 실제 Playwright 실행
+        any_failure = False
+        if server_platforms:
+            server_results, any_failure = await self.publish_service.execute_publish(
+                server_platforms, packages,
+            )
+            publish_results.update(server_results)
+
         set_publish_complete(workflow_meta, publish_results)
 
         any_success = any(r.get("success") for r in publish_results.values())
 
+        # extension_required는 실패로 치지 않음
+        real_failures = {
+            p: r for p, r in publish_results.items()
+            if not r.get("success") and r.get("source") != "extension_required"
+        }
+
         if any_failure:
             await self._handle_publish_failure(session_id, workflow_meta, publish_results)
 
-        # 부분 성공(1개라도 성공)이면 completed, 전부 실패해야 publishing_failed
-        final_status = "completed" if any_success else "publishing_failed"
+        # 서버 게시 플랫폼이 없거나 성공한 게 있거나 실패가 없으면 completed
+        if not server_platforms or any_success or not real_failures:
+            final_status = "completed"
+        else:
+            final_status = "publishing_failed"
 
         payload: dict[str, Any] = {"status": final_status, "workflow_meta_jsonb": workflow_meta}
         updated = self._update_or_raise(session_id, payload)
