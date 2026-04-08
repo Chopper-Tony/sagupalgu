@@ -6,7 +6,7 @@
 importScripts("cookies.js");
 
 // 기본 서버 URL (배포 시 변경)
-const DEFAULT_SERVER_URL = "http://98.92.99.216";
+const DEFAULT_SERVER_URL = "http://3.80.231.49";
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "CONNECT_PLATFORM") {
@@ -96,10 +96,31 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
   // content script 초기화 대기
   await new Promise((r) => setTimeout(r, 2000));
 
-  // 3. content script에 폼 입력 메시지 전송
+  // 2.5. 이미지를 background에서 다운로드 → data URL 변환 (CORS 우회)
+  const imageDataUrls = [];
+  if (publishData.image_urls && publishData.image_urls.length > 0) {
+    for (const imgUrl of publishData.image_urls) {
+      try {
+        // 상대 경로면 서버 URL 붙이기
+        const fullUrl = imgUrl.startsWith("http") ? imgUrl : `${url}${imgUrl}`;
+        const resp = await fetch(fullUrl);
+        const blob = await resp.blob();
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        imageDataUrls.push(dataUrl);
+      } catch (e) {
+        console.warn("[사구팔구] 이미지 다운로드 실패:", imgUrl, e);
+      }
+    }
+  }
+
+  // 3. content script에 폼 입력 메시지 전송 (이미지는 data URL로 전달)
   const result = await chrome.tabs.sendMessage(tab.id, {
     type: "FILL_JOONGNA_FORM",
-    data: publishData,
+    data: { ...publishData, image_data_urls: imageDataUrls },
   });
 
   // 4. 결과를 서버에 보고

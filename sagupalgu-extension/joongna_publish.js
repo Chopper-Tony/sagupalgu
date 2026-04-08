@@ -73,14 +73,17 @@
   // ── 이미지 업로드 ────────────────────────────────────────
 
   /**
-   * URL 배열을 File 객체로 변환 후 input[type=file]에 주입.
-   * 서버에서 이미지 URL을 받아 fetch → Blob → File 변환.
+   * data URL 배열을 File 객체로 변환 후 input[type=file]에 주입.
+   * background script에서 미리 다운로드한 data URL을 사용 (CORS 우회).
    */
-  async function uploadImages(imageUrls) {
-    if (!imageUrls || imageUrls.length === 0) return;
+  async function uploadImages(imageDataUrls) {
+    if (!imageDataUrls || imageDataUrls.length === 0) {
+      console.warn("[사구팔구] 업로드할 이미지 없음");
+      return;
+    }
 
     const fileInput = document.querySelector(
-      "input[type='file'][accept*='image'], input[type='file'][multiple]"
+      "input[type='file'][accept*='image'], input[type='file'][multiple], input[type='file']"
     );
     if (!fileInput) {
       console.warn("[사구팔구] 이미지 업로드 input을 찾지 못함");
@@ -88,18 +91,22 @@
     }
 
     const files = [];
-    for (const url of imageUrls) {
+    for (let i = 0; i < imageDataUrls.length; i++) {
       try {
-        const resp = await fetch(url);
+        const dataUrl = imageDataUrls[i];
+        const resp = await fetch(dataUrl);
         const blob = await resp.blob();
-        const name = url.split("/").pop() || `image_${files.length}.jpg`;
-        files.push(new File([blob], name, { type: blob.type || "image/jpeg" }));
+        const ext = blob.type === "image/png" ? "png" : "jpg";
+        files.push(new File([blob], `image_${i}.${ext}`, { type: blob.type || "image/jpeg" }));
       } catch (e) {
-        console.warn(`[사구팔구] 이미지 다운로드 실패: ${url}`, e);
+        console.warn(`[사구팔구] 이미지 변환 실패 (index ${i}):`, e);
       }
     }
 
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      console.warn("[사구팔구] 변환된 이미지 파일 없음");
+      return;
+    }
 
     const dt = new DataTransfer();
     files.forEach((f) => dt.items.add(f));
@@ -169,10 +176,10 @@
         throw new Error("중고나라 접속이 차단되었습니다.");
       }
 
-      // ① 이미지 업로드
+      // ① 이미지 업로드 (background에서 전달받은 data URL 사용)
       steps.push("이미지 업로드");
-      await uploadImages(data.image_urls);
-      await sleep(1500);
+      await uploadImages(data.image_data_urls || []);
+      await sleep(2000);
 
       // ② 상품명
       steps.push("상품명 입력");
