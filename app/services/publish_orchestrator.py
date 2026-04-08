@@ -146,10 +146,13 @@ class PublishOrchestrator:
         publish_results, any_failure = await self.publish_service.execute_publish(selected, packages)
         set_publish_complete(workflow_meta, publish_results)
 
-        final_status = "completed"
+        any_success = any(r.get("success") for r in publish_results.values())
+
         if any_failure:
             await self._handle_publish_failure(session_id, workflow_meta, publish_results)
-            final_status = "publishing_failed"
+
+        # 부분 성공(1개라도 성공)이면 completed, 전부 실패해야 publishing_failed
+        final_status = "completed" if any_success else "publishing_failed"
 
         payload: dict[str, Any] = {"status": final_status, "workflow_meta_jsonb": workflow_meta}
         updated = self._update_or_raise(session_id, payload)

@@ -37,6 +37,19 @@ export function ChatWindow({ items, currentStatus, session, onAction }: ChatWind
 
   const renderCard = (item: Extract<TimelineItem, { type: "card" }>) => {
     switch (item.cardType) {
+      case "ProgressCard":
+        return <ProgressCard status={currentStatus ?? "images_uploaded"} />;
+
+      case "ErrorCard":
+        return (
+          <ErrorCard
+            code=""
+            message={session?.last_error ?? "알 수 없는 오류가 발생했습니다."}
+            currentStatus={currentStatus}
+            onAction={onAction}
+          />
+        );
+
       case "ImageUploadCard":
         return (
           <ImageUploadCard

@@ -292,7 +292,8 @@ class PublishWorker:
                     "results": publish_results,
                     "any_failure": any_failure,
                 }
-                new_status = "publishing_failed" if any_failure else "completed"
+                any_success = any(r.get("success") for r in publish_results.values())
+                new_status = "completed" if any_success else "publishing_failed"
 
                 get_supabase().table("sell_sessions").update({
                     "status": new_status,
