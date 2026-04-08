@@ -130,6 +130,11 @@ class JoongnaPublisher(BasePublisher):
             if "login" in page.url.lower():
                 raise Exception("로그인 세션 만료")
 
+            # CloudFront/WAF 차단 감지 (AWS IP 대역 봇 차단)
+            page_text = await page.text_content("body") or ""
+            if "403" in await page.title() or "403 ERROR" in page_text:
+                raise Exception("중고나라 접속 차단 (서버 IP가 클라우드 환경으로 감지됨). 크롬 익스텐션을 통한 게시를 이용해주세요.")
+
             title_sel = "input[placeholder*='상품명']"
             await page.wait_for_selector(title_sel, timeout=15000)
 

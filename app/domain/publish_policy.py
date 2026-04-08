@@ -72,6 +72,11 @@ FAILURE_TAXONOMY: Dict[str, Dict[str, Any]] = {
         "auto_recoverable": True,
         "description": "폼 필수값 검증 오류",
     },
+    "access_blocked": {
+        "category": "external",
+        "auto_recoverable": False,
+        "description": "플랫폼이 서버 IP를 차단 — 크롬 익스텐션 게시 필요",
+    },
     "publish_exception": {
         "category": "unknown",
         "auto_recoverable": False,
@@ -98,6 +103,8 @@ def classify_error(error_code: str, error_message: str = "") -> Dict[str, Any]:
         return {**FAILURE_TAXONOMY["content_policy"], "error_code": "content_policy"}
     if "503" in msg or "502" in msg or "maintenance" in msg:
         return {**FAILURE_TAXONOMY["platform_unavailable"], "error_code": "platform_unavailable"}
+    if "403" in msg or "차단" in msg or "cloudfront" in msg or "접속 차단" in msg:
+        return {**FAILURE_TAXONOMY["access_blocked"], "error_code": "access_blocked"}
     if "이미지" in msg and ("업로드" in msg or "필수" in msg or "찾지 못" in msg):
         return {**FAILURE_TAXONOMY["image_upload_failed"], "error_code": "image_upload_failed"}
     if "카테고리" in msg and ("선택" in msg or "실패" in msg):
