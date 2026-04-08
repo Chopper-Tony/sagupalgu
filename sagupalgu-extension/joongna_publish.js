@@ -73,11 +73,13 @@
   // ── 이미지 업로드 ────────────────────────────────────────
 
   /**
-   * data URL 배열을 File 객체로 변환 후 input[type=file]에 주입.
+   * data URL 배열을 File 객체로 변환 후 이미지 업로드 영역에 주입.
    * background script에서 미리 다운로드한 data URL을 사용 (CORS 우회).
    *
-   * 중고나라는 input[type=file]이 hidden이고 카메라 아이콘 클릭으로 트리거됨.
-   * React 앱이므로 DataTransfer + _valueTracker 초기화 + change 이벤트가 필요.
+   * 3단계 시도:
+   * 1) input[type=file] 직접 설정 + change 이벤트
+   * 2) 이미지 영역에 drag-and-drop 이벤트 시뮬레이션
+   * 3) input.click() 인터셉트로 파일 주입
    */
   async function uploadImages(imageDataUrls) {
     if (!imageDataUrls || imageDataUrls.length === 0) {
@@ -104,42 +106,120 @@
       return;
     }
 
-    // input[type=file] 찾기 (hidden 포함, 우선순위순 시도)
-    const selectors = [
-      "input[type='file'][accept*='image']",
-      "input[type='file'][multiple]",
-      "input[type='file']",
-    ];
-
-    let fileInput = null;
-    for (const sel of selectors) {
-      fileInput = document.querySelector(sel);
-      if (fileInput) break;
-    }
-
-    if (!fileInput) {
-      console.warn("[사구팔구] 이미지 업로드 input을 찾지 못함");
-      return;
-    }
-
-    // DataTransfer로 FileList 구성
     const dt = new DataTransfer();
     files.forEach((f) => dt.items.add(f));
 
-    // 1. files 프로퍼티에 직접 설정
-    fileInput.files = dt.files;
+    // ── 방법 1: input[type=file] 직접 설정 ──
+    const fileInput = document.querySelector(
+      "input[type='file'][accept*='image'], input[type='file'][multiple], input[type='file']"
+    );
 
-    // 2. React _valueTracker 초기화 (React가 변경을 감지하도록)
-    const tracker = fileInput._valueTracker;
-    if (tracker) {
-      tracker.setValue("");
+    if (fileInput) {
+      fileInput.files = dt.files;
+      const tracker = fileInput._valueTracker;
+      if (tracker) tracker.setValue("");
+      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      console.log("[사구팔구] 방법1: input.files 직접 설정 완료");
+      await sleep(2000);
     }
 
-    // 3. change 이벤트 dispatch (bubbles 필수 — React synthetic event 트리거)
-    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    // 이미지 반영 확인
+    const uploaded = document.querySelectorAll(
+      "img[src*='blob:'], img[src*='data:'], [class*='image'] img, [class*='photo'] img, [class*='preview'] img"
+    ).length;
 
-    console.log(`[사구팔구] 이미지 ${files.length}개 업로드 시도 완료`);
-    await sleep(2000);
+    if (uploaded > 0) {
+      console.log(`[사구팔구] 이미지 ${uploaded}개 반영 확인`);
+      return;
+    }
+
+    // ── 방법 2: 드래그 앤 드롭 시뮬레이션 ──
+    console.log("[사구팔구] 방법1 실패, 방법2: 드래그 앤 드롭 시도");
+
+    // 이미지 업로드 드롭 영역 찾기 (카메라 아이콘 영역)
+    const dropTargetSelectors = [
+      "[class*='image-upload']",
+      "[class*='photo-upload']",
+      "[class*='file-upload']",
+      "[class*='dropzone']",
+      "[class*='camera']",
+      "label[for]",
+    ];
+
+    let dropTarget = null;
+    for (const sel of dropTargetSelectors) {
+      dropTarget = document.querySelector(sel);
+      if (dropTarget) break;
+    }
+
+    // 못 찾으면 "상품 이미지" 텍스트 근처 영역 사용
+    if (!dropTarget) {
+      const labels = document.querySelectorAll("*");
+      for (const el of labels) {
+        if (el.textContent && el.textContent.trim().startsWith("상품 이미지")) {
+          dropTarget = el.parentElement || el;
+          break;
+        }
+      }
+    }
+
+    if (dropTarget) {
+      const dropDt = new DataTransfer();
+      files.forEach((f) => dropDt.items.add(f));
+
+      const dragEnter = new DragEvent("dragenter", { bubbles: true, dataTransfer: dropDt });
+      const dragOver = new DragEvent("dragover", { bubbles: true, dataTransfer: dropDt });
+      const drop = new DragEvent("drop", { bubbles: true, dataTransfer: dropDt });
+
+      dropTarget.dispatchEvent(dragEnter);
+      dropTarget.dispatchEvent(dragOver);
+      dropTarget.dispatchEvent(drop);
+
+      console.log("[사구팔구] 방법2: 드롭 이벤트 발생 완료");
+      await sleep(2000);
+    }
+
+    // 다시 확인
+    const uploaded2 = document.querySelectorAll(
+      "img[src*='blob:'], img[src*='data:'], [class*='image'] img, [class*='photo'] img, [class*='preview'] img"
+    ).length;
+
+    if (uploaded2 > 0) {
+      console.log(`[사구팔구] 이미지 ${uploaded2}개 반영 확인`);
+      return;
+    }
+
+    // ── 방법 3: input.click() 인터셉트 ──
+    console.log("[사구팔구] 방법2 실패, 방법3: click 인터셉트 시도");
+
+    if (fileInput) {
+      const origClick = HTMLInputElement.prototype.click;
+      let intercepted = false;
+
+      HTMLInputElement.prototype.click = function () {
+        if (this.type === "file" && !intercepted) {
+          intercepted = true;
+          const dt3 = new DataTransfer();
+          files.forEach((f) => dt3.items.add(f));
+          this.files = dt3.files;
+          this.dispatchEvent(new Event("change", { bubbles: true }));
+          console.log("[사구팔구] 방법3: click 인터셉트로 파일 주입 성공");
+        } else {
+          origClick.call(this);
+        }
+      };
+
+      // 카메라 영역 클릭하여 file input click 트리거
+      const cameraArea = dropTarget || fileInput.closest("label") || fileInput.parentElement;
+      if (cameraArea) {
+        cameraArea.click();
+        await sleep(1500);
+      }
+
+      HTMLInputElement.prototype.click = origClick;
+    }
+
+    console.log("[사구팔구] 이미지 업로드 3가지 방법 모두 시도 완료");
   }
 
   // ── 카테고리 선택 ────────────────────────────────────────
