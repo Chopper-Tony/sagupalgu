@@ -24,7 +24,7 @@ from app.services.session_ui import build_session_ui_response
 logger = logging.getLogger(__name__)
 
 # 서버 Playwright 게시 불가 → 크롬 익스텐션 전용 플랫폼
-EXTENSION_ONLY_PLATFORMS = {"joongna"}
+EXTENSION_ONLY_PLATFORMS = {"joongna", "bunjang"}
 
 
 class PublishOrchestrator:

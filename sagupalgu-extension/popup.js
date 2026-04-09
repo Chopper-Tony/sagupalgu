@@ -1,6 +1,8 @@
 /**
- * Popup UI 로직 — 연결 버튼 + 상태 표시.
+ * Popup UI 로직 — 연결 버튼 + 상태 표시 + 자동 게시.
  */
+
+const DEFAULT_SERVER_URL = "http://18.232.188.74";
 
 function showMessage(text, type = "info") {
   const area = document.getElementById("message-area");
@@ -95,7 +97,7 @@ async function startJoongnaPublish() {
 
   try {
     // 1. 서버에서 게시 데이터 가져오기
-    const url = serverUrl || "http://98.92.99.216";
+    const url = serverUrl || DEFAULT_SERVER_URL;
     const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`);
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
@@ -138,6 +140,65 @@ async function startJoongnaPublish() {
   }
 }
 
+// ── 번개장터 익스텐션 게시 ──────────────────────────────────
+
+async function startBunjangPublish() {
+  const sessionId = document.getElementById("session-id-input").value.trim();
+  const serverUrl = document.getElementById("server-url").value.trim();
+  const btn = document.getElementById("btn-publish-bunjang");
+
+  if (!sessionId) {
+    showMessage("세션 ID를 입력하세요. 웹앱 URL에서 확인할 수 있습니다.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "게시 데이터 가져오는 중...";
+  clearMessage();
+
+  try {
+    const url = serverUrl || DEFAULT_SERVER_URL;
+    const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`);
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body.detail || `서버 에러: ${resp.status}`);
+    }
+    const publishData = await resp.json();
+
+    btn.textContent = "번개장터 페이지 여는 중...";
+    showMessage(`"${publishData.title}" 자동 게시를 시작합니다...`, "info");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "PUBLISH_BUNJANG",
+        publishData,
+        sessionId,
+        serverUrl: url,
+      },
+      (response) => {
+        btn.disabled = false;
+        btn.textContent = "번개장터 자동 게시";
+
+        if (chrome.runtime.lastError) {
+          showMessage(`오류: ${chrome.runtime.lastError.message}`, "error");
+          return;
+        }
+
+        if (response && response.success && response.data && response.data.success) {
+          showMessage("번개장터 게시 성공!", "success");
+        } else {
+          const err = response?.data?.error || response?.error || "알 수 없는 오류";
+          showMessage(`게시 실패: ${err}`, "error");
+        }
+      }
+    );
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "번개장터 자동 게시";
+    showMessage(`오류: ${e.message}`, "error");
+  }
+}
+
 // 초기화: 버튼 바인딩 + 상태 조회
 document.addEventListener("DOMContentLoaded", () => {
   // 인라인 onclick 대신 addEventListener (Manifest V3 CSP 준수)
@@ -148,8 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // 중고나라 게시 버튼
+  // 게시 버튼
   document.getElementById("btn-publish-joongna").addEventListener("click", startJoongnaPublish);
+  document.getElementById("btn-publish-bunjang").addEventListener("click", startBunjangPublish);
 
   const serverUrl = document.getElementById("server-url").value.trim();
 

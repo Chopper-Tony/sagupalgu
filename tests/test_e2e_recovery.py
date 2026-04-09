@@ -26,8 +26,9 @@ pytestmark = pytest.mark.usefixtures("_force_sync_publish")
 
 @pytest.fixture(autouse=True)
 def _force_sync_publish():
-    """PUBLISH_USE_QUEUE=False로 강제하여 동기 게시 경로를 사용."""
-    with patch("app.core.config.get_settings") as mock_gs:
+    """PUBLISH_USE_QUEUE=False로 강제 + EXTENSION_ONLY_PLATFORMS 비움 (서버 게시 경로 테스트)."""
+    with patch("app.core.config.get_settings") as mock_gs, \
+         patch("app.services.publish_orchestrator.EXTENSION_ONLY_PLATFORMS", set()):
         mock_gs.return_value.publish_use_queue = False
         yield
 

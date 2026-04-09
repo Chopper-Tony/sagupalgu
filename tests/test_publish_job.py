@@ -235,20 +235,19 @@ class TestAdminRouter:
 # ── Orchestrator 큐 등록 테스트 ────��──────────────────────────────
 
 class TestPublishOrchestratorQueue:
-    def test_publish_via_queue_enqueues_jobs(self):
-        """_publish_via_queue: joongna는 EXTENSION_ONLY이므로 bunjang만 큐에 등록."""
+    def test_publish_via_queue_all_extension_only(self):
+        """_publish_via_queue: bunjang+joongna 모두 EXTENSION_ONLY이면 큐 등록 없이 completed."""
         from app.services.publish_orchestrator import PublishOrchestrator
 
         mock_repo = MagicMock()
         mock_repo.get_by_id.return_value = {"id": "sess-1", "status": "publishing"}
-        mock_repo.update.return_value = {"id": "sess-1", "status": "publishing"}
+        mock_repo.update.return_value = {"id": "sess-1", "status": "completed",
+                                          "workflow_meta_jsonb": {}, "product_data_jsonb": {},
+                                          "listing_data_jsonb": {}, "selected_platforms_jsonb": []}
 
         mock_publish_svc = MagicMock()
         mock_recovery_svc = MagicMock()
         mock_job_repo = MagicMock()
-        mock_job_repo.create_batch.return_value = [
-            {"id": "job-1", "platform": "bunjang"},
-        ]
 
         orch = PublishOrchestrator(
             session_repository=mock_repo,
@@ -268,12 +267,8 @@ class TestPublishOrchestratorQueue:
             orch._publish_via_queue("sess-1", session, "awaiting_publish_approval", user_id="user-1")
         )
 
-        # bunjang만 큐에 등록, joongna는 extension_required로 즉시 처리
-        mock_job_repo.create_batch.assert_called_once()
-        call_kwargs = mock_job_repo.create_batch.call_args[1]
-        assert call_kwargs["session_id"] == "sess-1"
-        assert call_kwargs["user_id"] == "user-1"
-        assert set(call_kwargs["platforms"]) == {"bunjang"}
+        # 큐 등록 없음 (모두 extension_required)
+        mock_job_repo.create_batch.assert_not_called()
 
 
 # ── Worker 테스트 ────────────────────────────────────────────────

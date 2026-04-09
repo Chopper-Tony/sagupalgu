@@ -20,6 +20,11 @@
       "matches": ["*://web.joongna.com/product/form*"],
       "js": ["joongna_publish.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://m.bunjang.co.kr/sell/edit*"],
+      "js": ["bunjang_publish.js"],
+      "run_at": "document_idle"
     }
   ],
   "icons": {}
