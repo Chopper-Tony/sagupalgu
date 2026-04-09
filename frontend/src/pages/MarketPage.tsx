@@ -1,28 +1,76 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../lib/api";
 import type { MarketItem } from "../types/market";
 import "./MarketPage.css";
 
 export function MarketPage() {
   const [items, setItems] = useState<MarketItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api
-      .getMarketItems(20, 0)
-      .then((res) => setItems(res.items))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  // 검색/필터 상태
+  const [query, setQuery] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchItems = useCallback(async (q?: string, min?: number, max?: number) => {
+    setLoading(true);
+    try {
+      const hasFilter = (q && q.trim()) || min !== undefined || max !== undefined;
+      if (hasFilter) {
+        const res = await api.searchMarketItems({
+          q: q?.trim() || undefined,
+          min_price: min,
+          max_price: max,
+          limit: 50,
+          offset: 0,
+        });
+        setItems(res.items);
+        setTotal(res.total);
+      } else {
+        const res = await api.getMarketItems(50, 0);
+        setItems(res.items);
+        setTotal(res.total);
+      }
+    } catch {
+      setItems([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading) return <div className="market-loading">불러오는 중...</div>;
-  if (items.length === 0) return (
-    <div className="market-empty">
-      <p className="market-empty__title">사구팔구 마켓</p>
-      <p className="market-empty__sub">등록된 상품이 없습니다.</p>
-      <a href="#/" className="market-empty__link">셀러 코파일럿으로 돌아가기</a>
-    </div>
-  );
+  // 초기 로드
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  // 디바운스 검색
+  const handleSearchChange = (value: string) => {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const min = minPrice ? parseInt(minPrice, 10) : undefined;
+      const max = maxPrice ? parseInt(maxPrice, 10) : undefined;
+      fetchItems(value, min, max);
+    }, 300);
+  };
+
+  const handlePriceFilter = () => {
+    const min = minPrice ? parseInt(minPrice, 10) : undefined;
+    const max = maxPrice ? parseInt(maxPrice, 10) : undefined;
+    fetchItems(query, min, max);
+  };
+
+  const handleClearFilters = () => {
+    setQuery("");
+    setMinPrice("");
+    setMaxPrice("");
+    fetchItems();
+  };
+
+  const hasActiveFilter = query.trim() || minPrice || maxPrice;
 
   return (
     <div className="market-page">
@@ -30,12 +78,64 @@ export function MarketPage() {
         <h1 className="market-title">사구팔구 마켓</h1>
         <a href="#/" className="market-back-link">셀러 코파일럿</a>
       </div>
-      <p className="market-subtitle">{items.length}개 상품</p>
-      <div className="market-grid">
-        {items.map((item) => (
-          <MarketCard key={item.session_id} item={item} />
-        ))}
+
+      {/* 검색 + 필터 */}
+      <div className="market-search-bar">
+        <input
+          type="text"
+          className="market-search-input"
+          placeholder="상품명 또는 태그로 검색..."
+          value={query}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
+        <div className="market-price-filter">
+          <input
+            type="number"
+            className="market-price-input"
+            placeholder="최소 가격"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            onBlur={handlePriceFilter}
+            onKeyDown={(e) => e.key === "Enter" && handlePriceFilter()}
+            min={0}
+          />
+          <span className="market-price-sep">~</span>
+          <input
+            type="number"
+            className="market-price-input"
+            placeholder="최대 가격"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            onBlur={handlePriceFilter}
+            onKeyDown={(e) => e.key === "Enter" && handlePriceFilter()}
+            min={0}
+          />
+          <button className="market-filter-btn" onClick={handlePriceFilter}>검색</button>
+        </div>
       </div>
+
+      {hasActiveFilter && (
+        <div className="market-filter-status">
+          <span>검색 결과: {total}개</span>
+          <button className="market-clear-btn" onClick={handleClearFilters}>필터 초기화</button>
+        </div>
+      )}
+
+      {!hasActiveFilter && <p className="market-subtitle">{total}개 상품</p>}
+
+      {loading ? (
+        <div className="market-loading">불러오는 중...</div>
+      ) : items.length === 0 ? (
+        <div className="market-empty-inline">
+          <p>{hasActiveFilter ? "검색 결과가 없습니다." : "등록된 상품이 없습니다."}</p>
+        </div>
+      ) : (
+        <div className="market-grid">
+          {items.map((item) => (
+            <MarketCard key={item.session_id} item={item} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -49,7 +149,7 @@ function MarketCard({ item }: { item: MarketItem }) {
   };
 
   return (
-    <div className="market-card">
+    <a href={`#/market/${item.session_id}`} className="market-card" style={{ textDecoration: "none" }}>
       {thumbnail ? (
         <img className="market-card__image" src={thumbnail} alt={item.title} />
       ) : (
@@ -75,6 +175,6 @@ function MarketCard({ item }: { item: MarketItem }) {
           </div>
         )}
       </div>
-    </div>
+    </a>
   );
 }

@@ -87,4 +87,19 @@ export const api = {
     client.get<{ items: import("../types/market").MarketItem[]; total: number; limit: number; offset: number }>(
       "/market", { params: { limit, offset } }
     ).then((r) => r.data),
+
+  searchMarketItems: (params: import("../types/market").MarketSearchParams) =>
+    client.get<import("../types/market").MarketListResponse>(
+      "/market", { params }
+    ).then((r) => r.data),
+
+  getMarketItem: (sessionId: string) =>
+    client.get<import("../types/market").MarketDetailItem>(
+      `/market/${sessionId}`
+    ).then((r) => r.data),
+
+  submitInquiry: (sessionId: string, body: import("../types/market").InquiryRequest) =>
+    client.post<{ success: boolean; discord_sent: boolean }>(
+      `/market/${sessionId}/inquiry`, body
+    ).then((r) => r.data),
 };

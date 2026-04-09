@@ -27,17 +27,113 @@
 .market-back-link:hover {
   text-decoration: underline;
 }
+
+/* 검색 + 필터 */
+.market-search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.market-search-input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.market-search-input::placeholder {
+  color: var(--text-muted);
+}
+.market-search-input:focus {
+  border-color: var(--accent);
+}
+.market-price-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.market-price-input {
+  flex: 1;
+  max-width: 160px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+}
+.market-price-input::placeholder {
+  color: var(--text-muted);
+}
+.market-price-input:focus {
+  border-color: var(--accent);
+}
+.market-price-sep {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.market-filter-btn {
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg, 12px);
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.market-filter-btn:hover {
+  opacity: 0.9;
+}
+.market-filter-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 0.875rem;
+}
+.market-clear-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.market-clear-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.market-empty-inline {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem 0;
+  font-size: 0.95rem;
+}
+
+/* 그리드 */
 .market-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 1.25rem;
 }
 .market-card {
+  display: block;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 12px);
   overflow: hidden;
   transition: box-shadow 0.2s, transform 0.2s;
+  cursor: pointer;
+  color: inherit;
 }
 .market-card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -97,6 +193,8 @@
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* 로딩 / 빈 상태 (전체 페이지) */
 .market-loading,
 .market-empty {
   display: flex;
@@ -136,5 +234,12 @@
   .market-card__image,
   .market-card__no-image {
     height: 140px;
+  }
+  .market-price-filter {
+    flex-wrap: wrap;
+  }
+  .market-price-input {
+    max-width: none;
+    flex: 1 1 40%;
   }
 }

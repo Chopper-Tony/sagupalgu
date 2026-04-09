@@ -86,3 +86,77 @@ class SessionRepository:
         total = count_response.count or 0
 
         return items, total
+
+    def search_completed(
+        self,
+        q: str | None = None,
+        min_price: int | None = None,
+        max_price: int | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[dict], int]:
+        """completed 상태 세션 검색 (키워드 + 가격 범위 필터)."""
+        from app.db.client import get_supabase
+
+        cols = "id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at"
+        query = (
+            get_supabase()
+            .table(self.table_name)
+            .select(cols)
+            .eq("status", "completed")
+        )
+        count_query = (
+            get_supabase()
+            .table(self.table_name)
+            .select("id", count="exact")
+            .eq("status", "completed")
+        )
+
+        # Supabase PostgREST는 JSONB 내부 필드 ILIKE를 직접 지원하지 않으므로
+        # 전체 조회 후 Python 필터링으로 처리한다 (상품 수 규모가 작으므로 허용).
+        response = query.order("created_at", desc=True).execute()
+        all_items = response.data or []
+
+        def _matches(row: dict) -> bool:
+            listing = (row.get("listing_data_jsonb") or {}).get("canonical_listing") or {}
+            title = (listing.get("title") or "").lower()
+            tags = listing.get("tags") or []
+            price = listing.get("price", 0)
+            if isinstance(price, str):
+                try:
+                    price = int(price)
+                except (ValueError, TypeError):
+                    price = 0
+
+            if q:
+                keyword = q.lower()
+                tag_match = any(keyword in t.lower() for t in tags)
+                if keyword not in title and not tag_match:
+                    return False
+
+            if min_price is not None and price < min_price:
+                return False
+            if max_price is not None and price > max_price:
+                return False
+            return True
+
+        filtered = [row for row in all_items if _matches(row)]
+        total = len(filtered)
+        page = filtered[offset : offset + limit]
+        return page, total
+
+    def get_completed_by_id(self, session_id: str) -> dict | None:
+        """completed 상태 세션 단건 조회 (마켓 상세용)."""
+        from app.db.client import get_supabase
+
+        response = (
+            get_supabase()
+            .table(self.table_name)
+            .select("id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at")
+            .eq("id", session_id)
+            .eq("status", "completed")
+            .limit(1)
+            .execute()
+        )
+        data = response.data or []
+        return data[0] if data else None
