@@ -108,7 +108,9 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
-- **M133**: 부분 성공 처리 + 중고나라 익스텐션 자동 게시 — 게시 부분 성공(1개 성공 시 completed, 전부 실패 시만 publishing_failed), ChatWindow ProgressCard/ErrorCard case 누락 수정, 중고나라 CloudFront 403 감지+사용자 친화적 에러 메시지, access_blocked 에러 분류 추가, langgraph-prebuilt 버전 고정(ExecutionInfo import 에러 해결), 크롬 익스텐션 중고나라 자동 게시 구현(Content Script 폼 자동 입력+background에서 이미지 CORS 우회+세션 ID 기반 게시 데이터 조회), GET /publish-data + POST /extension-publish-result API 추가, PublishResultCard 서버 차단 시 익스텐션 안내+세션 ID 복사
+- **M135**: 게시 UX 통합 — 세션 ID 수동 복사 제거, publish_bridge.js Content Script(웹앱→익스텐션 자동 통신), PublishResultCard "자동 게시" 버튼, RLS 마이그레이션 파일화(003_rls_policies.sql)
+- **M134**: 번개장터 Content Script 자동 게시 — bunjang_publish.js 구현, EXTENSION_ONLY_PLATFORMS에 bunjang 추가, 서버 Playwright 게시 완전 제거
+- **M133**: 부분 성공 처리 + 중고나라 CDP 이미지 업로드 — CDP Runtime.evaluate base64→File+React fiber onChange 방식, chrome.downloads 제거, nginx /uploads/ 프록시, AI 작성 토글 자동 비활성화 — 게시 부분 성공(1개 성공 시 completed, 전부 실패 시만 publishing_failed), ChatWindow ProgressCard/ErrorCard case 누락 수정, 중고나라 CloudFront 403 감지+사용자 친화적 에러 메시지, access_blocked 에러 분류 추가, langgraph-prebuilt 버전 고정(ExecutionInfo import 에러 해결), 크롬 익스텐션 중고나라 자동 게시 구현(Content Script 폼 자동 입력+background에서 이미지 CORS 우회+세션 ID 기반 게시 데이터 조회), GET /publish-data + POST /extension-publish-result API 추가, PublishResultCard 서버 차단 시 익스텐션 안내+세션 ID 복사
 - **M128**: EC2 배포 + 크롬 익스텐션 플랫폼 연동 — EC2(us-east-1) 배포 완료, 크롬 익스텐션(Manifest V3) 구현(쿠키 수집+storage_state 변환+connect_token 인증), 번개장터 자동 게시 E2E 성공, 세션 user별 분리 저장+공용 경로 동기, API baseURL 상대 경로 전환, nginx CORS preflight 처리, Dockerfile legacy_spikes 복사, DraftCard 이미지 섹션 제거
 - **M127**: 크롬 익스텐션 설계 — CTO 3명 합의(하이브리드: 로그인은 클라이언트, 게시는 서버), connect_token 플랫폼별 재사용, 쿠키 endsWith 필터링, sameSite 변환, 사전 체크, 즉시 검증(쿠키 기반)
 - **M126**: 배포 문서 + 운영 안전장치 — deployment.md 전면 재작성(장애 대응·스케일 한계·로그/모니터링), docker-compose.prod.yml worker 메모리 제한(1536M)+MAX_CONCURRENT_BROWSERS=1, .env.example S3/도메인 설정 추가, check_prod_readiness.py DOMAIN_NAME 검증, _active_jobs 완전 제거(단일 진실 _active_tasks)

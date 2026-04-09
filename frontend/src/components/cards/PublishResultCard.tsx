@@ -31,6 +31,10 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
 
   const successCount = serverResults.filter((r) => r.success).length;
   const blockedResults = serverResults.filter((r) => !r.success && isAccessBlocked(r.error));
+  const extensionPlatforms = [
+    ...extensionResults.map((r) => r.platform),
+    ...blockedResults.map((r) => r.platform),
+  ].filter((v, i, a) => a.indexOf(v) === i);
 
   // 헤더 메시지 결정
   const allServerSuccess = serverResults.length > 0 && successCount === serverResults.length;
@@ -100,32 +104,51 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
         ))}
       </div>
 
-      {/* 익스텐션 안내 (extension_required 또는 차단된 플랫폼) */}
-      {(extensionResults.length > 0 || blockedResults.length > 0) && (
+      {/* 익스텐션 자동 게시 버튼 */}
+      {extensionPlatforms.length > 0 && sessionId && (
         <div className="publish-result-card__extension-notice">
-          <p style={{ fontSize: "12px", color: "#93c5fd", marginBottom: "6px" }}>
-            {[...extensionResults, ...blockedResults]
-              .map((r) => platformLabel(r.platform))
-              .filter((v, i, a) => a.indexOf(v) === i)
-              .join(", ")}
-            는 크롬 익스텐션에서 게시해주세요.
-          </p>
-          <p style={{ fontSize: "11px", color: "#94a3b8" }}>
-            익스텐션을 열어 아래 세션 ID를 입력한 후 "자동 게시 시작"을 눌러주세요.
-          </p>
-          {sessionId && (
-            <code
-              style={{
-                display: "block", fontSize: "11px", color: "#e0e0e0",
-                background: "#1e293b", padding: "6px 8px", borderRadius: "4px",
-                marginTop: "4px", cursor: "pointer", wordBreak: "break-all",
-              }}
-              onClick={() => navigator.clipboard.writeText(sessionId)}
-              title="클릭하여 복사"
-            >
-              {sessionId}
-            </code>
-          )}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {extensionPlatforms.map((platform) => (
+              <button
+                key={platform}
+                className="publish-result-card__auto-publish-btn"
+                style={{
+                  flex: 1, padding: "10px", border: "none", borderRadius: "6px",
+                  background: platform === "bunjang" ? "#dc2626" : "#059669",
+                  color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                  minWidth: "120px",
+                }}
+                onClick={() => {
+                  window.postMessage({
+                    type: "SAGUPALGU_PUBLISH",
+                    sessionId,
+                    platform,
+                    serverUrl: window.location.origin,
+                  }, "*");
+                }}
+              >
+                {platformLabel(platform)} 자동 게시
+              </button>
+            ))}
+          </div>
+          <details style={{ marginTop: "8px" }}>
+            <summary style={{ fontSize: "11px", color: "#94a3b8", cursor: "pointer" }}>
+              수동 게시 (세션 ID 복사)
+            </summary>
+            {sessionId && (
+              <code
+                style={{
+                  display: "block", fontSize: "11px", color: "#e0e0e0",
+                  background: "#1e293b", padding: "6px 8px", borderRadius: "4px",
+                  marginTop: "4px", cursor: "pointer", wordBreak: "break-all",
+                }}
+                onClick={() => navigator.clipboard.writeText(sessionId)}
+                title="클릭하여 복사"
+              >
+                {sessionId}
+              </code>
+            )}
+          </details>
         </div>
       )}
 

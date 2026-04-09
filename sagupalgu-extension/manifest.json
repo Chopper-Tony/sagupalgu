@@ -25,6 +25,11 @@
       "matches": ["*://m.bunjang.co.kr/sell/edit*"],
       "js": ["bunjang_publish.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["publish_bridge.js"],
+      "run_at": "document_idle"
     }
   ],
   "icons": {}
