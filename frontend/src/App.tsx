@@ -4,6 +4,7 @@ import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { ChatComposer } from "./components/chat/ChatComposer";
 import { MarketPage } from "./pages/MarketPage";
+import { MarketDetailPage } from "./pages/MarketDetailPage";
 import { useSession } from "./hooks/useSession";
 import { api } from "./lib/api";
 import { getStatusUiConfig, statusLabel } from "./lib/sessionStatusUiMap";
@@ -36,15 +37,28 @@ function friendlyError(e: unknown): string {
 }
 
 export default function App() {
-  // 해시 라우팅: #/market → 마켓 페이지
-  const [page, setPage] = useState<"chat" | "market">(
-    window.location.hash === "#/market" ? "market" : "chat"
-  );
+  // 해시 라우팅: #/market → 마켓 목록, #/market/{id} → 마켓 상세
+  const [page, setPage] = useState<"chat" | "market" | "market-detail">("chat");
+  const [marketDetailId, setMarketDetailId] = useState<string | null>(null);
 
   useEffect(() => {
-    const handler = () => setPage(window.location.hash === "#/market" ? "market" : "chat");
-    window.addEventListener("hashchange", handler);
-    return () => window.removeEventListener("hashchange", handler);
+    const parseHash = () => {
+      const hash = window.location.hash;
+      const detailMatch = hash.match(/^#\/market\/(.+)$/);
+      if (detailMatch) {
+        setPage("market-detail");
+        setMarketDetailId(detailMatch[1]);
+      } else if (hash === "#/market") {
+        setPage("market");
+        setMarketDetailId(null);
+      } else {
+        setPage("chat");
+        setMarketDetailId(null);
+      }
+    };
+    parseHash();
+    window.addEventListener("hashchange", parseHash);
+    return () => window.removeEventListener("hashchange", parseHash);
   }, []);
 
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
@@ -58,6 +72,7 @@ export default function App() {
   const uiConfig = currentStatus ? getStatusUiConfig(currentStatus) : null;
 
   if (page === "market") return <MarketPage />;
+  if (page === "market-detail" && marketDetailId) return <MarketDetailPage sessionId={marketDetailId} />;
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {
