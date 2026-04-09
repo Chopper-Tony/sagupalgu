@@ -100,12 +100,17 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
   //      Content Script에서는 file input 보안 정책으로 불가능하므로
   //      debugger API로 DOM.setFileInputFiles를 직접 호출한다.
   let imageUploaded = false;
+  console.log("[사구팔구] 이미지 URL 목록:", publishData.image_urls);
   if (publishData.image_urls && publishData.image_urls.length > 0) {
     try {
+      console.log("[사구팔구] CDP 이미지 업로드 시작...");
       imageUploaded = await uploadImagesViaCDP(tab.id, publishData.image_urls, url);
+      console.log("[사구팔구] CDP 이미지 업로드 결과:", imageUploaded);
     } catch (e) {
-      console.warn("[사구팔구] CDP 이미지 업로드 실패:", e);
+      console.error("[사구팔구] CDP 이미지 업로드 실패:", e.message, e.stack);
     }
+  } else {
+    console.warn("[사구팔구] 이미지 URL이 없음 — 이미지 업로드 스킵");
   }
 
   // 3. content script에 폼 입력 메시지 전송 (이미지는 CDP에서 처리 완료)
@@ -147,6 +152,8 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
  * 5. detach + 임시 파일 삭제
  */
 async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
+  console.log("[사구팔구] uploadImagesViaCDP 시작", { tabId, imageUrls, serverUrl });
+
   // 1. 이미지를 로컬에 다운로드
   const downloadedPaths = [];
   const downloadIds = [];
@@ -156,6 +163,7 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
       const imgUrl = imageUrls[i].startsWith("http")
         ? imageUrls[i]
         : `${serverUrl}${imageUrls[i]}`;
+      console.log(`[사구팔구] 이미지 다운로드 시도 (${i}):`, imgUrl);
 
       const downloadId = await new Promise((resolve, reject) => {
         chrome.downloads.download(
