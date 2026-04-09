@@ -29,6 +29,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
+
+  if (msg.type === "PUBLISH_BUNJANG") {
+    handleBunjangPublish(msg.publishData, msg.sessionId, msg.serverUrl)
+      .then((result) => sendResponse({ success: true, data: result }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
 });
 
 async function handleConnect(platform, connectToken, serverUrl) {
@@ -134,6 +141,67 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
     });
   } catch (e) {
     console.warn("[사구팔구] 게시 결과 서버 전송 실패:", e);
+  }
+
+  return result;
+}
+
+/**
+ * 번개장터 자동 게시: 새 탭 → content script로 폼 자동 입력 → 결과 서버 전송.
+ * 중고나라와 동일 구조 — CDP 이미지 업로드 재사용.
+ */
+async function handleBunjangPublish(publishData, sessionId, serverUrl) {
+  const url = serverUrl || DEFAULT_SERVER_URL;
+  const WRITE_URL = "https://m.bunjang.co.kr/sell/edit";
+
+  const tab = await chrome.tabs.create({ url: WRITE_URL, active: true });
+
+  await new Promise((resolve) => {
+    function listener(tabId, info) {
+      if (tabId === tab.id && info.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+
+  await new Promise((r) => setTimeout(r, 2000));
+
+  // CDP 이미지 업로드
+  let imageUploaded = false;
+  console.log("[사구팔구] [번개장터] 이미지 URL 목록:", publishData.image_urls);
+  if (publishData.image_urls && publishData.image_urls.length > 0) {
+    try {
+      console.log("[사구팔구] [번개장터] CDP 이미지 업로드 시작...");
+      imageUploaded = await uploadImagesViaCDP(tab.id, publishData.image_urls, url);
+      console.log("[사구팔구] [번개장터] CDP 이미지 업로드 결과:", imageUploaded);
+    } catch (e) {
+      console.error("[사구팔구] [번개장터] CDP 이미지 업로드 실패:", e.message);
+    }
+  }
+
+  // content script에 폼 입력 메시지 전송
+  const result = await chrome.tabs.sendMessage(tab.id, {
+    type: "FILL_BUNJANG_FORM",
+    data: { ...publishData, image_already_uploaded: imageUploaded },
+  });
+
+  // 결과를 서버에 보고
+  try {
+    await fetch(`${url}/api/v1/sessions/${sessionId}/extension-publish-result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        platform: "bunjang",
+        success: result.success,
+        listing_url: result.listing_url || null,
+        listing_id: result.listing_id || null,
+        error: result.error || null,
+      }),
+    });
+  } catch (e) {
+    console.warn("[사구팔구] [번개장터] 게시 결과 서버 전송 실패:", e);
   }
 
   return result;
