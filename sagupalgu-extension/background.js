@@ -163,13 +163,28 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
       const imgUrl = imageUrls[i].startsWith("http")
         ? imageUrls[i]
         : `${serverUrl}${imageUrls[i]}`;
-      console.log(`[사구팔구] 이미지 다운로드 시도 (${i}):`, imgUrl);
+      console.log(`[사구팔구] 이미지 fetch 시도 (${i}):`, imgUrl);
 
+      // 1단계: fetch()로 메모리에 다운로드 (CORS/인증 제약 없음)
+      const resp = await fetch(imgUrl);
+      if (!resp.ok) throw new Error(`fetch 실패: ${resp.status}`);
+      const blob = await resp.blob();
+      console.log(`[사구팔구] 이미지 fetch 성공 (${i}): ${blob.size} bytes, type=${blob.type}`);
+
+      // 2단계: Blob → data URL 변환
+      const dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+
+      // 3단계: data URL → chrome.downloads로 로컬 저장 (saveAs: false → 대화상자 안 뜸)
       const downloadId = await new Promise((resolve, reject) => {
         chrome.downloads.download(
           {
-            url: imgUrl,
+            url: dataUrl,
             filename: `sagupalgu_temp/image_${Date.now()}_${i}.jpg`,
+            saveAs: false,
             conflictAction: "uniquify",
           },
           (id) => {
@@ -184,16 +199,15 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
 
       downloadIds.push(downloadId);
 
-      // 다운로드 완료 대기
+      // 4단계: 다운로드 완료 대기 → 로컬 파일 경로 획득
       const filePath = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("다운로드 시간 초과")), 30000);
+        const timeout = setTimeout(() => reject(new Error("다운로드 시간 초과")), 15000);
 
         function onChanged(delta) {
           if (delta.id !== downloadId) return;
           if (delta.state && delta.state.current === "complete") {
             chrome.downloads.onChanged.removeListener(onChanged);
             clearTimeout(timeout);
-            // 로컬 파일 경로 가져오기
             chrome.downloads.search({ id: downloadId }, (results) => {
               if (results && results[0]) {
                 resolve(results[0].filename);
@@ -212,9 +226,9 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
       });
 
       downloadedPaths.push(filePath);
-      console.log(`[사구팔구] 이미지 다운로드 완료: ${filePath}`);
+      console.log(`[사구팔구] 이미지 로컬 저장 완료 (${i}): ${filePath}`);
     } catch (e) {
-      console.warn(`[사구팔구] 이미지 다운로드 실패 (${i}):`, e);
+      console.error(`[사구팔구] 이미지 처리 실패 (${i}):`, e.message);
     }
   }
 
