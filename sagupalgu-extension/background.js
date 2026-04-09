@@ -140,24 +140,20 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
 }
 
 /**
- * chrome.downloads로 이미지를 로컬에 다운로드한 후
- * CDP DOM.setFileInputFiles로 로컬 파일 경로를 직접 설정.
- * Playwright set_input_files()와 동일한 원리.
+ * CDP Runtime.evaluate로 이미지를 base64 → File → input.files에 설정.
+ * chrome.downloads 사용하지 않음 (탐색기 대화상자 문제 방지).
  *
  * 흐름:
- * 1. chrome.downloads.download() → 사용자 Downloads 폴더에 저장
- * 2. chrome.debugger.attach → CDP 연결
- * 3. DOM.querySelector → file input 노드 찾기
- * 4. DOM.setFileInputFiles(files: [로컬 경로들]) → 파일 설정
- * 5. detach + 임시 파일 삭제
+ * 1. Background에서 fetch() → base64 변환
+ * 2. CDP attach → Runtime.evaluate로 페이지 내에서 File 생성 + input.files 설정
+ * 3. React fiber onChange 직접 호출
+ * 4. detach
  */
 async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
   console.log("[사구팔구] uploadImagesViaCDP 시작", { tabId, imageUrls, serverUrl });
 
-  // 1. 이미지를 로컬에 다운로드
-  const downloadedPaths = [];
-  const downloadIds = [];
-
+  // 1. 이미지를 fetch → base64 변환
+  const base64Images = [];
   for (let i = 0; i < imageUrls.length; i++) {
     try {
       const imgUrl = imageUrls[i].startsWith("http")
@@ -165,75 +161,27 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
         : `${serverUrl}${imageUrls[i]}`;
       console.log(`[사구팔구] 이미지 fetch 시도 (${i}):`, imgUrl);
 
-      // 1단계: fetch()로 메모리에 다운로드 (CORS/인증 제약 없음)
       const resp = await fetch(imgUrl);
       if (!resp.ok) throw new Error(`fetch 실패: ${resp.status}`);
       const blob = await resp.blob();
-      console.log(`[사구팔구] 이미지 fetch 성공 (${i}): ${blob.size} bytes, type=${blob.type}`);
+      console.log(`[사구팔구] 이미지 fetch 성공 (${i}): ${blob.size} bytes`);
 
-      // 2단계: Blob → data URL 변환
-      const dataUrl = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
+      const arrayBuffer = await blob.arrayBuffer();
+      const base64 = btoa(
+        new Uint8Array(arrayBuffer).reduce((s, b) => s + String.fromCharCode(b), "")
+      );
+      base64Images.push({
+        base64,
+        name: `image_${i}.jpg`,
+        type: blob.type || "image/jpeg",
       });
-
-      // 3단계: data URL → chrome.downloads로 로컬 저장 (saveAs: false → 대화상자 안 뜸)
-      const downloadId = await new Promise((resolve, reject) => {
-        chrome.downloads.download(
-          {
-            url: dataUrl,
-            filename: `sagupalgu_temp/image_${Date.now()}_${i}.jpg`,
-            saveAs: false,
-            conflictAction: "uniquify",
-          },
-          (id) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else {
-              resolve(id);
-            }
-          }
-        );
-      });
-
-      downloadIds.push(downloadId);
-
-      // 4단계: 다운로드 완료 대기 → 로컬 파일 경로 획득
-      const filePath = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("다운로드 시간 초과")), 15000);
-
-        function onChanged(delta) {
-          if (delta.id !== downloadId) return;
-          if (delta.state && delta.state.current === "complete") {
-            chrome.downloads.onChanged.removeListener(onChanged);
-            clearTimeout(timeout);
-            chrome.downloads.search({ id: downloadId }, (results) => {
-              if (results && results[0]) {
-                resolve(results[0].filename);
-              } else {
-                reject(new Error("다운로드 경로 조회 실패"));
-              }
-            });
-          } else if (delta.state && delta.state.current === "interrupted") {
-            chrome.downloads.onChanged.removeListener(onChanged);
-            clearTimeout(timeout);
-            reject(new Error("다운로드 중단"));
-          }
-        }
-
-        chrome.downloads.onChanged.addListener(onChanged);
-      });
-
-      downloadedPaths.push(filePath);
-      console.log(`[사구팔구] 이미지 로컬 저장 완료 (${i}): ${filePath}`);
     } catch (e) {
-      console.error(`[사구팔구] 이미지 처리 실패 (${i}):`, e.message);
+      console.error(`[사구팔구] 이미지 fetch 실패 (${i}):`, e.message);
     }
   }
 
-  if (downloadedPaths.length === 0) {
-    console.warn("[사구팔구] 다운로드된 이미지 없음");
+  if (base64Images.length === 0) {
+    console.warn("[사구팔구] 변환된 이미지 없음");
     return false;
   }
 
@@ -241,49 +189,21 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
   await chrome.debugger.attach({ tabId }, "1.3");
 
   try {
-    // 3. DOM 활성화 + file input 찾기
-    await chrome.debugger.sendCommand({ tabId }, "DOM.enable");
-    const { root } = await chrome.debugger.sendCommand({ tabId }, "DOM.getDocument");
-
-    const selectors = [
-      "input[type='file'][accept*='image']",
-      "input[type='file'][multiple]",
-      "input[type='file']",
-    ];
-
-    let fileInputNodeId = null;
-    for (const sel of selectors) {
-      try {
-        const { nodeId } = await chrome.debugger.sendCommand({ tabId }, "DOM.querySelector", {
-          nodeId: root.nodeId,
-          selector: sel,
-        });
-        if (nodeId) {
-          fileInputNodeId = nodeId;
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    if (!fileInputNodeId) {
-      console.warn("[사구팔구] CDP: file input 노드를 찾지 못함");
-      return false;
-    }
-
-    // 4. DOM.setFileInputFiles — 로컬 파일 경로로 직접 설정 (Playwright 방식)
-    await chrome.debugger.sendCommand({ tabId }, "DOM.setFileInputFiles", {
-      nodeId: fileInputNodeId,
-      files: downloadedPaths,
-    });
-
-    console.log(`[사구팔구] CDP: DOM.setFileInputFiles 완료 (${downloadedPaths.length}개)`);
-
-    // 5. React에 change 이벤트 강제 전달 (setFileInputFiles만으로는 React가 감지 못함)
-    await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+    // 3. Runtime.evaluate: base64 → File → DataTransfer → input.files + React onChange
+    const { result } = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
       expression: `
         (function() {
+          const images = ${JSON.stringify(base64Images)};
+          const dt = new DataTransfer();
+
+          for (const img of images) {
+            const binary = atob(img.base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            dt.items.add(new File([bytes], img.name, { type: img.type }));
+          }
+
+          // file input 찾기
           const selectors = [
             "input[type='file'][accept*='image']",
             "input[type='file'][multiple]",
@@ -294,51 +214,68 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
             input = document.querySelector(sel);
             if (input) break;
           }
-          if (!input) return 'input not found';
+          if (!input) return JSON.stringify({ ok: false, reason: 'input not found' });
 
-          // 방법 1: 표준 change 이벤트
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          // files 설정
+          input.files = dt.files;
 
-          // 방법 2: React fiber에서 onChange 핸들러 직접 호출
+          // React fiber에서 onChange 핸들러 직접 호출
           const keys = Object.keys(input);
-          const reactKey = keys.find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+          const reactKey = keys.find(k =>
+            k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+          );
+          let reactCalled = false;
           if (reactKey) {
             let fiber = input[reactKey];
             while (fiber) {
               if (fiber.memoizedProps && fiber.memoizedProps.onChange) {
-                fiber.memoizedProps.onChange({ target: input });
-                return 'React onChange called';
+                // 가짜 이벤트 객체 생성 (React가 기대하는 형태)
+                const fakeEvent = {
+                  target: input,
+                  currentTarget: input,
+                  preventDefault: function() {},
+                  stopPropagation: function() {},
+                  nativeEvent: new Event('change'),
+                };
+                fiber.memoizedProps.onChange(fakeEvent);
+                reactCalled = true;
+                break;
               }
               fiber = fiber.return;
             }
           }
 
-          return 'change event dispatched';
+          // 표준 이벤트도 발생 (다른 리스너가 있을 수 있으므로)
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+
+          return JSON.stringify({
+            ok: true,
+            fileCount: dt.files.length,
+            reactCalled: reactCalled,
+            inputFiles: input.files.length,
+          });
         })()
       `,
       returnByValue: true,
     });
 
-    console.log("[사구팔구] CDP: React change 이벤트 강제 발생 완료");
+    const evalResult = JSON.parse(result.value || '{"ok":false}');
+    console.log("[사구팔구] CDP Runtime.evaluate 결과:", evalResult);
+
+    if (!evalResult.ok) {
+      console.warn("[사구팔구] CDP: 이미지 설정 실패:", evalResult.reason);
+      return false;
+    }
+
+    console.log(`[사구팔구] CDP: 이미지 ${evalResult.fileCount}개 설정, React onChange: ${evalResult.reactCalled}`);
     await new Promise((r) => setTimeout(r, 2000));
 
     return true;
   } finally {
-    // 5. detach
     try {
       await chrome.debugger.detach({ tabId });
     } catch (e) {
       // 이미 detach된 경우 무시
-    }
-
-    // 6. 임시 다운로드 파일 삭제
-    for (const id of downloadIds) {
-      try {
-        chrome.downloads.removeFile(id);
-        chrome.downloads.erase({ id });
-      } catch (e) {
-        // 삭제 실패 무시
-      }
     }
   }
 }
