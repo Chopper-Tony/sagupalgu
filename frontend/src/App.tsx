@@ -3,6 +3,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { ChatComposer } from "./components/chat/ChatComposer";
+import { MarketPage } from "./pages/MarketPage";
 import { useSession } from "./hooks/useSession";
 import { api } from "./lib/api";
 import { getStatusUiConfig, statusLabel } from "./lib/sessionStatusUiMap";
@@ -35,6 +36,17 @@ function friendlyError(e: unknown): string {
 }
 
 export default function App() {
+  // 해시 라우팅: #/market → 마켓 페이지
+  const [page, setPage] = useState<"chat" | "market">(
+    window.location.hash === "#/market" ? "market" : "chat"
+  );
+
+  useEffect(() => {
+    const handler = () => setPage(window.location.hash === "#/market" ? "market" : "chat");
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
+
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -44,6 +56,8 @@ export default function App() {
 
   const currentStatus: SessionStatus | null = session?.status ?? null;
   const uiConfig = currentStatus ? getStatusUiConfig(currentStatus) : null;
+
+  if (page === "market") return <MarketPage />;
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {

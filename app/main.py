@@ -210,6 +210,8 @@ def create_app() -> FastAPI:
     application.include_router(platform_router, prefix=settings.api_v1_prefix)
     from app.api.admin_router import router as admin_router
     application.include_router(admin_router, prefix=settings.api_v1_prefix)
+    from app.api.market_router import router as market_router
+    application.include_router(market_router, prefix=settings.api_v1_prefix)
 
     # 업로드 이미지 정적 서빙
     if os.path.isdir("uploads"):

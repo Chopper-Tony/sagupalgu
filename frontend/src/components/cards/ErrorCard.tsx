@@ -36,7 +36,12 @@ export function ErrorCard({ code, message, currentStatus, onAction }: ErrorCardP
         <span className="error-card__title">오류가 발생했습니다</span>
       </div>
       <p className="error-card__message">{message}</p>
-      {code && <p className="error-card__code">오류 코드: {code}</p>}
+      {code && (
+        <details className="error-card__details">
+          <summary className="error-card__details-summary">오류 상세 보기</summary>
+          <p className="error-card__code">오류 코드: {code}</p>
+        </details>
+      )}
       <div className="error-card__actions">
         {actions.map((a) => (
           <button

@@ -60,3 +60,29 @@ class SessionRepository:
             query = query.eq("status", expected_status)
         response = query.execute()
         return response.data[0] if response.data else None
+
+    def list_completed(self, limit: int = 20, offset: int = 0) -> tuple[list[dict], int]:
+        """completed 상태 세션 목록 조회 (마켓용, 최신순)."""
+        from app.db.client import get_supabase
+
+        response = (
+            get_supabase()
+            .table(self.table_name)
+            .select("id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at")
+            .eq("status", "completed")
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        items = response.data or []
+
+        count_response = (
+            get_supabase()
+            .table(self.table_name)
+            .select("id", count="exact")
+            .eq("status", "completed")
+            .execute()
+        )
+        total = count_response.count or 0
+
+        return items, total

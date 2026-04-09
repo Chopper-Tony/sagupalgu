@@ -151,7 +151,7 @@ export function statusLabel(status: string): string {
 export const PROGRESS_COPY: Partial<Record<SessionStatus, { title: string; subtitle: string }>> = {
   images_uploaded: {
     title: "상품을 분석하고 있습니다",
-    subtitle: "잠시만 기다려 주세요",
+    subtitle: "AI가 상품을 분석하고 있습니다...",
   },
   market_analyzing: {
     title: "중고 시세를 분석 중입니다",
@@ -159,10 +159,10 @@ export const PROGRESS_COPY: Partial<Record<SessionStatus, { title: string; subti
   },
   product_confirmed: {
     title: "판매 전략을 수립하고 있습니다",
-    subtitle: "잠시만 기다려 주세요",
+    subtitle: "시세를 크롤링하고 최적 가격을 계산합니다...",
   },
   publishing: {
     title: "플랫폼에 게시 중입니다",
-    subtitle: "선택한 플랫폼에 판매글을 올리고 있습니다",
+    subtitle: "선택한 플랫폼에 판매글을 올리고 있습니다...",
   },
 };

@@ -37,7 +37,14 @@ export function OptimizationSuggestionCard({ suggestion, onRestart }: Optimizati
       </div>
 
       <div className="optimization-card__actions">
-        <button className="optimization-card__restart-btn" onClick={onRestart}>
+        <button
+          className="optimization-card__restart-btn"
+          onClick={() => {
+            if (window.confirm("현재 세션을 초기화하고 새로 시작하시겠습니까?")) {
+              onRestart();
+            }
+          }}
+        >
           새로 시작하기
         </button>
       </div>
