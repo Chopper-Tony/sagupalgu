@@ -108,6 +108,9 @@ cd frontend && npm test
 
 ## 최근 변경 (이번 세션)
 
+- **M143**: 마켓 고도화 — 상품 상세 페이지(#/market/{id}, 이미지 갤러리+플랫폼 게시 링크), 검색+필터(키워드 ILIKE+가격 범위, 디바운스 300ms), 구매 문의(Discord 웹훅 전송), MarketDetailPage 신규, search_completed() 메서드
+- **M136**: 프론트 UX 개선 — ErrorCard 오류 코드 접기, ProductConfirmationCard 필드 검증+후보 없음 메시지, DraftCard 게시 준비 로딩 상태, ChatComposer textarea 자동 높이+disabled 플레이스홀더, Progress 메시지 구체화, 새로 시작하기 확인 팝업
+- **M137**: 자체 마켓 프로토타입 — GET /api/v1/market(공개 목록), MarketPage 카드 그리드, 해시 라우팅(#/market)
 - **M135**: 게시 UX 통합 — 세션 ID 수동 복사 제거, publish_bridge.js+FETCH_AND_PUBLISH(웹앱→background 자동 통신), PublishResultCard "자동 게시" 버튼(window.postMessage), RLS 마이그레이션 파일화(003_rls_policies.sql), EBS 19GB 증설+Docker 정상 재빌드 복구, 중고나라 자동 게시 E2E 성공
 - **M134**: 번개장터 Content Script 자동 게시 — bunjang_publish.js 구현, EXTENSION_ONLY_PLATFORMS에 bunjang 추가, 서버 Playwright 게시 완전 제거
 - **M133**: 부분 성공 처리 + 중고나라 CDP 이미지 업로드 — CDP Runtime.evaluate base64→File+React fiber onChange 방식, chrome.downloads 제거, nginx /uploads/ 프록시, AI 작성 토글 자동 비활성화 — 게시 부분 성공(1개 성공 시 completed, 전부 실패 시만 publishing_failed), ChatWindow ProgressCard/ErrorCard case 누락 수정, 중고나라 CloudFront 403 감지+사용자 친화적 에러 메시지, access_blocked 에러 분류 추가, langgraph-prebuilt 버전 고정(ExecutionInfo import 에러 해결), 크롬 익스텐션 중고나라 자동 게시 구현(Content Script 폼 자동 입력+background에서 이미지 CORS 우회+세션 ID 기반 게시 데이터 조회), GET /publish-data + POST /extension-publish-result API 추가, PublishResultCard 서버 차단 시 익스텐션 안내+세션 ID 복사
