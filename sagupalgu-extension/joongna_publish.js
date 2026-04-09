@@ -283,6 +283,39 @@
         throw new Error("중고나라 접속이 차단되었습니다.");
       }
 
+      // ⓪ "AI로 작성하기" 토글 끄기 (이미지 첨부 시 AI가 폼을 덮어쓰는 것 방지)
+      steps.push("AI 작성 모드 비활성화");
+      const aiToggle = document.querySelector(
+        "input[type='checkbox'][checked], input[type='checkbox']:checked, [role='switch'][aria-checked='true'], [role='switch']"
+      );
+      if (aiToggle) {
+        // 토글이 켜져있으면 클릭하여 끄기
+        const isOn = aiToggle.checked || aiToggle.getAttribute("aria-checked") === "true"
+          || aiToggle.classList.contains("active") || aiToggle.closest("[class*='active']");
+        if (isOn) {
+          aiToggle.click();
+          console.log("[사구팔구] AI 작성 모드 비활성화 완료");
+          await sleep(500);
+        }
+      }
+      // 텍스트 기반으로도 찾기
+      if (!aiToggle) {
+        const allElements = document.querySelectorAll("*");
+        for (const el of allElements) {
+          if (el.textContent && el.textContent.includes("AI") && el.textContent.includes("작성")) {
+            const toggle = el.closest("label, div")?.querySelector(
+              "input[type='checkbox'], [role='switch'], button"
+            ) || el.closest("label, div");
+            if (toggle) {
+              toggle.click();
+              console.log("[사구팔구] AI 작성 모드 비활성화 (텍스트 탐색)");
+              await sleep(500);
+              break;
+            }
+          }
+        }
+      }
+
       // ① 이미지 업로드 (CDP에서 이미 처리된 경우 스킵)
       steps.push("이미지 업로드");
       if (data.image_already_uploaded) {

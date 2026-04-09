@@ -440,7 +440,7 @@ async def get_publish_data(
     session = session_service._get_or_raise(session_id, user_id=user.user_id)
     listing_data = session.get("listing_data_jsonb") or {}
     canonical = listing_data.get("canonical_listing") or {}
-    image_urls = (session.get("product_data_jsonb") or {}).get("image_urls") or []
+    image_urls = (session.get("product_data_jsonb") or {}).get("image_paths") or []
     packages = listing_data.get("platform_packages") or {}
 
     return {
