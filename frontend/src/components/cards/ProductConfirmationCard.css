@@ -125,6 +125,10 @@
   font-size: 13px;
 }
 
+.product-confirm-card__input--error {
+  border-color: #ef4444;
+}
+
 .product-confirm-card__input:focus {
   outline: none;
   border-color: #2563eb;
@@ -153,4 +157,26 @@
 
 .product-confirm-card__submit:not(:disabled):hover {
   background: #1d4ed8;
+}
+
+.product-confirm-card__field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.product-confirm-card__hint {
+  font-size: 11px;
+  color: #ef4444;
+  padding-left: 4px;
+}
+
+.product-confirm-card__no-candidates {
+  font-size: 13px;
+  color: #f59e0b;
+  margin: 0;
+  padding: 8px 12px;
+  background: #1a1a10;
+  border: 1px solid #3a3a1e;
+  border-radius: 6px;
 }

@@ -31,10 +31,25 @@
   line-height: 1.5;
 }
 
+.error-card__details {
+  margin: 0;
+}
+
+.error-card__details-summary {
+  font-size: 12px;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+
+.error-card__details-summary:hover {
+  color: #aaa;
+}
+
 .error-card__code {
   font-size: 11px;
   color: #666;
-  margin: 0;
+  margin: 4px 0 0;
   font-family: monospace;
 }
 

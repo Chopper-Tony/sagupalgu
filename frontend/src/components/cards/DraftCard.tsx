@@ -57,6 +57,7 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [rewriteText, setRewriteText] = useState("");
   const [showRewrite, setShowRewrite] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDirectEdit, setShowDirectEdit] = useState(false);
   const [editTitle, setEditTitle] = useState(listing.title || "");
   const [editDescription, setEditDescription] = useState(listing.description || "");
@@ -214,10 +215,14 @@ export function DraftCard({ listing, marketContext, criticScore, criticFeedback,
       <div className="draft-card__actions">
         <button
           className="draft-card__approve-btn"
-          onClick={() => onApprove(selectedPlatforms.map((p) => PLATFORM_MAP[p] ?? p))}
-          disabled={selectedPlatforms.length === 0}
+          onClick={() => {
+            setIsSubmitting(true);
+            onApprove(selectedPlatforms.map((p) => PLATFORM_MAP[p] ?? p));
+          }}
+          disabled={selectedPlatforms.length === 0 || isSubmitting}
+          style={selectedPlatforms.length === 0 ? { opacity: 0.4 } : undefined}
         >
-          게시 준비
+          {isSubmitting ? "처리 중..." : "게시 준비"}
         </button>
         <button
           className="draft-card__rewrite-btn"

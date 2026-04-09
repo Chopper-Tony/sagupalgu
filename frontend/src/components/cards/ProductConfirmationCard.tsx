@@ -18,6 +18,7 @@ export function ProductConfirmationCard({
   const [brand, setBrand] = useState(top?.brand ?? "");
   const [model, setModel] = useState(top?.model ?? "");
   const [category, setCategory] = useState(top?.category ?? "");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const handleConfirm = (candidate?: ProductCandidate) => {
     if (candidate) {
@@ -39,6 +40,13 @@ export function ProductConfirmationCard({
           </p>
         </div>
       </div>
+
+      {/* 후보 없음 안내 */}
+      {candidates.length === 0 && (
+        <p className="product-confirm-card__no-candidates">
+          AI가 감지한 상품이 없습니다. 직접 입력해주세요.
+        </p>
+      )}
 
       {/* 후보 카드 */}
       {candidates.length > 0 && (
@@ -73,24 +81,42 @@ export function ProductConfirmationCard({
       <div className="product-confirm-card__manual">
         <p className="product-confirm-card__manual-label">직접 입력</p>
         <div className="product-confirm-card__fields">
-          <input
-            className="product-confirm-card__input"
-            placeholder="브랜드 (예: 애플, 삼성, LG)"
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-          />
-          <input
-            className="product-confirm-card__input"
-            placeholder="모델명 (예: 아이폰 15 프로, 갤럭시 S24)"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          />
-          <input
-            className="product-confirm-card__input"
-            placeholder="카테고리 (예: 스마트폰, 노트북, 태블릿)"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
+          <div className="product-confirm-card__field-wrap">
+            <input
+              className={`product-confirm-card__input${touched.brand && !brand.trim() ? " product-confirm-card__input--error" : ""}`}
+              placeholder="브랜드 (예: 애플, 삼성, LG)"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              onBlur={() => setTouched((prev) => ({ ...prev, brand: true }))}
+            />
+            {touched.brand && !brand.trim() && (
+              <span className="product-confirm-card__hint">필수 입력</span>
+            )}
+          </div>
+          <div className="product-confirm-card__field-wrap">
+            <input
+              className={`product-confirm-card__input${touched.model && !model.trim() ? " product-confirm-card__input--error" : ""}`}
+              placeholder="모델명 (예: 아이폰 15 프로, 갤럭시 S24)"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              onBlur={() => setTouched((prev) => ({ ...prev, model: true }))}
+            />
+            {touched.model && !model.trim() && (
+              <span className="product-confirm-card__hint">필수 입력</span>
+            )}
+          </div>
+          <div className="product-confirm-card__field-wrap">
+            <input
+              className={`product-confirm-card__input${touched.category && !category.trim() ? " product-confirm-card__input--error" : ""}`}
+              placeholder="카테고리 (예: 스마트폰, 노트북, 태블릿)"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              onBlur={() => setTouched((prev) => ({ ...prev, category: true }))}
+            />
+            {touched.category && !category.trim() && (
+              <span className="product-confirm-card__hint">필수 입력</span>
+            )}
+          </div>
         </div>
         <button
           className="product-confirm-card__submit"

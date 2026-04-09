@@ -81,4 +81,10 @@ export const api = {
   startPlatformConnect: () =>
     client.post<{ connect_token: string; expires_at: number }>("/platforms/connect/start")
       .then((r) => r.data),
+
+  // 마켓 (공개)
+  getMarketItems: (limit = 20, offset = 0) =>
+    client.get<{ items: import("../types/market").MarketItem[]; total: number; limit: number; offset: number }>(
+      "/market", { params: { limit, offset } }
+    ).then((r) => r.data),
 };
