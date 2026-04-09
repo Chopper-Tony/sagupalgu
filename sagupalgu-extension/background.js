@@ -36,6 +36,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
+
+  if (msg.type === "FETCH_AND_PUBLISH") {
+    handleFetchAndPublish(msg.sessionId, msg.platform, msg.serverUrl)
+      .then((result) => sendResponse({ success: true, data: result }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
 });
 
 async function handleConnect(platform, connectToken, serverUrl) {
@@ -205,6 +212,29 @@ async function handleBunjangPublish(publishData, sessionId, serverUrl) {
   }
 
   return result;
+}
+
+/**
+ * 웹앱 자동 게시 버튼용: 서버에서 데이터 fetch → 플랫폼별 게시 실행.
+ * publish_bridge.js에서 호출됨.
+ */
+async function handleFetchAndPublish(sessionId, platform, serverUrl) {
+  const url = serverUrl || DEFAULT_SERVER_URL;
+
+  // 서버에서 게시 데이터 가져오기
+  const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`);
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.detail || `서버 에러: ${resp.status}`);
+  }
+  const publishData = await resp.json();
+
+  // 플랫폼별 게시 실행
+  if (platform === "bunjang") {
+    return await handleBunjangPublish(publishData, sessionId, url);
+  } else {
+    return await handleJoongnaPublish(publishData, sessionId, url);
+  }
 }
 
 /**

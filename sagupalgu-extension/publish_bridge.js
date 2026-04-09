@@ -11,8 +11,8 @@
 (() => {
   "use strict";
 
-  window.addEventListener("message", async (event) => {
-    // 자기 자신의 메시지만 처리 (다른 origin 무시)
+  window.addEventListener("message", (event) => {
+    // 자기 자신의 메시지만 처리
     if (event.source !== window) return;
 
     const msg = event.data;
@@ -23,47 +23,25 @@
 
     console.log(`[사구팔구 Bridge] 게시 요청 수신: platform=${platform}, sessionId=${sessionId}`);
 
-    try {
-      // 1. 서버에서 게시 데이터 가져오기
-      const url = serverUrl || window.location.origin;
-      const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`);
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.detail || `서버 에러: ${resp.status}`);
-      }
-      const publishData = await resp.json();
-
-      // 2. background.js에 게시 요청 전달
-      const msgType = platform === "bunjang" ? "PUBLISH_BUNJANG" : "PUBLISH_JOONGNA";
-
-      chrome.runtime.sendMessage(
-        {
-          type: msgType,
-          publishData,
-          sessionId,
-          serverUrl: url,
-        },
-        (response) => {
-          // 결과를 웹앱에 전달
-          window.postMessage({
-            type: "SAGUPALGU_PUBLISH_RESULT",
-            platform,
-            sessionId,
-            success: response?.success && response?.data?.success,
-            error: response?.data?.error || response?.error || null,
-          }, "*");
-        }
-      );
-    } catch (e) {
-      console.error(`[사구팔구 Bridge] 게시 요청 실패:`, e.message);
-      window.postMessage({
-        type: "SAGUPALGU_PUBLISH_RESULT",
-        platform,
+    // background.js에 FETCH_AND_PUBLISH 메시지 전달
+    // background가 서버에서 데이터를 가져와 게시까지 처리
+    chrome.runtime.sendMessage(
+      {
+        type: "FETCH_AND_PUBLISH",
         sessionId,
-        success: false,
-        error: e.message,
-      }, "*");
-    }
+        platform,
+        serverUrl: serverUrl || window.location.origin,
+      },
+      (response) => {
+        window.postMessage({
+          type: "SAGUPALGU_PUBLISH_RESULT",
+          platform,
+          sessionId,
+          success: response?.success && response?.data?.success,
+          error: response?.data?.error || response?.error || null,
+        }, "*");
+      }
+    );
   });
 
   console.log("[사구팔구 Bridge] Content Script 로드됨");
