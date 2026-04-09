@@ -383,9 +383,9 @@
         banner.textContent = "📷 이미지를 직접 첨부해주세요. 첨부 후 자동으로 진행됩니다.";
         document.body.prepend(banner);
 
-        // 사용자가 이미지 첨부할 때까지 최대 60초 대기
+        // 사용자가 이미지 첨부할 때까지 최대 30초 대기
         let waitCount = 0;
-        while (waitCount < 30) {
+        while (waitCount < 15) {
           await sleep(2000);
           waitCount++;
           const imgs = document.querySelectorAll(
