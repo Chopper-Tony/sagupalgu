@@ -283,9 +283,13 @@
         throw new Error("중고나라 접속이 차단되었습니다.");
       }
 
-      // ① 이미지 업로드 (background에서 전달받은 data URL 사용)
+      // ① 이미지 업로드 (CDP에서 이미 처리된 경우 스킵)
       steps.push("이미지 업로드");
-      await uploadImages(data.image_data_urls || []);
+      if (data.image_already_uploaded) {
+        console.log("[사구팔구] 이미지는 CDP에서 이미 업로드됨 — 스킵");
+      } else {
+        await uploadImages(data.image_data_urls || []);
+      }
       await sleep(2000);
 
       // ② 상품명
