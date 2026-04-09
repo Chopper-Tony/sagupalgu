@@ -342,18 +342,17 @@
 
       if (imageCheck === 0) {
         console.warn("[사구팔구] 이미지 미첨부 — 사용자 수동 첨부 대기");
-        // 화면에 안내 배너 삽입
         const banner = document.createElement("div");
         banner.id = "sagupalgu-image-notice";
         banner.style.cssText =
           "position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e40af;color:#fff;" +
           "padding:16px;text-align:center;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.3);";
-        banner.textContent = "📷 이미지를 직접 첨부한 후, 아래 판매하기 버튼을 눌러주세요.";
+        banner.textContent = "📷 이미지를 직접 첨부해주세요. 첨부 후 자동으로 진행됩니다.";
         document.body.prepend(banner);
 
-        // 사용자가 이미지 첨부할 때까지 최대 120초 대기
+        // 사용자가 이미지 첨부할 때까지 최대 60초 대기
         let waitCount = 0;
-        while (waitCount < 60) {
+        while (waitCount < 30) {
           await sleep(2000);
           waitCount++;
           const imgs = document.querySelectorAll(
@@ -364,8 +363,40 @@
             break;
           }
         }
-        // 배너 제거
         banner.remove();
+
+        // ⑦-1. 중고나라 AI가 폼을 덮어쓴 경우 원래 데이터로 재입력
+        console.log("[사구팔구] 이미지 첨부 후 중고나라 AI 덮어쓰기 복원 대기");
+        await sleep(3000); // 중고나라 AI 처리 대기
+
+        steps.push("폼 내용 복원");
+
+        // 상품명 복원
+        const titleRestore = document.querySelector(
+          "input[placeholder*='상품명'], input[placeholder*='제목']"
+        );
+        if (titleRestore && data.title) {
+          fillInput(titleRestore, data.title);
+          await sleep(500);
+        }
+
+        // 가격 복원
+        const priceRestore = document.querySelector(
+          "input[placeholder*='판매가격'], input[placeholder*='가격']"
+        );
+        if (priceRestore && data.price) {
+          fillInput(priceRestore, String(data.price));
+          await sleep(500);
+        }
+
+        // 설명 복원
+        const textareaRestore = document.querySelector("textarea");
+        if (textareaRestore && data.description) {
+          fillTextarea(textareaRestore, data.description);
+          await sleep(500);
+        }
+
+        console.log("[사구팔구] 폼 내용 복원 완료");
       }
 
       // ⑧ 판매하기 버튼 클릭
