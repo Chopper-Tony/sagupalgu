@@ -6,7 +6,7 @@
 importScripts("cookies.js");
 
 // 기본 서버 URL (배포 시 변경)
-const DEFAULT_SERVER_URL = "http://3.80.231.49";
+const DEFAULT_SERVER_URL = "http://18.232.188.74";
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "CONNECT_PLATFORM") {
