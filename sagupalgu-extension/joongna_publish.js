@@ -288,7 +288,7 @@
       if (data.image_already_uploaded) {
         console.log("[사구팔구] 이미지는 CDP에서 이미 업로드됨 — 스킵");
       } else {
-        await uploadImages(data.image_data_urls || []);
+        console.warn("[사구팔구] CDP 이미지 업로드 실패 — 수동 첨부 필요");
       }
       await sleep(2000);
 
@@ -334,7 +334,41 @@
         }
       }
 
-      // ⑦ 판매하기 버튼 클릭
+      // ⑦ 이미지 첨부 확인 — 없으면 사용자에게 안내 후 대기
+      steps.push("이미지 확인");
+      const imageCheck = document.querySelectorAll(
+        "img[src*='blob:'], img[src*='data:'], [class*='preview'] img, [class*='thumb'] img"
+      ).length;
+
+      if (imageCheck === 0) {
+        console.warn("[사구팔구] 이미지 미첨부 — 사용자 수동 첨부 대기");
+        // 화면에 안내 배너 삽입
+        const banner = document.createElement("div");
+        banner.id = "sagupalgu-image-notice";
+        banner.style.cssText =
+          "position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e40af;color:#fff;" +
+          "padding:16px;text-align:center;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.3);";
+        banner.textContent = "📷 이미지를 직접 첨부한 후, 아래 판매하기 버튼을 눌러주세요.";
+        document.body.prepend(banner);
+
+        // 사용자가 이미지 첨부할 때까지 최대 120초 대기
+        let waitCount = 0;
+        while (waitCount < 60) {
+          await sleep(2000);
+          waitCount++;
+          const imgs = document.querySelectorAll(
+            "img[src*='blob:'], img[src*='data:'], [class*='preview'] img, [class*='thumb'] img"
+          ).length;
+          if (imgs > 0) {
+            console.log(`[사구팔구] 이미지 ${imgs}개 감지 — 계속 진행`);
+            break;
+          }
+        }
+        // 배너 제거
+        banner.remove();
+      }
+
+      // ⑧ 판매하기 버튼 클릭
       steps.push("판매하기 클릭");
       await sleep(1000);
       const submitBtn = Array.from(document.querySelectorAll("button")).find(
