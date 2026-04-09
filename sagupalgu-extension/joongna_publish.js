@@ -367,13 +367,23 @@
         }
       }
 
-      // ⑦ 이미지 첨부 확인 — 없으면 사용자에게 안내 후 대기
+      // ⑦ 이미지 첨부 확인 — CDP 성공이면 스킵, 아니면 수동 첨부 대기
       steps.push("이미지 확인");
-      const imageCheck = document.querySelectorAll(
-        "img[src*='blob:'], img[src*='data:'], [class*='preview'] img, [class*='thumb'] img"
-      ).length;
 
-      if (imageCheck === 0) {
+      // CDP가 이미지를 설정했으면 file input에 파일이 있는지로 확인
+      let imageOk = false;
+      if (data.image_already_uploaded) {
+        const fi = document.querySelector(
+          "input[type='file'][accept*='image'], input[type='file'][multiple], input[type='file']"
+        );
+        imageOk = fi && fi.files && fi.files.length > 0;
+        if (imageOk) {
+          console.log(`[사구팔구] CDP 이미지 확인 완료: ${fi.files.length}개`);
+        }
+      }
+
+      // CDP 성공이 아니거나 file input에 파일이 없으면 수동 대기
+      if (!imageOk) {
         console.warn("[사구팔구] 이미지 미첨부 — 사용자 수동 첨부 대기");
         const banner = document.createElement("div");
         banner.id = "sagupalgu-image-notice";
