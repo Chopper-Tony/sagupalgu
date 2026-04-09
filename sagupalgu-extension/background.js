@@ -279,6 +279,47 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
     });
 
     console.log(`[사구팔구] CDP: DOM.setFileInputFiles 완료 (${downloadedPaths.length}개)`);
+
+    // 5. React에 change 이벤트 강제 전달 (setFileInputFiles만으로는 React가 감지 못함)
+    await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+      expression: `
+        (function() {
+          const selectors = [
+            "input[type='file'][accept*='image']",
+            "input[type='file'][multiple]",
+            "input[type='file']",
+          ];
+          let input = null;
+          for (const sel of selectors) {
+            input = document.querySelector(sel);
+            if (input) break;
+          }
+          if (!input) return 'input not found';
+
+          // 방법 1: 표준 change 이벤트
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+
+          // 방법 2: React fiber에서 onChange 핸들러 직접 호출
+          const keys = Object.keys(input);
+          const reactKey = keys.find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+          if (reactKey) {
+            let fiber = input[reactKey];
+            while (fiber) {
+              if (fiber.memoizedProps && fiber.memoizedProps.onChange) {
+                fiber.memoizedProps.onChange({ target: input });
+                return 'React onChange called';
+              }
+              fiber = fiber.return;
+            }
+          }
+
+          return 'change event dispatched';
+        })()
+      `,
+      returnByValue: true,
+    });
+
+    console.log("[사구팔구] CDP: React change 이벤트 강제 발생 완료");
     await new Promise((r) => setTimeout(r, 2000));
 
     return true;
