@@ -352,6 +352,76 @@
   text-decoration: underline;
 }
 
+/* 최근 본 상품 */
+.market-recent {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+}
+.market-recent__title {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+.market-recent__list {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+.market-recent__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+}
+.market-recent__item:hover {
+  border-color: var(--accent);
+}
+.market-recent__thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.market-recent__no-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: var(--bg-tertiary, #1e293b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.market-recent__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.market-recent__name {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.market-recent__price {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .market-page {
     padding: 1rem;

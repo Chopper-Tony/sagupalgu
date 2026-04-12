@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../lib/api";
 import { useWishlist } from "../hooks/useWishlist";
+import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import type { MarketItem } from "../types/market";
 import "./MarketPage.css";
 
@@ -13,6 +14,7 @@ export function MarketPage() {
   const [sortBy, setSortBy] = useState<string>("latest");
   const [showWishlistOnly, setShowWishlistOnly] = useState(false);
   const { toggle: toggleWish, isWished } = useWishlist();
+  const { items: recentItems } = useRecentlyViewed();
 
   // 검색/필터 상태
   const [query, setQuery] = useState("");
@@ -202,6 +204,28 @@ export function MarketPage() {
           {displayItems.map((item) => (
             <MarketCard key={item.session_id} item={item} isWished={isWished(item.session_id)} onToggleWish={() => toggleWish(item.session_id)} />
           ))}
+        </div>
+      )}
+
+      {/* 최근 본 상품 */}
+      {recentItems.length > 0 && (
+        <div className="market-recent">
+          <h3 className="market-recent__title">최근 본 상품</h3>
+          <div className="market-recent__list">
+            {recentItems.map((r) => (
+              <a key={r.session_id} href={`#/market/${r.session_id}`} className="market-recent__item">
+                {r.thumbnail ? (
+                  <img className="market-recent__thumb" src={r.thumbnail} alt={r.title} />
+                ) : (
+                  <div className="market-recent__no-thumb">-</div>
+                )}
+                <div className="market-recent__info">
+                  <span className="market-recent__name">{r.title}</span>
+                  <span className="market-recent__price">{r.price.toLocaleString()}원</span>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>

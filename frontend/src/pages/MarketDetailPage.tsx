@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
+import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import type { MarketDetailItem } from "../types/market";
 import "./MarketDetailPage.css";
 
@@ -20,6 +21,7 @@ export function MarketDetailPage({ sessionId }: Props) {
 
   // 판매자 프로필
   const [seller, setSeller] = useState<{ nickname: string; total_listings: number; sold_count: number } | null>(null);
+  const { add: addRecentlyViewed } = useRecentlyViewed();
 
   // 문의 폼 상태
   const [showInquiry, setShowInquiry] = useState(false);
@@ -36,6 +38,8 @@ export function MarketDetailPage({ sessionId }: Props) {
       .getMarketItem(sessionId)
       .then((data) => {
         setItem(data);
+        // 최근 본 상품 기록
+        addRecentlyViewed({ session_id: data.session_id, title: data.title, price: data.price, image_urls: data.image_urls });
         // 판매자 프로필 로드
         const sellerId = (data as any).seller_id;
         if (sellerId) {
