@@ -9,6 +9,7 @@ export interface MarketItem {
   tags: string[];
   published_platforms: string[];
   sale_status: SaleStatus;
+  category: string;
   created_at: string | null;
 }
 
@@ -46,6 +47,7 @@ export interface MarketSearchParams {
   q?: string;
   min_price?: number;
   max_price?: number;
+  category?: string;
   limit?: number;
   offset?: number;
 }

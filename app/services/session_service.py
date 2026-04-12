@@ -65,6 +65,46 @@ class SessionService:
     async def get_session(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
         return build_session_ui_response(self._get_or_raise(session_id, user_id))
 
+    async def relist_session(
+        self, session_id: str, user_id: str, new_price: int | None = None,
+    ) -> dict[str, Any]:
+        """기존 세션을 복제하여 새 세션을 생성한다 (재등록)."""
+        original = self._get_or_raise(session_id, user_id)
+
+        # 새 세션 생성
+        new_session = self.repo.create(user_id=user_id)
+
+        # 기존 데이터 복사
+        product_data = dict(original.get("product_data_jsonb") or {})
+        listing_data = dict(original.get("listing_data_jsonb") or {})
+
+        # 가격 조정 (옵션)
+        if new_price is not None:
+            canonical = listing_data.get("canonical_listing") or {}
+            canonical["price"] = new_price
+            listing_data["canonical_listing"] = canonical
+
+        # sale_status 초기화 (새 상품이므로 available)
+        listing_data.pop("sale_status", None)
+
+        # 재등록 출처 기록
+        workflow_meta: dict[str, Any] = {
+            "schema_version": 1,
+            "relisted_from": session_id,
+        }
+
+        payload: dict[str, Any] = {
+            "status": "completed",
+            "product_data_jsonb": product_data,
+            "listing_data_jsonb": listing_data,
+            "workflow_meta_jsonb": workflow_meta,
+        }
+        result = self.repo.update(new_session.id, payload)
+        if not result:
+            raise SessionUpdateError(f"재등록 세션 업데이트 실패: {new_session.id}")
+
+        return build_session_ui_response(result)
+
     # ── 이미지 업로드 ──────────────────────────────────────────────
 
     async def attach_images(self, session_id: str, image_urls: list[str], user_id: str | None = None) -> dict[str, Any]:

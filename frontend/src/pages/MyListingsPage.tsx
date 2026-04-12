@@ -26,6 +26,7 @@ export function MyListingsPage() {
   const [inquiryLoading, setInquiryLoading] = useState(false);
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [replySending, setReplySending] = useState<string | null>(null);
+  const [aiSuggesting, setAiSuggesting] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -59,6 +60,32 @@ export function MyListingsPage() {
       } else {
         alert("상태 변경에 실패했습니다.");
       }
+    }
+  };
+
+  const handleRelist = async (sessionId: string) => {
+    if (!confirm("이 상품을 재등록하시겠습니까?")) return;
+    try {
+      const res = await api.relistListing(sessionId);
+      alert("재등록 완료! 새 상품이 마켓에 등록되었습니다.");
+      fetchItems();
+      if (res.new_session?.session_id) {
+        window.location.hash = `#/market/${res.new_session.session_id}`;
+      }
+    } catch {
+      alert("재등록에 실패했습니다.");
+    }
+  };
+
+  const handleSuggestReply = async (sessionId: string, inquiryId: string) => {
+    setAiSuggesting(inquiryId);
+    try {
+      const res = await api.suggestReply(sessionId, inquiryId);
+      setReplyText((prev) => ({ ...prev, [inquiryId]: res.suggested_reply }));
+    } catch {
+      alert("AI 답변 생성에 실패했습니다. 직접 작성해주세요.");
+    } finally {
+      setAiSuggesting(null);
     }
   };
 
@@ -179,6 +206,9 @@ export function MyListingsPage() {
                         <button className="my-listings__action-btn my-listings__action-btn--sold" onClick={() => handleStatusChange(item.session_id, "sold")}>판매완료</button>
                       </>
                     )}
+                    {status === "sold" && (
+                      <button className="my-listings__action-btn my-listings__action-btn--relist" onClick={() => handleRelist(item.session_id)}>재등록</button>
+                    )}
                   </div>
                 </div>
 
@@ -214,13 +244,22 @@ export function MyListingsPage() {
                                 onChange={(e) => setReplyText((prev) => ({ ...prev, [inq.id]: e.target.value }))}
                                 rows={2}
                               />
-                              <button
-                                className="my-listings__reply-btn"
-                                onClick={() => handleReply(item.session_id, inq.id)}
-                                disabled={replySending === inq.id || !(replyText[inq.id]?.trim())}
-                              >
-                                {replySending === inq.id ? "전송 중..." : "답변 보내기"}
-                              </button>
+                              <div className="my-listings__reply-actions">
+                                <button
+                                  className="my-listings__ai-suggest-btn"
+                                  onClick={() => handleSuggestReply(item.session_id, inq.id)}
+                                  disabled={aiSuggesting === inq.id}
+                                >
+                                  {aiSuggesting === inq.id ? "AI 생성 중..." : "AI 답변 제안"}
+                                </button>
+                                <button
+                                  className="my-listings__reply-btn"
+                                  onClick={() => handleReply(item.session_id, inq.id)}
+                                  disabled={replySending === inq.id || !(replyText[inq.id]?.trim())}
+                                >
+                                  {replySending === inq.id ? "전송 중..." : "답변 보내기"}
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
