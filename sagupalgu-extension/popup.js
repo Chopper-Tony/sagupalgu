@@ -2,7 +2,7 @@
  * Popup UI 로직 — 연결 버튼 + 상태 표시 + 자동 게시.
  */
 
-const DEFAULT_SERVER_URL = "http://34.236.36.212";
+const DEFAULT_SERVER_URL = "http://3.233.245.120";
 
 function showMessage(text, type = "info") {
   const area = document.getElementById("message-area");

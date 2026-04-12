@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.core.auth import AuthenticatedUser, get_current_user
+from app.core.auth import AuthenticatedUser, get_current_user, get_optional_user
 from app.services.platform_auth_service import (
     get_session_status,
     open_login_browser,
@@ -44,7 +44,7 @@ class ConnectSessionRequest(BaseModel):
 
 
 @router.get("/status")
-async def platform_status(user: AuthenticatedUser = Depends(get_current_user)):
+async def platform_status(user: AuthenticatedUser = Depends(get_optional_user)):
     """각 플랫폼의 로그인 세션 상태를 확인한다."""
     return {"platforms": get_session_status(user_id=user.user_id)}
 
@@ -52,12 +52,15 @@ async def platform_status(user: AuthenticatedUser = Depends(get_current_user)):
 @router.post("/{platform}/login")
 async def platform_login(platform: str):
     """Playwright 브라우저를 열어 사용자가 직접 로그인한다. (로컬 개발용)"""
+    from app.core.config import get_settings
+    if get_settings().environment == "prod":
+        raise HTTPException(status_code=501, detail="프로덕션에서는 크롬 익스텐션으로 연결하세요")
     result = await open_login_browser(platform)
     return result
 
 
 @router.post("/connect/start")
-async def start_connect(user: AuthenticatedUser = Depends(get_current_user)):
+async def start_connect(user: AuthenticatedUser = Depends(get_optional_user)):
     """Connect token 발급. 익스텐션이 세션 업로드 시 이 토큰으로 사용자 식별."""
     _cleanup_expired_tokens()
 

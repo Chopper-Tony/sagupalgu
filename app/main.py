@@ -214,9 +214,9 @@ def create_app() -> FastAPI:
     application.include_router(market_router, prefix=settings.api_v1_prefix)
 
     # 업로드 이미지 정적 서빙
-    if os.path.isdir("uploads"):
-        from fastapi.staticfiles import StaticFiles
-        application.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    os.makedirs("uploads", exist_ok=True)
+    from fastapi.staticfiles import StaticFiles
+    application.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
     return application
 

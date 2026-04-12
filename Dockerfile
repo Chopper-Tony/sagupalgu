@@ -20,7 +20,7 @@ COPY legacy_spikes/ ./legacy_spikes/
 COPY migrations/ ./migrations/
 
 # 세션/스크린샷 디렉터리
-RUN mkdir -p sessions screenshots
+RUN mkdir -p sessions screenshots uploads
 
 EXPOSE 8000
 
