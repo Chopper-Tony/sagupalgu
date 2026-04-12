@@ -27,6 +27,7 @@ export function MyListingsPage() {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [replySending, setReplySending] = useState<string | null>(null);
   const [aiSuggesting, setAiSuggesting] = useState<string | null>(null);
+  const [soldCelebration, setSoldCelebration] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -48,9 +49,9 @@ export function MyListingsPage() {
   const handleStatusChange = async (sessionId: string, newStatus: SaleStatus) => {
     try {
       await api.updateSaleStatusMarket(sessionId, newStatus);
-      // 판매 완료 시 축하 메시지
       if (newStatus === "sold") {
-        alert("판매 완료를 축하합니다! 비슷한 상품을 재등록해보세요.");
+        setSoldCelebration(sessionId);
+        setTimeout(() => setSoldCelebration(null), 8000);
       }
       fetchItems();
     } catch (e) {
@@ -151,8 +152,10 @@ export function MyListingsPage() {
         <div className="my-listings__loading">불러오는 중...</div>
       ) : items.length === 0 ? (
         <div className="my-listings__empty">
-          <p>등록된 상품이 없습니다.</p>
-          <a href="#/" className="my-listings__link">셀러 코파일럿에서 상품 등록하기</a>
+          <p className="my-listings__empty-icon">📦</p>
+          <p>아직 등록된 상품이 없습니다.</p>
+          <p className="my-listings__empty-sub">사진 한 장만 올리면 AI가 판매글을 만들어드려요!</p>
+          <a href="#/" className="my-listings__empty-cta">셀러 코파일럿에서 시작하기</a>
         </div>
       ) : (
         <div className="my-listings__list">
@@ -230,6 +233,20 @@ export function MyListingsPage() {
                   </div>
                 </div>
 
+                {/* 판매 완료 축하 배너 */}
+                {soldCelebration === item.session_id && (
+                  <div className="my-listings__celebration">
+                    <span className="my-listings__celebration-emoji">🎉</span>
+                    <div>
+                      <strong>판매 완료를 축하합니다!</strong>
+                      <p>비슷한 상품이 있다면 재등록해보세요.</p>
+                    </div>
+                    <button className="my-listings__celebration-cta" onClick={() => handleRelist(item.session_id)}>
+                      재등록하기
+                    </button>
+                  </div>
+                )}
+
                 {/* 코파일럿 제안 */}
                 {(item as any).copilot_suggestions?.length > 0 && (
                   <div className="my-listings__suggestions">
@@ -258,7 +275,10 @@ export function MyListingsPage() {
                     {inquiryLoading ? (
                       <p className="my-listings__inquiries-loading">문의 불러오는 중...</p>
                     ) : inquiries.length === 0 ? (
-                      <p className="my-listings__inquiries-empty">아직 문의가 없습니다.</p>
+                      <div className="my-listings__inquiries-empty">
+                        <p>아직 문의가 없습니다.</p>
+                        <p className="my-listings__inquiries-empty-hint">가격을 조정하거나 제목에 키워드를 추가하면 문의가 늘어날 수 있어요.</p>
+                      </div>
                     ) : (
                       inquiries.map((inq) => (
                         <div key={inq.id} className={`my-listings__inquiry ${inq.status === "open" ? "my-listings__inquiry--open" : ""}`}>
@@ -290,7 +310,7 @@ export function MyListingsPage() {
                                   onClick={() => handleSuggestReply(item.session_id, inq.id)}
                                   disabled={aiSuggesting === inq.id}
                                 >
-                                  {aiSuggesting === inq.id ? "AI 생성 중..." : "AI 답변 제안"}
+                                  {aiSuggesting === inq.id ? "AI가 답변을 작성하고 있습니다..." : "AI 답변 제안"}
                                 </button>
                                 <button
                                   className="my-listings__reply-btn"
