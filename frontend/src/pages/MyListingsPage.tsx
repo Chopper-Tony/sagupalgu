@@ -199,6 +199,17 @@ export function MyListingsPage() {
                         <span className="my-listings__unread-badge">{item.unread_inquiry_count}</span>
                       )}
                     </button>
+                    {import.meta.env.DEV && status === "available" && (
+                      <button
+                        className="my-listings__action-btn"
+                        onClick={async () => {
+                          try {
+                            await api.createMockInquiry(item.session_id);
+                            fetchItems();
+                          } catch { /* ignore */ }
+                        }}
+                      >테스트 문의</button>
+                    )}
 
                     {/* 상태 변경 버튼 */}
                     {status === "available" && (
