@@ -357,6 +357,42 @@ async def _generate_reply_with_llm(
         return None
 
 
+@router.post("/my-listings/{session_id}/mock-inquiry", tags=["seller"])
+async def create_mock_inquiry(
+    session_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    repo: SessionRepository = Depends(get_session_repository),
+    inquiry_repo: InquiryRepository = Depends(get_inquiry_repository),
+) -> dict[str, Any]:
+    """테스트 문의 생성 (dev 환경 전용). prod에서는 404."""
+    from app.core.config import get_settings
+    settings = get_settings()
+    if settings.environment not in ("local", "dev"):
+        raise HTTPException(status_code=404)
+
+    session = repo.get_by_id_and_user(session_id, user.user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없거나 권한이 없습니다")
+
+    import random
+    names = ["김구매", "이관심", "박문의", "최테스트", "정사용자"]
+    messages = [
+        "네고 가능하세요?",
+        "상태 어떤가요? 하자 있나요?",
+        "직거래 가능하세요? 서울 강남역 근처입니다.",
+        "택배 거래 가능한가요? 택배비 포함인가요?",
+        "아직 판매 중인가요? 바로 구매하고 싶습니다.",
+    ]
+    name = random.choice(names)
+    inquiry = inquiry_repo.create(
+        listing_id=session_id,
+        buyer_name=name,
+        buyer_contact=f"010-{random.randint(1000,9999)}-{random.randint(1000,9999)}",
+        message=random.choice(messages),
+    )
+    return {"success": True, "inquiry": inquiry}
+
+
 @router.get("/sellers/{user_id}/profile", tags=["market"])
 async def get_seller_profile(
     user_id: str,

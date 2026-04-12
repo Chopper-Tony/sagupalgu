@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     app_name: str = "sagupalgu"
     environment: Literal["local", "dev", "prod"] = "local"
+    demo_mode: bool = False
     debug: bool = True
     api_v1_prefix: str = "/api/v1"
 

@@ -146,4 +146,9 @@ export const api = {
     client.get<{ user_id: string; nickname: string; total_listings: number; sold_count: number }>(
       `/market/sellers/${userId}/profile`
     ).then((r) => r.data),
+
+  createMockInquiry: (sessionId: string) =>
+    client.post<{ success: boolean; inquiry: Record<string, unknown> }>(
+      `/market/my-listings/${sessionId}/mock-inquiry`
+    ).then((r) => r.data),
 };
