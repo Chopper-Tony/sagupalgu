@@ -131,4 +131,14 @@ export const api = {
     client.post<{ success: boolean; inquiry: import("../types/market").InquiryItem }>(
       `/market/my-listings/${sessionId}/inquiries/${inquiryId}/reply`, { reply }
     ).then((r) => r.data),
+
+  relistListing: (sessionId: string, newPrice?: number) =>
+    client.post<{ success: boolean; new_session: import("../types").SessionResponse }>(
+      `/market/my-listings/${sessionId}/relist`, newPrice != null ? { new_price: newPrice } : {}
+    ).then((r) => r.data),
+
+  suggestReply: (sessionId: string, inquiryId: string) =>
+    client.post<{ suggested_reply: string; inquiry_type: string; goal: string; source: string }>(
+      `/market/my-listings/${sessionId}/inquiries/${inquiryId}/suggest-reply`
+    ).then((r) => r.data),
 };

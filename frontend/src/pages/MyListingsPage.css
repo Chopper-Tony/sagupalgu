@@ -186,6 +186,13 @@
 .my-listings__action-btn--sold:hover {
   background: rgba(34, 197, 94, 0.1);
 }
+.my-listings__action-btn--relist {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.my-listings__action-btn--relist:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
 
 /* 문의 목록 (펼침) */
 .my-listings__inquiries {
@@ -278,6 +285,27 @@
   cursor: pointer;
 }
 .my-listings__reply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.my-listings__reply-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.my-listings__ai-suggest-btn {
+  padding: 0.4rem 1rem;
+  background: none;
+  border: 1px solid #a855f7;
+  color: #a855f7;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.my-listings__ai-suggest-btn:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.1);
+}
+.my-listings__ai-suggest-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -5,9 +5,10 @@ import "./MarketPage.css";
 
 export function MarketPage() {
   const [items, setItems] = useState<MarketItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // 검색/필터 상태
   const [query, setQuery] = useState("");
@@ -73,10 +74,14 @@ export function MarketPage() {
 
   const hasActiveFilter = query.trim() || minPrice || maxPrice;
 
-  const displayItems = showAvailableOnly
-    ? items.filter((item) => (item.sale_status || "available") === "available")
-    : items;
-  const displayTotal = showAvailableOnly ? displayItems.length : total;
+  let displayItems = items;
+  if (showAvailableOnly) {
+    displayItems = displayItems.filter((item) => (item.sale_status || "available") === "available");
+  }
+  if (selectedCategory !== "all") {
+    displayItems = displayItems.filter((item) => (item.category || "") === selectedCategory);
+  }
+  const displayTotal = displayItems.length;
 
   return (
     <div className="market-page">
@@ -98,6 +103,19 @@ export function MarketPage() {
           />
           판매중만 보기
         </label>
+      </div>
+
+      {/* 카테고리 필터 */}
+      <div className="market-category-filter">
+        {["all", "스마트폰", "태블릿", "노트북", "가전", "패션", "기타"].map((cat) => (
+          <button
+            key={cat}
+            className={`market-category-btn ${selectedCategory === cat ? "market-category-btn--active" : ""}`}
+            onClick={() => setSelectedCategory(cat)}
+          >
+            {cat === "all" ? "전체" : cat}
+          </button>
+        ))}
       </div>
 
       {/* 검색 + 필터 */}

@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.core.auth import AuthenticatedUser, get_current_user
-from app.dependencies import get_inquiry_repository, get_session_repository
+from app.dependencies import get_inquiry_repository, get_session_repository, get_session_service
+from app.services.session_service import SessionService
 from app.repositories.inquiry_repository import InquiryRepository
 from app.repositories.session_repository import (
     SALE_STATUS_TRANSITIONS,
@@ -33,9 +34,10 @@ async def list_market_items(
     min_price: int | None = Query(default=None, ge=0, description="최소 가격"),
     max_price: int | None = Query(default=None, ge=0, description="최대 가격"),
     sale_status: str | None = Query(default=None, description="판매 상태 필터 (available/reserved/sold)"),
+    category: str | None = Query(default=None, description="카테고리 필터"),
     repo: SessionRepository = Depends(get_session_repository),
 ) -> dict[str, Any]:
-    """completed 상태 세션의 상품 목록을 반환한다. 검색/가격/판매상태 필터 지원."""
+    """completed 상태 세션의 상품 목록을 반환한다. 검색/가격/판매상태/카테고리 필터 지원."""
     has_filter = q is not None or min_price is not None or max_price is not None
 
     if has_filter:
@@ -49,6 +51,11 @@ async def list_market_items(
     # 판매 상태 필터 (Python 레벨 — 데이터 규모가 작으므로 허용)
     if sale_status:
         items = [row for row in items if _get_sale_status(row) == sale_status]
+        total = len(items)
+
+    # 카테고리 필터
+    if category:
+        items = [row for row in items if _get_category(row) == category]
         total = len(items)
 
     return {
@@ -132,6 +139,10 @@ class SaleStatusUpdateRequest(BaseModel):
 
 class ReplyRequest(BaseModel):
     reply: str = Field(..., min_length=1, max_length=2000)
+
+
+class RelistRequest(BaseModel):
+    new_price: int | None = Field(default=None, ge=0, description="변경할 가격 (없으면 기존 가격 유지)")
 
 
 @router.get("/my-listings", tags=["seller"])
@@ -243,7 +254,139 @@ async def reply_to_inquiry(
     return {"success": True, "inquiry": updated}
 
 
+@router.post("/my-listings/{session_id}/inquiries/{inquiry_id}/suggest-reply", tags=["seller"])
+async def suggest_inquiry_reply(
+    session_id: str,
+    inquiry_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    repo: SessionRepository = Depends(get_session_repository),
+    inquiry_repo: InquiryRepository = Depends(get_inquiry_repository),
+) -> dict[str, Any]:
+    """AI가 문의 응답 초안을 제안한다. LLM 실패 시 goal별 규칙 기반 템플릿 fallback."""
+    session = repo.get_by_id_and_user(session_id, user.user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없거나 권한이 없습니다")
+
+    inquiry = inquiry_repo.get_by_id(inquiry_id)
+    if not inquiry or inquiry.get("listing_id") != session_id:
+        raise HTTPException(status_code=404, detail="문의를 찾을 수 없습니다")
+
+    listing_data = session.get("listing_data_jsonb") or {}
+    canonical = listing_data.get("canonical_listing") or {}
+    product_data = session.get("product_data_jsonb") or {}
+    workflow_meta = session.get("workflow_meta_jsonb") or {}
+
+    goal = workflow_meta.get("mission_goal") or session.get("strategy_goal") or "balanced"
+    price = canonical.get("price", 0)
+    title = canonical.get("title", "")
+    message = inquiry.get("message", "")
+
+    # 문의 유형 감지 (간단한 키워드 기반)
+    msg_lower = message.lower()
+    if any(kw in msg_lower for kw in ["네고", "할인", "깎", "가격", "에누리"]):
+        inquiry_type = "nego"
+    elif any(kw in msg_lower for kw in ["상태", "하자", "기스", "스크래치", "사용감"]):
+        inquiry_type = "condition"
+    else:
+        inquiry_type = "default"
+
+    # LLM 시도
+    suggested_reply = None
+    source = "template"
+    try:
+        suggested_reply = await _generate_reply_with_llm(
+            message=message, title=title, price=price, goal=goal, inquiry_type=inquiry_type,
+        )
+        if suggested_reply:
+            source = "llm"
+    except Exception as e:
+        logger.warning("inquiry_copilot_llm_failed session=%s error=%s", session_id, e)
+
+    # Fallback: 규칙 기반 템플릿
+    if not suggested_reply:
+        from app.domain.goal_strategy import get_inquiry_reply_template
+        suggested_reply = get_inquiry_reply_template(goal, inquiry_type, price)
+
+    return {
+        "suggested_reply": suggested_reply,
+        "inquiry_type": inquiry_type,
+        "goal": goal,
+        "source": source,
+    }
+
+
+async def _generate_reply_with_llm(
+    message: str, title: str, price: int, goal: str, inquiry_type: str,
+) -> str | None:
+    """LLM으로 문의 응답 초안을 생성한다."""
+    try:
+        import httpx
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        api_key = getattr(settings, "openai_api_key", None)
+        if not api_key:
+            return None
+
+        from app.domain.goal_strategy import get_negotiation_policy
+        nego_policy = get_negotiation_policy(goal)
+
+        system_prompt = (
+            f"당신은 중고거래 판매자의 문의 응대를 돕는 AI 비서입니다.\n"
+            f"상품: {title} (가격: {price:,}원)\n"
+            f"판매 전략: {goal} (협상 정책: {nego_policy})\n"
+            f"구매자의 문의에 대해 친절하고 자연스러운 한국어 답변을 1~3문장으로 작성하세요.\n"
+            f"반말이 아닌 존댓말을 사용하세요."
+        )
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "gpt-4.1-mini",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"구매자 문의: {message}"},
+                    ],
+                    "max_tokens": 200,
+                    "temperature": 0.7,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.warning("llm_reply_generation_failed: %s", e)
+        return None
+
+
+@router.post("/my-listings/{session_id}/relist", tags=["seller"])
+async def relist_listing(
+    session_id: str,
+    body: RelistRequest | None = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service),
+) -> dict[str, Any]:
+    """기존 상품을 재등록한다. 이미지+정보 복제 + 새 세션 생성."""
+    new_price = body.new_price if body else None
+    result = await session_service.relist_session(
+        session_id=session_id,
+        user_id=user.user_id,
+        new_price=new_price,
+    )
+    logger.info("listing_relisted original=%s new=%s", session_id, result.get("session_id"))
+    return {"success": True, "new_session": result}
+
+
 # ── 헬퍼 ───────────────────────────────────────────────
+
+
+def _get_category(session: dict) -> str:
+    """세션에서 상품 카테고리를 추출한다."""
+    product_data = session.get("product_data_jsonb") or {}
+    confirmed = product_data.get("confirmed_product") or {}
+    return confirmed.get("category", "")
 
 
 def _to_market_item(session: dict) -> dict[str, Any]:
@@ -268,6 +411,7 @@ def _to_market_item(session: dict) -> dict[str, Any]:
         "tags": canonical.get("tags") or [],
         "published_platforms": published_platforms,
         "sale_status": _get_sale_status(session),
+        "category": _get_category(session),
         "created_at": session.get("created_at"),
     }
 
