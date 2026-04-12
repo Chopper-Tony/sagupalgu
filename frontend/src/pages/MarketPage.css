@@ -176,6 +176,30 @@
   border-color: var(--text-muted);
 }
 
+/* 찜 버튼 */
+.market-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.market-card__wish-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.market-card__wish-btn--active {
+  color: #ef4444;
+}
+.market-card__wish-btn:hover {
+  color: #ef4444;
+}
+
 /* 정렬 */
 .market-sort {
   margin-bottom: 1rem;

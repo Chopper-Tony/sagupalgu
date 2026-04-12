@@ -83,10 +83,17 @@ async def get_market_item(
     session_id: str,
     repo: SessionRepository = Depends(get_session_repository),
 ) -> dict[str, Any]:
-    """completed 상태 세션의 상품 상세 정보를 반환한다."""
+    """completed 상태 세션의 상품 상세 정보를 반환한다. view_count 증가."""
     row = repo.get_completed_by_id(session_id)
     if not row:
         raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
+    # view_count 증가 (fire-and-forget)
+    try:
+        listing_data = dict(row.get("listing_data_jsonb") or {})
+        listing_data["view_count"] = (listing_data.get("view_count") or 0) + 1
+        repo.update(session_id, {"listing_data_jsonb": listing_data})
+    except Exception:
+        pass  # 조회수 증가 실패는 무시
     return _to_market_detail(row)
 
 
@@ -372,6 +379,23 @@ async def _generate_reply_with_llm(
         return None
 
 
+@router.get("/sellers/{user_id}/profile", tags=["market"])
+async def get_seller_profile(
+    user_id: str,
+    repo: SessionRepository = Depends(get_session_repository),
+) -> dict[str, Any]:
+    """판매자 프로필 (공개). 등록 상품 수 + 판매 완료 수."""
+    all_items = repo.list_by_user(user_id)
+    total_listings = len(all_items)
+    sold_count = sum(1 for item in all_items if _get_sale_status(item) == "sold")
+    return {
+        "user_id": user_id,
+        "nickname": f"판매자 {user_id[:8]}",
+        "total_listings": total_listings,
+        "sold_count": sold_count,
+    }
+
+
 @router.post("/my-listings/{session_id}/relist", tags=["seller"])
 async def relist_listing(
     session_id: str,
@@ -506,9 +530,30 @@ def _to_market_item(session: dict) -> dict[str, Any]:
 
 
 def _to_my_listing_item(session: dict) -> dict[str, Any]:
-    """DB 레코드 -> 판매자 대시보드용 응답 (sale_status + inquiry 정보 포함)."""
+    """DB 레코드 -> 판매자 대시보드용 응답 (sale_status + 성과 요약 포함)."""
     base = _to_market_item(session)
     base["sale_status"] = _get_sale_status(session)
+
+    # 성과 요약 (SC-1)
+    listing_data = session.get("listing_data_jsonb") or {}
+    base["view_count"] = listing_data.get("view_count", 0)
+
+    # 시세 대비 위치
+    workflow_meta = session.get("workflow_meta_jsonb") or {}
+    market_context = workflow_meta.get("market_context") or {}
+    median_price = market_context.get("median_price")
+    current_price = base.get("price", 0)
+    if median_price and current_price and median_price > 0:
+        diff_pct = round((current_price - median_price) / median_price * 100)
+        if diff_pct > 0:
+            base["market_position"] = f"시세 대비 {diff_pct}% 높음"
+        elif diff_pct < 0:
+            base["market_position"] = f"시세 대비 {abs(diff_pct)}% 낮음"
+        else:
+            base["market_position"] = "시세 적정가"
+    else:
+        base["market_position"] = None
+
     return base
 
 
@@ -535,6 +580,8 @@ def _to_market_detail(session: dict) -> dict[str, Any]:
         "tags": canonical.get("tags") or [],
         "platform_links": platform_links,
         "sale_status": _get_sale_status(session),
+        "seller_id": session.get("user_id"),
+        "view_count": listing_data.get("view_count", 0),
         "created_at": session.get("created_at"),
     }
 

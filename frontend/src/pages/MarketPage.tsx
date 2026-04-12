@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../lib/api";
+import { useWishlist } from "../hooks/useWishlist";
 import type { MarketItem } from "../types/market";
 import "./MarketPage.css";
 
@@ -10,6 +11,8 @@ export function MarketPage() {
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("latest");
+  const [showWishlistOnly, setShowWishlistOnly] = useState(false);
+  const { toggle: toggleWish, isWished } = useWishlist();
 
   // 검색/필터 상태
   const [query, setQuery] = useState("");
@@ -82,6 +85,9 @@ export function MarketPage() {
   if (selectedCategory !== "all") {
     displayItems = displayItems.filter((item) => (item.category || "") === selectedCategory);
   }
+  if (showWishlistOnly) {
+    displayItems = displayItems.filter((item) => isWished(item.session_id));
+  }
   if (sortBy === "price_asc") {
     displayItems = [...displayItems].sort((a, b) => a.price - b.price);
   } else if (sortBy === "price_desc") {
@@ -108,6 +114,14 @@ export function MarketPage() {
             onChange={(e) => setShowAvailableOnly(e.target.checked)}
           />
           판매중만 보기
+        </label>
+        <label className="market-toggle-label">
+          <input
+            type="checkbox"
+            checked={showWishlistOnly}
+            onChange={(e) => setShowWishlistOnly(e.target.checked)}
+          />
+          찜한 상품만
         </label>
       </div>
 
@@ -186,7 +200,7 @@ export function MarketPage() {
       ) : (
         <div className="market-grid">
           {displayItems.map((item) => (
-            <MarketCard key={item.session_id} item={item} />
+            <MarketCard key={item.session_id} item={item} isWished={isWished(item.session_id)} onToggleWish={() => toggleWish(item.session_id)} />
           ))}
         </div>
       )}
@@ -194,7 +208,7 @@ export function MarketPage() {
   );
 }
 
-function MarketCard({ item }: { item: MarketItem }) {
+function MarketCard({ item, isWished, onToggleWish }: { item: MarketItem; isWished: boolean; onToggleWish: () => void }) {
   const thumbnail = item.image_urls[0] || null;
   const saleStatus = item.sale_status || "available";
   const platformLabel: Record<string, string> = {
@@ -219,7 +233,16 @@ function MarketCard({ item }: { item: MarketItem }) {
         )}
       </div>
       <div className="market-card__body">
-        <h3 className="market-card__title">{item.title || "제목 없음"}</h3>
+        <div className="market-card__title-row">
+          <h3 className="market-card__title">{item.title || "제목 없음"}</h3>
+          <button
+            className={`market-card__wish-btn ${isWished ? "market-card__wish-btn--active" : ""}`}
+            onClick={(e) => { e.preventDefault(); onToggleWish(); }}
+            title={isWished ? "찜 해제" : "찜하기"}
+          >
+            {isWished ? "\u2764" : "\u2661"}
+          </button>
+        </div>
         <p className="market-card__price">{item.price.toLocaleString()}원</p>
         {item.published_platforms.length > 0 && (
           <div className="market-card__platforms">

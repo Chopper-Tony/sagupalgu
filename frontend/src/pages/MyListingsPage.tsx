@@ -179,6 +179,13 @@ export function MyListingsPage() {
                     <span className={`my-listings__status ${STATUS_CLASS[status]}`}>
                       {STATUS_LABEL[status]}
                     </span>
+                    <div className="my-listings__stats">
+                      <span className="my-listings__stat">조회 {(item as any).view_count || 0}</span>
+                      <span className="my-listings__stat">문의 {item.inquiry_count}</span>
+                      {(item as any).market_position && (
+                        <span className="my-listings__stat my-listings__stat--position">{(item as any).market_position}</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* 문의 뱃지 + 액션 */}
