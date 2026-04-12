@@ -176,9 +176,9 @@ export function MyListingsPage() {
                   {/* 상품 정보 */}
                   <div className="my-listings__info">
                     <h3 className="my-listings__item-title">
-                      <a href={`#/market/${item.session_id}`}>{item.title || "제목 없음"}</a>
+                      <a href={`#/market/${item.session_id}`}>{String(item.title || "") || "제목 없음"}</a>
                     </h3>
-                    <p className="my-listings__item-price">{item.price.toLocaleString()}원</p>
+                    <p className="my-listings__item-price">{Number(item.price || 0).toLocaleString()}원</p>
                     <span className={`my-listings__status ${STATUS_CLASS[status]}`}>
                       {STATUS_LABEL[status]}
                     </span>

@@ -92,11 +92,11 @@ export function MarketDetailPage({ sessionId }: Props) {
 
       {/* 제목 + 가격 + 판매 상태 */}
       <div className="detail-title-row">
-        <h1 className="detail-title">{item.title || "제목 없음"}</h1>
+        <h1 className="detail-title">{String(item.title || "") || "제목 없음"}</h1>
         {item.sale_status === "sold" && <span className="detail-status-badge detail-status-badge--sold">판매완료</span>}
         {item.sale_status === "reserved" && <span className="detail-status-badge detail-status-badge--reserved">예약중</span>}
       </div>
-      <p className="detail-price">{item.price.toLocaleString()}원</p>
+      <p className="detail-price">{Number(item.price || 0).toLocaleString()}원</p>
 
       {/* 판매자 프로필 */}
       {seller && (
@@ -112,14 +112,14 @@ export function MarketDetailPage({ sessionId }: Props) {
       {item.tags.length > 0 && (
         <div className="detail-tags">
           {item.tags.map((tag) => (
-            <span key={tag} className="detail-tag">#{tag}</span>
+            <span key={String(tag)} className="detail-tag">#{String(tag)}</span>
           ))}
         </div>
       )}
 
       {/* 설명 */}
       <div className="detail-description">
-        {item.description.split("\n").map((line, i) => (
+        {String(item.description || "").split("\n").map((line, i) => (
           <p key={i}>{line}</p>
         ))}
       </div>

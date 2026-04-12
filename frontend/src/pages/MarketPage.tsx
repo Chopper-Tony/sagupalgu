@@ -220,8 +220,8 @@ export function MarketPage() {
                   <div className="market-recent__no-thumb">-</div>
                 )}
                 <div className="market-recent__info">
-                  <span className="market-recent__name">{r.title}</span>
-                  <span className="market-recent__price">{r.price.toLocaleString()}원</span>
+                  <span className="market-recent__name">{String(r.title || "")}</span>
+                  <span className="market-recent__price">{Number(r.price || 0).toLocaleString()}원</span>
                 </div>
               </a>
             ))}
@@ -258,7 +258,7 @@ function MarketCard({ item, isWished, onToggleWish }: { item: MarketItem; isWish
       </div>
       <div className="market-card__body">
         <div className="market-card__title-row">
-          <h3 className="market-card__title">{item.title || "제목 없음"}</h3>
+          <h3 className="market-card__title">{String(item.title || "") || "제목 없음"}</h3>
           <button
             className={`market-card__wish-btn ${isWished ? "market-card__wish-btn--active" : ""}`}
             onClick={(e) => { e.preventDefault(); onToggleWish(); }}
@@ -267,12 +267,12 @@ function MarketCard({ item, isWished, onToggleWish }: { item: MarketItem; isWish
             {isWished ? "\u2764" : "\u2661"}
           </button>
         </div>
-        <p className="market-card__price">{item.price.toLocaleString()}원</p>
+        <p className="market-card__price">{Number(item.price || 0).toLocaleString()}원</p>
         {item.published_platforms.length > 0 && (
           <div className="market-card__platforms">
             {item.published_platforms.map((p) => (
               <span key={p} className="market-card__platform-badge">
-                {platformLabel[p] || p}
+                {platformLabel[String(p)] || String(p)}
               </span>
             ))}
           </div>
@@ -280,7 +280,7 @@ function MarketCard({ item, isWished, onToggleWish }: { item: MarketItem; isWish
         {item.tags.length > 0 && (
           <div className="market-card__tags">
             {item.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="market-card__tag">#{tag}</span>
+              <span key={String(tag)} className="market-card__tag">#{String(tag)}</span>
             ))}
           </div>
         )}
