@@ -74,10 +74,6 @@ export default function App() {
 
   const currentStatus: SessionStatus | null = session?.status ?? null;
   const uiConfig = currentStatus ? getStatusUiConfig(currentStatus) : null;
-
-  if (page === "market") return <MarketPage />;
-  if (page === "market-detail" && marketDetailId) return <MarketDetailPage sessionId={marketDetailId} />;
-  if (page === "my-listings") return <MyListingsPage />;
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {
@@ -260,6 +256,11 @@ export default function App() {
       pushItem({ type: "error", code: action, message: friendlyError(e) });
     }
   };
+
+  // 마켓/대시보드 페이지는 별도 렌더링
+  if (page === "market") return <MarketPage />;
+  if (page === "market-detail" && marketDetailId) return <MarketDetailPage sessionId={marketDetailId} />;
+  if (page === "my-listings") return <MyListingsPage />;
 
   const sidebarSessions = sessions.map((s) => ({
     id: s.id,
