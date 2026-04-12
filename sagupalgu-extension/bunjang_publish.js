@@ -77,61 +77,60 @@
       return;
     }
 
-    // "카테고리 선택" 버튼 또는 영역 찾기
-    const categoryBtnSelectors = [
-      "button:has-text('카테고리')",
-      "[class*='category'] button",
-      "[class*='category']",
-    ];
+    // 번개장터 products/new: 대분류 목록이 이미 노출된 3단 셀렉터
+    // 카테고리 매핑 (AI가 생성한 카테고리 → 번개장터 대분류)
+    const categoryMap = {
+      "스마트폰": "디지털기기",
+      "태블릿": "디지털기기",
+      "노트북": "디지털기기",
+      "가전": "생활가전",
+      "음향기기": "디지털기기",
+      "카메라": "디지털기기",
+      "패션": "남성의류",
+      "문구": "도서/음반/문구",
+      "기타": "기타 중고물품",
+    };
 
-    for (const sel of categoryBtnSelectors) {
-      try {
-        // :has-text는 CSS에서 지원 안 하므로 JS로 찾기
-        const btns = document.querySelectorAll("button");
-        for (const btn of btns) {
-          if (btn.textContent.includes("카테고리")) {
-            btn.click();
-            await sleep(1000);
-            break;
-          }
-        }
-        break;
-      } catch (e) {
-        continue;
-      }
-    }
+    const targetCategory = categoryMap[category] || category;
 
-    // 카테고리 목록에서 매칭되는 항목 클릭
-    await sleep(500);
-    const categoryItems = document.querySelectorAll(
-      "li, [role='option'], [role='menuitem'], [class*='category'] div"
+    // 대분류 목록에서 매칭 항목 클릭
+    const allItems = document.querySelectorAll(
+      "li, a, span, div"
     );
-    for (const item of categoryItems) {
-      if (item.textContent.trim().includes(category)) {
+    for (const item of allItems) {
+      const text = item.textContent.trim();
+      if (text === targetCategory) {
+        item.scrollIntoView({ block: "center" });
         item.click();
-        console.log(`[사구팔구] 카테고리 선택: ${category}`);
-        await sleep(500);
+        console.log(`[사구팔구] 카테고리 대분류 선택: ${targetCategory} (원본: ${category})`);
+        await sleep(1000);
         return;
       }
     }
 
-    console.warn(`[사구팔구] 카테고리 '${category}' 매칭 실패 — 수동 선택 필요`);
+    console.warn(`[사구팔구] 카테고리 '${targetCategory}' 매칭 실패 — 수동 선택 필요`);
   }
 
   // ── 상태 선택 ────────────────────────────────────────────
 
   async function selectCondition() {
-    // "중고" 상태 선택
-    const labels = document.querySelectorAll(
-      "label, button, [role='radio'], [role='button']"
-    );
-    for (const el of labels) {
-      const text = el.textContent.trim();
-      if (text === "사용감 적음" || text === "사용감 없음" || text === "중고") {
-        el.click();
-        console.log("[사구팔구] 상태 선택: 중고");
-        await sleep(300);
-        return;
+    // 상품상태 라디오 버튼 선택 (우선순위: 사용감 없음 > 사용감 적음)
+    const targets = ["사용감 없음", "사용감 적음"];
+    const labels = document.querySelectorAll("label");
+    for (const target of targets) {
+      for (const el of labels) {
+        if (el.textContent.includes(target)) {
+          // label 내부의 radio input 또는 label 자체 클릭
+          const radio = el.querySelector("input[type='radio']");
+          if (radio) {
+            radio.click();
+          } else {
+            el.click();
+          }
+          console.log(`[사구팔구] 상태 선택: ${target}`);
+          await sleep(300);
+          return;
+        }
       }
     }
     console.warn("[사구팔구] 상태 선택 실패 — 수동 선택 필요");
@@ -190,11 +189,14 @@
         await sleep(500);
       }
 
-      // ③ 상품명
+      // ③ 상품명 (검색창이 아닌 폼 내부 입력란)
       steps.push("상품명 입력");
       const titleInput = await waitFor(
-        "input[placeholder*='상품명'], input[placeholder*='상품명을 입력']"
+        "input[placeholder='상품명을 입력해 주세요.']"
       );
+      titleInput.scrollIntoView({ block: "center" });
+      titleInput.focus();
+      await sleep(300);
       fillInput(titleInput, data.title);
       await sleep(1000);
 
