@@ -75,29 +75,7 @@ async def list_market_items(
     }
 
 
-# ── 상세 ────────────────────────────────────────────────
-
-
-@router.get("/{session_id}")
-async def get_market_item(
-    session_id: str,
-    repo: SessionRepository = Depends(get_session_repository),
-) -> dict[str, Any]:
-    """completed 상태 세션의 상품 상세 정보를 반환한다. view_count 증가."""
-    row = repo.get_completed_by_id(session_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
-    # view_count 증가 (fire-and-forget)
-    try:
-        listing_data = dict(row.get("listing_data_jsonb") or {})
-        listing_data["view_count"] = (listing_data.get("view_count") or 0) + 1
-        repo.update(session_id, {"listing_data_jsonb": listing_data})
-    except Exception:
-        pass  # 조회수 증가 실패는 무시
-    return _to_market_detail(row)
-
-
-# ── 구매 문의 ─────────────────────────────────────────
+# ── 구매 문의 ─────────────────────��───────────────────
 
 
 class InquiryRequest(BaseModel):
@@ -414,7 +392,28 @@ async def relist_listing(
     return {"success": True, "new_session": result}
 
 
-# ── 헬퍼 ───────────────────────────────────────────────
+# ── 상세 (/{session_id} — 반드시 고정 경로 라우트 뒤에 배치) ──
+
+
+@router.get("/{session_id}")
+async def get_market_item(
+    session_id: str,
+    repo: SessionRepository = Depends(get_session_repository),
+) -> dict[str, Any]:
+    """completed 상태 세션의 상품 상세 정보를 반환한다. view_count 증가."""
+    row = repo.get_completed_by_id(session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 ���습니다.")
+    try:
+        listing_data = dict(row.get("listing_data_jsonb") or {})
+        listing_data["view_count"] = (listing_data.get("view_count") or 0) + 1
+        repo.update(session_id, {"listing_data_jsonb": listing_data})
+    except Exception:
+        pass
+    return _to_market_detail(row)
+
+
+# ── 헬퍼 ───────���───────────────────────────────────────
 
 
 def _compute_copilot_suggestions(session: dict, inquiry_count: int) -> list[dict[str, str]]:
