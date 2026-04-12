@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Component } from "react";
+import type { ReactNode, ErrorInfo } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -10,6 +11,24 @@ import { useSession } from "./hooks/useSession";
 import { api } from "./lib/api";
 import { getStatusUiConfig, statusLabel } from "./lib/sessionStatusUiMap";
 import type { ConfirmedProduct, TimelineItem, TimelineItemInput, SessionStatus } from "./types";
+
+class DebugErrorBoundary extends Component<{ name: string; children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[ErrorBoundary:${this.props.name}]`, error.message, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return <div style={{ color: "red", padding: 20, whiteSpace: "pre-wrap" }}>
+        <h2>React Error in {this.props.name}</h2>
+        <p>{this.state.error.message}</p>
+        <p>Check browser console (F12) for componentStack</p>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
 
 interface SidebarSession {
   id: string;
@@ -75,9 +94,9 @@ export default function App() {
   const currentStatus: SessionStatus | null = session?.status ?? null;
   const uiConfig = currentStatus ? getStatusUiConfig(currentStatus) : null;
 
-  if (page === "market") return <MarketPage />;
-  if (page === "market-detail" && marketDetailId) return <MarketDetailPage sessionId={marketDetailId} />;
-  if (page === "my-listings") return <MyListingsPage />;
+  if (page === "market") return <DebugErrorBoundary name="MarketPage"><MarketPage /></DebugErrorBoundary>;
+  if (page === "market-detail" && marketDetailId) return <DebugErrorBoundary name="MarketDetailPage"><MarketDetailPage sessionId={marketDetailId} /></DebugErrorBoundary>;
+  if (page === "my-listings") return <DebugErrorBoundary name="MyListingsPage"><MyListingsPage /></DebugErrorBoundary>;
   const composerMode = uiConfig?.composerMode ?? "disabled";
 
   const pushItem = useCallback((item: TimelineItemInput) => {
