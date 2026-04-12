@@ -219,7 +219,7 @@ class SessionRepository:
         response = (
             get_supabase()
             .table(self.table_name)
-            .select("id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at")
+            .select("id, user_id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at")
             .eq("id", session_id)
             .eq("status", "completed")
             .limit(1)

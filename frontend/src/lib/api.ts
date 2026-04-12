@@ -141,4 +141,9 @@ export const api = {
     client.post<{ suggested_reply: string; inquiry_type: string; goal: string; source: string }>(
       `/market/my-listings/${sessionId}/inquiries/${inquiryId}/suggest-reply`
     ).then((r) => r.data),
+
+  getSellerProfile: (userId: string) =>
+    client.get<{ user_id: string; nickname: string; total_listings: number; sold_count: number }>(
+      `/market/sellers/${userId}/profile`
+    ).then((r) => r.data),
 };

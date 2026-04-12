@@ -18,6 +18,9 @@ export function MarketDetailPage({ sessionId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 판매자 프로필
+  const [seller, setSeller] = useState<{ nickname: string; total_listings: number; sold_count: number } | null>(null);
+
   // 문의 폼 상태
   const [showInquiry, setShowInquiry] = useState(false);
   const [inquiryName, setInquiryName] = useState("");
@@ -31,7 +34,14 @@ export function MarketDetailPage({ sessionId }: Props) {
     setError(null);
     api
       .getMarketItem(sessionId)
-      .then((data) => setItem(data))
+      .then((data) => {
+        setItem(data);
+        // 판매자 프로필 로드
+        const sellerId = (data as any).seller_id;
+        if (sellerId) {
+          api.getSellerProfile(sellerId).then(setSeller).catch(() => {});
+        }
+      })
       .catch(() => setError("상품을 찾을 수 없습니다."))
       .finally(() => setLoading(false));
   }, [sessionId]);
@@ -83,6 +93,16 @@ export function MarketDetailPage({ sessionId }: Props) {
         {item.sale_status === "reserved" && <span className="detail-status-badge detail-status-badge--reserved">예약중</span>}
       </div>
       <p className="detail-price">{item.price.toLocaleString()}원</p>
+
+      {/* 판매자 프로필 */}
+      {seller && (
+        <div className="detail-seller">
+          <span className="detail-seller__nickname">{seller.nickname}</span>
+          <span className="detail-seller__stats">
+            등록 {seller.total_listings}개 | 판매완료 {seller.sold_count}개
+          </span>
+        </div>
+      )}
 
       {/* 태그 */}
       {item.tags.length > 0 && (

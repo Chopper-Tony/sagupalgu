@@ -43,6 +43,27 @@
   padding: 1rem 0;
 }
 
+/* 판매자 프로필 */
+.detail-seller {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  margin-bottom: 1rem;
+}
+.detail-seller__nickname {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.detail-seller__stats {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* 이미지 갤러리 */
 .detail-gallery {
   display: flex;
