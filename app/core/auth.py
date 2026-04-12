@@ -87,15 +87,20 @@ async def get_current_user(request: Request) -> AuthenticatedUser:
             raise HTTPException(status_code=401, detail="토큰에 사용자 정보가 없습니다")
         return AuthenticatedUser(user_id=user_id)
 
-    # 2. Dev bypass (local/dev 환경만)
+    # 2. Dev bypass 안전장치: prod에서 X-Dev-User-Id 절대 차단
+    dev_user_header = request.headers.get("x-dev-user-id")
+    if settings.environment == "prod" and dev_user_header:
+        logger.warning("prod_dev_bypass_blocked: header=%s", dev_user_header)
+        raise HTTPException(status_code=403, detail="Dev bypass는 프로덕션에서 사용할 수 없습니다")
+
+    # 3. Dev bypass (local/dev 환경만)
     if settings.environment in ("local", "dev"):
-        dev_user = request.headers.get("x-dev-user-id")
-        if dev_user:
-            return AuthenticatedUser(user_id=dev_user)
+        if dev_user_header:
+            return AuthenticatedUser(user_id=dev_user_header)
         # local/dev에서 헤더 없으면 기본 사용자
         return AuthenticatedUser(user_id="dev-user")
 
-    # 3. prod 환경에서 인증 없으면 401
+    # 4. prod 환경에서 인증 없으면 401
     raise HTTPException(status_code=401, detail="인증이 필요합니다")
 
 

@@ -3,6 +3,19 @@ from uuid import uuid4
 from app.db.client import get_supabase
 from app.db.models import SellSession
 
+SALE_STATUS_TRANSITIONS = {
+    "available": ["reserved", "sold"],
+    "reserved": ["sold", "available"],
+    "sold": [],  # 판매 완료는 되돌릴 수 없음
+}
+
+
+def _get_sale_status(session: dict) -> str:
+    """세션에서 마켓 판매 상태를 추출한다. 기본값 available."""
+    listing_data = session.get("listing_data_jsonb") or {}
+    return listing_data.get("sale_status", "available")
+
+
 class SessionRepository:
     table_name = "sell_sessions"
 
@@ -144,6 +157,60 @@ class SessionRepository:
         total = len(filtered)
         page = filtered[offset : offset + limit]
         return page, total
+
+    def list_by_user(self, user_id: str, sale_status_filter: str | None = None) -> list[dict]:
+        """특정 사용자의 completed 세션 목록 (판매자 대시보드용)."""
+        from app.db.client import get_supabase
+
+        cols = "id, product_data_jsonb, listing_data_jsonb, workflow_meta_jsonb, created_at"
+        query = (
+            get_supabase()
+            .table(self.table_name)
+            .select(cols)
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .order("created_at", desc=True)
+        )
+        items = (query.execute()).data or []
+
+        if sale_status_filter:
+            items = [
+                row for row in items
+                if _get_sale_status(row) == sale_status_filter
+            ]
+        return items
+
+    def update_sale_status(
+        self, session_id: str, user_id: str, new_status: str, allowed_from: list[str],
+    ) -> dict | None:
+        """마켓 판매 상태를 원자적으로 변경. race condition 방어 포함."""
+        from app.db.client import get_supabase
+
+        # 현재 세션 + 소유권 확인
+        session = self.get_by_id_and_user(session_id, user_id)
+        if not session:
+            return None
+
+        current_status = _get_sale_status(session)
+        if current_status not in allowed_from:
+            return "INVALID_TRANSITION"
+
+        listing_data = dict(session.get("listing_data_jsonb") or {})
+        listing_data["sale_status"] = new_status
+
+        payload = {
+            "listing_data_jsonb": listing_data,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        response = (
+            get_supabase()
+            .table(self.table_name)
+            .update(payload)
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return response.data[0] if response.data else None
 
     def get_completed_by_id(self, session_id: str) -> dict | None:
         """completed 상태 세션 단건 조회 (마켓 상세용)."""

@@ -8,6 +8,14 @@ const client = axios.create({
   timeout: 120000,
 });
 
+// Dev 환경 자동 인증 (X-Dev-User-Id 헤더 주입)
+client.interceptors.request.use((config) => {
+  if (import.meta.env.DEV) {
+    config.headers["X-Dev-User-Id"] = "seller-1";
+  }
+  return config;
+});
+
 export const api = {
   /** SSE 스트림 URL을 반환한다. EventSource에서 사용. */
   getSessionStreamUrl: (id: string) => `${BASE_URL}/sessions/${id}/stream`,
@@ -99,7 +107,28 @@ export const api = {
     ).then((r) => r.data),
 
   submitInquiry: (sessionId: string, body: import("../types/market").InquiryRequest) =>
-    client.post<{ success: boolean; discord_sent: boolean }>(
+    client.post<{ success: boolean; inquiry_id: string; discord_sent: boolean }>(
       `/market/${sessionId}/inquiry`, body
+    ).then((r) => r.data),
+
+  // 판매자 전용 (인증 필요)
+  getMyListings: (saleStatusFilter?: string) =>
+    client.get<{ items: import("../types/market").MyListingItem[]; total: number }>(
+      "/market/my-listings", { params: saleStatusFilter ? { sale_status_filter: saleStatusFilter } : {} }
+    ).then((r) => r.data),
+
+  updateSaleStatusMarket: (sessionId: string, saleStatus: string) =>
+    client.patch<{ success: boolean; sale_status: string }>(
+      `/market/my-listings/${sessionId}/status`, { sale_status: saleStatus }
+    ).then((r) => r.data),
+
+  getInquiries: (sessionId: string) =>
+    client.get<{ listing: Record<string, unknown>; inquiries: import("../types/market").InquiryItem[]; total: number }>(
+      `/market/my-listings/${sessionId}/inquiries`
+    ).then((r) => r.data),
+
+  replyToInquiry: (sessionId: string, inquiryId: string, reply: string) =>
+    client.post<{ success: boolean; inquiry: import("../types/market").InquiryItem }>(
+      `/market/my-listings/${sessionId}/inquiries/${inquiryId}/reply`, { reply }
     ).then((r) => r.data),
 };
