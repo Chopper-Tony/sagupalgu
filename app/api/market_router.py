@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -35,9 +36,10 @@ async def list_market_items(
     max_price: int | None = Query(default=None, ge=0, description="최대 가격"),
     sale_status: str | None = Query(default=None, description="판매 상태 필터 (available/reserved/sold)"),
     category: str | None = Query(default=None, description="카테고리 필터"),
+    sort: str | None = Query(default=None, description="정렬 (price_asc/price_desc/latest)"),
     repo: SessionRepository = Depends(get_session_repository),
 ) -> dict[str, Any]:
-    """completed 상태 세션의 상품 목록을 반환한다. 검색/가격/판매상태/카테고리 필터 지원."""
+    """completed 상태 세션의 상품 목록을 반환한다. 검색/가격/판매상태/카테고리/정렬 지원."""
     has_filter = q is not None or min_price is not None or max_price is not None
 
     if has_filter:
@@ -57,6 +59,13 @@ async def list_market_items(
     if category:
         items = [row for row in items if _get_category(row) == category]
         total = len(items)
+
+    # 정렬
+    if sort == "price_asc":
+        items.sort(key=lambda r: _get_price(r))
+    elif sort == "price_desc":
+        items.sort(key=lambda r: _get_price(r), reverse=True)
+    # latest는 기본 (created_at desc — DB에서 이미 정렬됨)
 
     return {
         "items": [_to_market_item(row) for row in items],
@@ -152,7 +161,7 @@ async def list_my_listings(
     repo: SessionRepository = Depends(get_session_repository),
     inquiry_repo: InquiryRepository = Depends(get_inquiry_repository),
 ) -> dict[str, Any]:
-    """내 상품 목록 (판매자 대시보드용). 인증 필요. inquiry_count 포함."""
+    """내 상품 목록 (판매자 대시보드용). inquiry_count + copilot_suggestions + publish_results 포함."""
     items = repo.list_by_user(user.user_id, sale_status_filter=sale_status_filter)
     result = []
     for row in items:
@@ -160,6 +169,8 @@ async def list_my_listings(
         sid = row.get("id", "")
         item["inquiry_count"] = inquiry_repo.count_by_listing(sid)
         item["unread_inquiry_count"] = inquiry_repo.count_unread(sid)
+        item["copilot_suggestions"] = _compute_copilot_suggestions(row, item["inquiry_count"])
+        item["publish_results"] = _extract_publish_results(row)
         result.append(item)
     return {
         "items": result,
@@ -380,6 +391,84 @@ async def relist_listing(
 
 
 # ── 헬퍼 ───────────────────────────────────────────────
+
+
+def _compute_copilot_suggestions(session: dict, inquiry_count: int) -> list[dict[str, str]]:
+    """등록 경과일 + 문의 수 기반 가격/제목/재등록 제안을 계산한다."""
+    suggestions: list[dict[str, str]] = []
+    sale_status = _get_sale_status(session)
+    if sale_status != "available":
+        return suggestions
+
+    created_at = session.get("created_at")
+    if not created_at:
+        return suggestions
+
+    try:
+        if isinstance(created_at, str):
+            created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        else:
+            created = created_at
+        days_listed = (datetime.now(timezone.utc) - created).days
+    except (ValueError, TypeError):
+        return suggestions
+
+    listing_data = session.get("listing_data_jsonb") or {}
+    canonical = listing_data.get("canonical_listing") or {}
+    price = canonical.get("price", 0)
+
+    if days_listed >= 3 and inquiry_count == 0:
+        suggested_price = int(price * 0.95) if price > 0 else 0
+        suggestions.append({
+            "type": "price",
+            "message": f"등록 {days_listed}일 경과, 문의 0건. 가격을 {suggested_price:,}원으로 낮추면 문의 확률이 올라가요.",
+            "urgency": "low" if days_listed < 7 else "medium",
+        })
+
+    if days_listed >= 7 and inquiry_count == 0:
+        suggestions.append({
+            "type": "title",
+            "message": "제목에 [급처] 또는 [가격인하] 키워드를 추가해보세요.",
+            "urgency": "medium",
+        })
+
+    if days_listed >= 14:
+        suggestions.append({
+            "type": "relist",
+            "message": "재등록하면 새 글로 상위 노출돼요. 재등록을 추천합니다.",
+            "urgency": "high",
+        })
+
+    return suggestions
+
+
+def _extract_publish_results(session: dict) -> list[dict[str, Any]]:
+    """세션의 외부 플랫폼 게시 결과를 추출한다."""
+    workflow_meta = session.get("workflow_meta_jsonb") or {}
+    publish_results = workflow_meta.get("publish_results") or {}
+    results = []
+    platform_label = {"bunjang": "번개장터", "joongna": "중고나라", "daangn": "당근마켓"}
+    for platform, detail in publish_results.items():
+        if not isinstance(detail, dict):
+            continue
+        results.append({
+            "platform": platform,
+            "platform_name": platform_label.get(platform, platform),
+            "success": detail.get("success", False),
+            "external_url": detail.get("external_url") or detail.get("listing_url") or "",
+        })
+    return results
+
+
+def _get_price(session: dict) -> int:
+    """세션에서 가격을 추출한다."""
+    listing_data = session.get("listing_data_jsonb") or {}
+    canonical = listing_data.get("canonical_listing") or {}
+    price = canonical.get("price", 0)
+    try:
+        return int(price)
+    except (ValueError, TypeError):
+        return 0
 
 
 def _get_category(session: dict) -> str:

@@ -176,6 +176,24 @@
   border-color: var(--text-muted);
 }
 
+/* 정렬 */
+.market-sort {
+  margin-bottom: 1rem;
+}
+.market-sort-select {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.market-sort-select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 /* SOLD / 예약중 오버레이 */
 .market-card__image-wrapper {
   position: relative;
