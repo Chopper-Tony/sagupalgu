@@ -4,7 +4,7 @@
  * background.js에서 FILL_BUNJANG_FORM 메시지를 받으면
  * 상품명/가격/설명/카테고리/이미지를 순서대로 입력하고 결과를 반환한다.
  *
- * 실행 조건: m.bunjang.co.kr/sell/edit* 페이지에서만 동작.
+ * 실행 조건: m.bunjang.co.kr/products/new* 페이지에서만 동작.
  * 셀렉터 출처: legacy_spikes/secondhand_publisher/publishers/bunjang.py
  */
 
@@ -127,7 +127,7 @@
     );
     for (const el of labels) {
       const text = el.textContent.trim();
-      if (text === "중고" || text === "사용감 있음") {
+      if (text === "사용감 적음" || text === "사용감 없음" || text === "중고") {
         el.click();
         console.log("[사구팔구] 상태 선택: 중고");
         await sleep(300);
@@ -281,7 +281,7 @@
       // 성공 검증: /products/숫자 패턴
       const match = currentUrl.match(/\/products\/(\d+)/);
 
-      if (currentUrl.includes("sell/edit")) {
+      if (currentUrl.includes("products/new")) {
         throw new Error("등록 후에도 글쓰기 페이지에 머뭄 — 필수 항목 누락 가능");
       }
 
