@@ -7,6 +7,7 @@ export function MarketPage() {
   const [items, setItems] = useState<MarketItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
 
   // 검색/필터 상태
   const [query, setQuery] = useState("");
@@ -72,11 +73,31 @@ export function MarketPage() {
 
   const hasActiveFilter = query.trim() || minPrice || maxPrice;
 
+  const displayItems = showAvailableOnly
+    ? items.filter((item) => (item.sale_status || "available") === "available")
+    : items;
+  const displayTotal = showAvailableOnly ? displayItems.length : total;
+
   return (
     <div className="market-page">
       <div className="market-header">
         <h1 className="market-title">사구팔구 마켓</h1>
-        <a href="#/" className="market-back-link">셀러 코파일럿</a>
+        <div className="market-header__actions">
+          <a href="#/my-listings" className="market-my-listings-link">내 상품 관리</a>
+          <a href="#/" className="market-back-link">셀러 코파일럿</a>
+        </div>
+      </div>
+
+      {/* 판매중만 보기 토글 */}
+      <div className="market-status-toggle">
+        <label className="market-toggle-label">
+          <input
+            type="checkbox"
+            checked={showAvailableOnly}
+            onChange={(e) => setShowAvailableOnly(e.target.checked)}
+          />
+          판매중만 보기
+        </label>
       </div>
 
       {/* 검색 + 필터 */}
@@ -116,22 +137,22 @@ export function MarketPage() {
 
       {hasActiveFilter && (
         <div className="market-filter-status">
-          <span>검색 결과: {total}개</span>
+          <span>검색 결과: {displayTotal}개</span>
           <button className="market-clear-btn" onClick={handleClearFilters}>필터 초기화</button>
         </div>
       )}
 
-      {!hasActiveFilter && <p className="market-subtitle">{total}개 상품</p>}
+      {!hasActiveFilter && <p className="market-subtitle">{displayTotal}개 상품</p>}
 
       {loading ? (
         <div className="market-loading">불러오는 중...</div>
-      ) : items.length === 0 ? (
+      ) : displayItems.length === 0 ? (
         <div className="market-empty-inline">
           <p>{hasActiveFilter ? "검색 결과가 없습니다." : "등록된 상품이 없습니다."}</p>
         </div>
       ) : (
         <div className="market-grid">
-          {items.map((item) => (
+          {displayItems.map((item) => (
             <MarketCard key={item.session_id} item={item} />
           ))}
         </div>
@@ -142,6 +163,7 @@ export function MarketPage() {
 
 function MarketCard({ item }: { item: MarketItem }) {
   const thumbnail = item.image_urls[0] || null;
+  const saleStatus = item.sale_status || "available";
   const platformLabel: Record<string, string> = {
     bunjang: "번개장터",
     joongna: "중고나라",
@@ -149,12 +171,20 @@ function MarketCard({ item }: { item: MarketItem }) {
   };
 
   return (
-    <a href={`#/market/${item.session_id}`} className="market-card" style={{ textDecoration: "none" }}>
-      {thumbnail ? (
-        <img className="market-card__image" src={thumbnail} alt={item.title} />
-      ) : (
-        <div className="market-card__no-image">이미지 없음</div>
-      )}
+    <a href={`#/market/${item.session_id}`} className={`market-card ${saleStatus !== "available" ? "market-card--inactive" : ""}`} style={{ textDecoration: "none" }}>
+      <div className="market-card__image-wrapper">
+        {thumbnail ? (
+          <img className="market-card__image" src={thumbnail} alt={item.title} />
+        ) : (
+          <div className="market-card__no-image">이미지 없음</div>
+        )}
+        {saleStatus === "sold" && (
+          <div className="market-card__sold-overlay">판매완료</div>
+        )}
+        {saleStatus === "reserved" && (
+          <div className="market-card__reserved-overlay">예약중</div>
+        )}
+      </div>
       <div className="market-card__body">
         <h3 className="market-card__title">{item.title || "제목 없음"}</h3>
         <p className="market-card__price">{item.price.toLocaleString()}원</p>

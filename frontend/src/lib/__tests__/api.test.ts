@@ -10,6 +10,11 @@ vi.mock("axios", () => {
   const mockClient = {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
   };
   return {
     default: {

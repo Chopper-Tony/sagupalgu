@@ -119,6 +119,68 @@
   font-size: 0.95rem;
 }
 
+/* 판매중만 보기 토글 */
+.market-status-toggle {
+  margin-bottom: 1rem;
+}
+.market-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.market-toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+.market-header__actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.market-my-listings-link {
+  color: var(--accent);
+  font-size: 0.875rem;
+  text-decoration: none;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg, 12px);
+}
+.market-my-listings-link:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+/* SOLD / 예약중 오버레이 */
+.market-card__image-wrapper {
+  position: relative;
+}
+.market-card--inactive {
+  opacity: 0.7;
+}
+.market-card__sold-overlay,
+.market-card__reserved-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.market-card__sold-overlay {
+  background: rgba(0, 0, 0, 0.6);
+  color: #ef4444;
+}
+.market-card__reserved-overlay {
+  background: rgba(0, 0, 0, 0.45);
+  color: #f59e0b;
+}
+
 /* 그리드 */
 .market-grid {
   display: grid;

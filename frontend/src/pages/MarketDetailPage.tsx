@@ -76,8 +76,12 @@ export function MarketDetailPage({ sessionId }: Props) {
         </div>
       )}
 
-      {/* 제목 + 가격 */}
-      <h1 className="detail-title">{item.title || "제목 없음"}</h1>
+      {/* 제목 + 가격 + 판매 상태 */}
+      <div className="detail-title-row">
+        <h1 className="detail-title">{item.title || "제목 없음"}</h1>
+        {item.sale_status === "sold" && <span className="detail-status-badge detail-status-badge--sold">판매완료</span>}
+        {item.sale_status === "reserved" && <span className="detail-status-badge detail-status-badge--reserved">예약중</span>}
+      </div>
       <p className="detail-price">{item.price.toLocaleString()}원</p>
 
       {/* 태그 */}
@@ -117,9 +121,15 @@ export function MarketDetailPage({ sessionId }: Props) {
         </div>
       )}
 
-      {/* 구매 문의 */}
+      {/* 구매 문의 — 판매완료/예약중이면 비활성화 */}
       <div className="detail-inquiry-section">
-        {!showInquiry && !inquiryDone && (
+        {item.sale_status === "sold" && (
+          <p className="detail-inquiry-unavailable">이미 판매가 완료된 상품입니다.</p>
+        )}
+        {item.sale_status === "reserved" && (
+          <p className="detail-inquiry-unavailable">현재 예약 중인 상품입니다.</p>
+        )}
+        {(!item.sale_status || item.sale_status === "available") && !showInquiry && !inquiryDone && (
           <button className="detail-inquiry-btn" onClick={() => setShowInquiry(true)}>
             판매자에게 문의
           </button>

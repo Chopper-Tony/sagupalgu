@@ -10,6 +10,7 @@ from functools import lru_cache
 
 from fastapi import Depends
 
+from app.repositories.inquiry_repository import InquiryRepository
 from app.repositories.session_repository import SessionRepository
 from app.services.optimization_service import OptimizationService
 from app.services.product_service import ProductService
@@ -19,6 +20,11 @@ from app.services.recovery_service import RecoveryService
 from app.services.sale_tracker import SaleTracker
 from app.services.seller_copilot_service import SellerCopilotService
 from app.services.session_service import SessionService
+
+
+@lru_cache(maxsize=1)
+def get_inquiry_repository() -> InquiryRepository:
+    return InquiryRepository()
 
 
 @lru_cache(maxsize=1)
