@@ -29,7 +29,7 @@ cd frontend && npm install && npm run dev
 
 # 테스트
 pip install -r requirements-dev.txt
-python -m pytest tests/ -m unit     # unit (~525개, 5초)
+python -m pytest tests/ -m unit     # unit (~581개, 10초)
 cd frontend && npm test             # FE 21개 (vitest)
 
 # Docker
