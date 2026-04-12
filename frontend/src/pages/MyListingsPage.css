@@ -186,6 +186,54 @@
 .my-listings__action-btn--sold:hover {
   background: rgba(34, 197, 94, 0.1);
 }
+/* 코파일럿 제안 */
+.my-listings__suggestions {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.my-listings__suggestion {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  background: var(--bg-tertiary, #1e293b);
+  color: var(--text-secondary);
+}
+.my-listings__suggestion--medium {
+  border-left: 3px solid #f59e0b;
+}
+.my-listings__suggestion--high {
+  border-left: 3px solid #ef4444;
+}
+
+/* 게시 플랫폼 상태 */
+.my-listings__publish-status {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.my-listings__publish-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.my-listings__publish-badge--ok {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.my-listings__publish-badge--ok a {
+  color: inherit;
+  text-decoration: underline;
+}
+.my-listings__publish-badge--fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
 .my-listings__action-btn--relist {
   border-color: var(--accent);
   color: var(--accent);

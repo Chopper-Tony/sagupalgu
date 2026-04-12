@@ -9,6 +9,7 @@ export function MarketPage() {
   const [loading, setLoading] = useState(true);
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("latest");
 
   // 검색/필터 상태
   const [query, setQuery] = useState("");
@@ -81,6 +82,11 @@ export function MarketPage() {
   if (selectedCategory !== "all") {
     displayItems = displayItems.filter((item) => (item.category || "") === selectedCategory);
   }
+  if (sortBy === "price_asc") {
+    displayItems = [...displayItems].sort((a, b) => a.price - b.price);
+  } else if (sortBy === "price_desc") {
+    displayItems = [...displayItems].sort((a, b) => b.price - a.price);
+  }
   const displayTotal = displayItems.length;
 
   return (
@@ -116,6 +122,15 @@ export function MarketPage() {
             {cat === "all" ? "전체" : cat}
           </button>
         ))}
+      </div>
+
+      {/* 정렬 */}
+      <div className="market-sort">
+        <select className="market-sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <option value="latest">최신순</option>
+          <option value="price_asc">가격 낮은순</option>
+          <option value="price_desc">가격 높은순</option>
+        </select>
       </div>
 
       {/* 검색 + 필터 */}

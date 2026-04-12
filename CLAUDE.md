@@ -2,147 +2,101 @@
 
 ## 프로젝트 개요
 
-중고거래(번개장터, 중고나라) 자동 게시 플랫폼.
+중고거래(번개장터, 중고나라) 자동 게시 + 자체 마켓 플랫폼.
 이미지 → AI 분석 → 가격 산정 → 카피라이팅 → 게시 → 복구의 파이프라인을
 LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
 
-> 당근마켓은 Android 에뮬레이터 기반, 현재 실험적 지원.
+게시는 크롬 익스텐션 Content Script 방식 (서버 Playwright → 계정 정지로 전환).
+자체 마켓(`#/market`, `#/my-listings`)에서 판매 상태 관리 + 문의 응답 + 셀러 코파일럿 제공.
 
 ## 기술 스택
 
 - **백엔드**: FastAPI + Pydantic v2
-- **워크플로우**: LangGraph 1.1.3 (`app/graph/`)
-- **에이전틱**: `langchain.agents.create_agent` + bind_tools
-- **Vision AI**: OpenAI gpt-4.1-mini (기본) / Gemini 2.5 Flash (설정 전환)
+- **워크플로우**: LangGraph (`app/graph/`), `langchain.agents.create_agent` + bind_tools
+- **Vision AI**: OpenAI gpt-4.1-mini (기본) / Gemini 2.5 Flash
 - **Listing LLM**: OpenAI gpt-4.1-mini → Gemini → Solar (fallback 체인)
 - **DB**: Supabase (PostgreSQL + pgvector)
-- **크롤러/게시**: Playwright (웹 자동화)
+- **게시**: 크롬 익스텐션 Content Script (CDP 이미지 업로드)
 - **프론트엔드**: React 18 + TypeScript + Vite
-- **배포**: Docker Compose + Caddy HTTPS + GitHub Actions CI/CD
-- **보조 스토리지**: S3 (게시 증적 스크린샷 아카이빙)
+- **배포**: Docker Compose (4 컨테이너) + Caddy HTTPS + GitHub Actions CI/CD
 
 ## 주요 명령어
 
 ```bash
-# 의존성 설치
-pip install -r requirements.txt
-pip install langchain-google-genai langchain-openai
-python -m playwright install chromium
-
-# FastAPI 서버
+pip install -r requirements.txt && python -m playwright install chromium
 uvicorn app.main:app --reload
-
-# 프론트엔드 (별도 터미널)
 cd frontend && npm install && npm run dev
 
-# Docker 풀스택
-docker compose up --build
-
-# 백엔드 테스트 (688개)
+# 테스트
 pip install -r requirements-dev.txt
-python -m pytest tests/           # 전체
-python -m pytest tests/ -m unit   # unit만 (0.5초)
+python -m pytest tests/ -m unit     # unit (~525개, 5초)
+cd frontend && npm test             # FE 21개 (vitest)
 
-# 프론트엔드 테스트 (21개)
-cd frontend && npm test
+# Docker
+docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build  # prod
 ```
 
 ## 레이어 구조
 
 - `app/domain/` — 상태 머신(SessionStatus SSOT), 스키마, 예외, Goal 전략, 게시 정책
-- `app/graph/` — LangGraph StateGraph, 노드, 라우팅 (lazy import)
-  - `nodes/` — 7개 에이전트 노드 모듈
+- `app/graph/nodes/` — 7개 에이전트 노드 (lazy import)
 - `app/tools/` — 10개 툴 (`agentic_tools.py` 단일 facade)
-- `app/services/` — 비즈니스 로직 (세션, 리스팅, 게시, 복구, 최적화)
-- `app/publishers/` — 플랫폼별 게시 adapter (Playwright)
-- `app/vision/` — Vision AI provider (OpenAI, Gemini)
-- `app/db/` — Supabase 클라이언트 + pgvector
-- `app/core/` — 설정, 로깅, 유틸리티
-- `app/api/` — FastAPI 라우터
+- `app/services/` — 세션, 리스팅, 게시, 복구, 최적화, 셀러 코파일럿, 판매 추적
+- `app/publishers/` — 플랫폼별 게시 adapter
+- `app/api/` — `session_router.py` (세션), `market_router.py` (마켓 + 판매자 대시보드)
+- `app/repositories/` — `session_repository.py`, `inquiry_repository.py`
 - `app/dependencies.py` — DI 체인 (lru_cache 싱글턴)
-- `frontend/` — React SPA (13개 상태 카드, SSE 실시간)
+- `frontend/src/pages/` — MarketPage, MarketDetailPage, MyListingsPage
+- `sagupalgu-extension/` — 크롬 익스텐션 (Manifest V3, Content Script)
 - `legacy_spikes/` — **읽기 전용**, 직접 수정 금지
-- `tests/` — 723개 (unit ~380 + integration ~180 + E2E 3 + sync 5 + infra 6)
-- `frontend/src/lib/__tests__/` — 프론트엔드 21개 (vitest + @testing-library/react)
 
 ## 핵심 코딩 규칙
 
-상세 규칙: @.claude/rules/coding-rules.md
+상세: @.claude/rules/coding-rules.md
 
 - **상태 머신**: `session_status.py` SSOT, `expected_status` 원자적 전이
 - **툴 import**: `app.tools.agentic_tools` 단일 facade만 사용
-- **예외**: `app/domain/exceptions.py`에 정의, `main.py` 글로벌 핸들러 단일
+- **예외**: `app/domain/exceptions.py`에 정의, `main.py` 글로벌 핸들러 단일 (`_DOMAIN_STATUS_MAP`)
 - **DI**: `app/dependencies.py` Depends()로만 주입, 라우터에서 직접 생성 금지
 - **lazy import**: supabase·langgraph·langchain은 함수 내부에서만 import
-- **Settings**: `config.py`의 `settings`는 `_SettingsProxy` lazy 프록시 — import 시점 초기화 없음
+- **Settings**: `config.py`의 `settings`는 `_SettingsProxy` lazy 프록시
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
-- **Agent trace**: tool_calls·critic_score 등 그래프→서비스→DB→UI 보존 필수
-- **인증**: `app/core/auth.py` JWT 검증 + 전 엔드포인트(SSE 포함) 소유권 검증, DB 레벨 user_id 필터
-- **Rate limit**: `app/middleware/rate_limit.py` in-memory sliding window, 경로 그룹별 bucket
-- **Rewrite 정책**: rewrite_instruction 있으면 template 신규 생성 금지, 기존 listing 유지
-- **게시 동시성**: `MAX_CONCURRENT_BROWSERS=2` 세마포어로 Playwright 동시 실행 제한
+- **인증**: `app/core/auth.py` JWT, dev 환경 `X-Dev-User-Id` bypass, prod에서는 차단 (403)
+- **게시 동시성**: `MAX_CONCURRENT_BROWSERS=2` 세마포어
 
-## 아키텍처 상세
+## 아키텍처
 
 상세: @.claude/rules/architecture.md
 
-**Production Path**: SessionService/SellerCopilotService 하이브리드 오케스트레이션.
-서비스가 상품 식별·시세 분석 선처리, LangGraph는 가격 전략→카피→비평→검증→패키징 담당.
-게시·복구는 PublishOrchestrator, 판매 후 최적화는 SaleTracker가 담당.
+- **Production Path**: SessionService + SellerCopilotService 하이브리드 오케스트레이션
+- **게시**: PublishOrchestrator → 크롬 익스텐션 Content Script (서버 Playwright 아님)
+- **판매 추적**: SaleTracker → OptimizationService
+- **마켓**: market_router.py — 공개 목록/상세/검색 + 판매자 대시보드/문의 관리/재등록/코파일럿
 
 ## 프론트엔드
 
 상세: @.claude/rules/frontend.md
 
-- ChatGPT 스타일 대화형 UI, 다크 테마
-- 13개 상태별 카드 컴포넌트
+- ChatGPT 스타일 대화형 UI, 다크 테마, 13개 상태별 카드
 - SSE 실시간 + 폴링 fallback
-- 웹 UI 플랫폼 로그인 (Playwright 브라우저 → 쿠키 저장)
+- 해시 라우팅: `#/` (셀러 코파일럿), `#/market` (마켓), `#/market/{id}` (상세), `#/my-listings` (대시보드)
+- `api.ts`: dev 환경 `X-Dev-User-Id` 자동 주입 interceptor
 
-## 현재 미완성 항목
+## 마켓 + 셀러 코파일럿
+
+- **판매 상태**: available / reserved / sold — 전이 규칙 + race condition 방어 (`WHERE sale_status IN ...`)
+- **문의**: `inquiries` 테이블 (`004_inquiries.sql`) — DB 저장 + Discord 알림 병행
+  - 응답 시 자동 상태 전이: status→replied, is_read→true, last_reply_at→now
+  - inquiry 조회 시 listing 컨텍스트 포함 (title, price, thumbnail)
+- **재등록**: `POST /my-listings/{id}/relist` — 기존 세션 복제, sale_status 초기화, relisted_from 기록
+- **문의 코파일럿**: `POST .../suggest-reply` — LLM 응답 초안 + goal별 fallback 템플릿 3종
+- **카테고리 필터**: `confirmed_product.category` 기반
+
+## 미완성 항목
 
 - pgvector 활성화: `migrations/001_pgvector_setup.sql` 실행 후 `python scripts/setup_pgvector.py --seed`
-- 당근마켓 게시 본격 구현 (Android 에뮬레이터)
+- 당근마켓 게시 (Android 에뮬레이터 필요, 보류)
 - Supabase Storage Public 버킷 생성 (코드는 완료)
-
-## 최근 변경 (이번 세션)
-
-- **M143**: 마켓 고도화 — 상품 상세 페이지(#/market/{id}, 이미지 갤러리+플랫폼 게시 링크), 검색+필터(키워드 ILIKE+가격 범위, 디바운스 300ms), 구매 문의(Discord 웹훅 전송), MarketDetailPage 신규, search_completed() 메서드
-- **M136**: 프론트 UX 개선 — ErrorCard 오류 코드 접기, ProductConfirmationCard 필드 검증+후보 없음 메시지, DraftCard 게시 준비 로딩 상태, ChatComposer textarea 자동 높이+disabled 플레이스홀더, Progress 메시지 구체화, 새로 시작하기 확인 팝업
-- **M137**: 자체 마켓 프로토타입 — GET /api/v1/market(공개 목록), MarketPage 카드 그리드, 해시 라우팅(#/market)
-- **M135**: 게시 UX 통합 — 세션 ID 수동 복사 제거, publish_bridge.js+FETCH_AND_PUBLISH(웹앱→background 자동 통신), PublishResultCard "자동 게시" 버튼(window.postMessage), RLS 마이그레이션 파일화(003_rls_policies.sql), EBS 19GB 증설+Docker 정상 재빌드 복구, 중고나라 자동 게시 E2E 성공
-- **M134**: 번개장터 Content Script 자동 게시 — bunjang_publish.js 구현, EXTENSION_ONLY_PLATFORMS에 bunjang 추가, 서버 Playwright 게시 완전 제거
-- **M133**: 부분 성공 처리 + 중고나라 CDP 이미지 업로드 — CDP Runtime.evaluate base64→File+React fiber onChange 방식, chrome.downloads 제거, nginx /uploads/ 프록시, AI 작성 토글 자동 비활성화 — 게시 부분 성공(1개 성공 시 completed, 전부 실패 시만 publishing_failed), ChatWindow ProgressCard/ErrorCard case 누락 수정, 중고나라 CloudFront 403 감지+사용자 친화적 에러 메시지, access_blocked 에러 분류 추가, langgraph-prebuilt 버전 고정(ExecutionInfo import 에러 해결), 크롬 익스텐션 중고나라 자동 게시 구현(Content Script 폼 자동 입력+background에서 이미지 CORS 우회+세션 ID 기반 게시 데이터 조회), GET /publish-data + POST /extension-publish-result API 추가, PublishResultCard 서버 차단 시 익스텐션 안내+세션 ID 복사
-- **M128**: EC2 배포 + 크롬 익스텐션 플랫폼 연동 — EC2(us-east-1) 배포 완료, 크롬 익스텐션(Manifest V3) 구현(쿠키 수집+storage_state 변환+connect_token 인증), 번개장터 자동 게시 E2E 성공, 세션 user별 분리 저장+공용 경로 동기, API baseURL 상대 경로 전환, nginx CORS preflight 처리, Dockerfile legacy_spikes 복사, DraftCard 이미지 섹션 제거
-- **M127**: 크롬 익스텐션 설계 — CTO 3명 합의(하이브리드: 로그인은 클라이언트, 게시는 서버), connect_token 플랫폼별 재사용, 쿠키 endsWith 필터링, sameSite 변환, 사전 체크, 즉시 검증(쿠키 기반)
-- **M126**: 배포 문서 + 운영 안전장치 — deployment.md 전면 재작성(장애 대응·스케일 한계·로그/모니터링), docker-compose.prod.yml worker 메모리 제한(1536M)+MAX_CONCURRENT_BROWSERS=1, .env.example S3/도메인 설정 추가, check_prod_readiness.py DOMAIN_NAME 검증, _active_jobs 완전 제거(단일 진실 _active_tasks)
-- **M125**: 테스트 정합성 복구 — test_e2e_recovery 14개 green(Queue→동기 경로 격리), test_s3_auxiliary 6개 green(boto3 미설치 환경 호환), 실패 테스트 0건 달성, 714 테스트 통과
-- **M123**: 배포 블로커 제거 — Admin API `X-Admin-Key` 인증(P0), Worker task set 추적+graceful shutdown(P0), `_active_jobs` 유령 버그 제거, `_semaphore._value` 직접 접근 제거, `on_event`→`lifespan` 전환, `RUN_PUBLISH_WORKER` 플래그(API/Worker 역할 분리), `admin_router` repo private 접근 제거(`list_jobs`/`reset_to_pending` 정식 메서드), 테스트 8개 추가
-- **M122**: 게시 링크 정합성 — publish_worker 결과 누적 저장(먼저 완료된 플랫폼 URL 소실 방지), 번개장터 리다이렉트 폴링 30초, 중고나라 completeSeq URL 파싱, 프론트 확정 메시지/스크롤/게시결과 카드 개선
-- **Bugfix #114, #116**: Job Queue 워커 버그 6건 수정 — 테이블명/컬럼명 정합화(`sell_sessions`/`status`), `PublishResult` 속성명, `publish_results` 키 일치, legacy 대기시간 30초→3초, stale job 방지, enum `.value`, PublishResultCard 링크 복원, 스크롤 UX
-- **M121**: Publish Job Queue 도입 — `publish_jobs` 테이블, 비동기 워커, per-account lock(DB 유니크 인덱스), admin 엔드포인트(재시도/강제 fail/플랫폼 중지), 단계별 타임아웃, structured logging, `PUBLISH_USE_QUEUE` 설정
-- **M120**: Caddy healthcheck + Docker rolling restart + named volumes 영속성
-- **M118**: except Exception 세분화 — auth/optimization 구체화 2건, 외부 경계 exc_info 로깅 강화 18건
-- **M117**: requirements.txt 버전 고정(`>=`→`==`) + `requirements-dev.txt` 분리(테스트 패키지)
-- **M116**: AWS 인프라 최적화 — Caddy HTTPS 리버스 프록시(`docker-compose.prod.yml`), S3 보조 스토리지(게시 증적 스크린샷), EC2 스왑 설정, `deployment.md` 전면 재작성
-- **M115**: 게시 안정성 개선 — 이벤트 루프 블로킹 해소(`asyncio.to_thread`), 번개장터 카테고리 3단계 보완 + 폼 입력 순서 수정, pgvector/Gemini 캐싱, LLM 타임아웃 30초
-- **M114** (Phase B v7): Playwright 동시성 세마포어 + 워커 분리 로드맵 문서화
-
-- **M100** (Phase A): Rewrite 강제 정책 — template fallback 완전 차단, 기존 listing 유지
-- **M101** (Phase A): 소유권 검증 — 전 엔드포인트 get_current_user + user_id 검증, 403
-- **M102** (Phase B): Rate Limit 키 재설계 — 경로 그룹별 독립 bucket
-- **M103** (Phase B): Broad Exception 정리 — 핵심 노드 세분화, 57건→46건
-- **M104** (Phase C): Prod 점검 스크립트 — CORS/debug/JWT/LLM/publisher 자동 검증
-- **M105** (Phase C): Smoke Test 스크립트 — health + 세션 API 자동 검증
-- **M106** (Phase D): Market 서비스 유닛 테스트 — QueryBuilder/RelevanceScorer/PriceAggregator 25개
-- **M107** (Phase D): ListingService + ProductService 통합 테스트 22개
-- **M108** (Phase D): 프론트엔드 테스트 인프라 — vitest + 21개 스모크 테스트
-- **M110** (Phase A v7): SSE stream 소유권 검증 + rewrite 테스트 mock 강화
-- **M111** (Phase A v7): SessionRepository DB 레벨 소유권 검증 (`get_by_id_and_user`)
-- **M112** (Phase A v7): Rate Limit 경로 그룹별 bucket 적용 확인
-- **M113** (Phase B v7): `copywriting_agent` 슬림화 — `_resolve_final_listing` 정책 함수 분리
-
-## 마일스톤 이력
-
-116+ 마일스톤 완료. 상세: @docs/milestones.md
+- 프로덕션 로그인 UI (Supabase Auth 프론트 연결 — dev bypass로 개발 중)

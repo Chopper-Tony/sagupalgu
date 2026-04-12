@@ -6,13 +6,20 @@ paths:
 # 프론트엔드 규칙 (React + Vite + TypeScript)
 
 ## 구조
-- `src/types/` — `session.ts`(SessionStatus·SessionResponse), `ui.ts`(CardType·ComposerMode·TimelineItem)
+- `src/types/` — `session.ts`, `ui.ts`, `market.ts` (SaleStatus, MarketItem, InquiryItem, MyListingItem)
 - `src/lib/sessionStatusUiMap.ts` — 13개 상태 → CardType·ComposerMode·polling SSOT
-- `src/lib/api.ts` — axios 클라이언트, baseURL `/api/v1`, timeout 120초
-- `src/hooks/useSession.ts` — SSE 실시간 + 스마트 폴링 fallback (활성 2.5s / 비활성 10s)
+- `src/lib/api.ts` — axios 클라이언트, baseURL `/api/v1`, timeout 120초, dev 환경 `X-Dev-User-Id` 자동 주입
+- `src/hooks/useSession.ts` — SSE 실시간 + 스마트 폴링 fallback
 - `src/components/layout/` — AppShell, SessionSidebar
 - `src/components/chat/` — ChatWindow(타임라인), ChatComposer(4가지 모드)
-- `src/components/cards/` — 13개 상태 전부 커버하는 카드 컴포넌트
+- `src/components/cards/` — 13개 상태별 카드 컴포넌트
+- `src/pages/` — MarketPage, MarketDetailPage, MyListingsPage
+
+## 해시 라우팅
+- `#/` — 셀러 코파일럿 (채팅 UI)
+- `#/market` — 마켓 목록
+- `#/market/{id}` — 마켓 상세
+- `#/my-listings` — 판매자 대시보드
 
 ## 카드 렌더링
 - 상태 변화 시 useEffect가 자동으로 카드 push (수동 pushItem 중복 금지)
