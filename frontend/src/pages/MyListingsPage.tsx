@@ -185,8 +185,8 @@ export function MyListingsPage() {
                     <div className="my-listings__stats">
                       <span className="my-listings__stat">조회 {(item as any).view_count || 0}</span>
                       <span className="my-listings__stat">문의 {item.inquiry_count}</span>
-                      {(item as any).market_position && (
-                        <span className="my-listings__stat my-listings__stat--position">{(item as any).market_position}</span>
+                      {typeof (item as any).market_position === "string" && (item as any).market_position && (
+                        <span className="my-listings__stat my-listings__stat--position">{String((item as any).market_position)}</span>
                       )}
                     </div>
                   </div>
@@ -248,22 +248,26 @@ export function MyListingsPage() {
                 )}
 
                 {/* 코파일럿 제안 */}
-                {(item as any).copilot_suggestions?.length > 0 && (
+                {Array.isArray((item as any).copilot_suggestions) && (item as any).copilot_suggestions.length > 0 && (
                   <div className="my-listings__suggestions">
                     {(item as any).copilot_suggestions.map((s: any, i: number) => (
-                      <div key={i} className={`my-listings__suggestion my-listings__suggestion--${s.urgency || "low"}`}>
-                        {s.type === "relist" ? "🔄" : s.type === "price" ? "💰" : "✏️"} {s.message}
+                      <div key={i} className={`my-listings__suggestion my-listings__suggestion--${String(s.urgency || "low")}`}>
+                        {s.type === "relist" ? "🔄" : s.type === "price" ? "💰" : "✏️"} {String(s.message || "")}
                       </div>
                     ))}
                   </div>
                 )}
 
                 {/* 게시 플랫폼 상태 */}
-                {(item as any).publish_results?.length > 0 && (
+                {Array.isArray((item as any).publish_results) && (item as any).publish_results.length > 0 && (
                   <div className="my-listings__publish-status">
-                    {(item as any).publish_results.map((r: any) => (
-                      <span key={r.platform} className={`my-listings__publish-badge ${r.success ? "my-listings__publish-badge--ok" : "my-listings__publish-badge--fail"}`}>
-                        {r.platform_name}: {r.success ? (r.external_url ? <a href={r.external_url} target="_blank" rel="noopener noreferrer">게시됨</a> : "성공") : "실패"}
+                    {(item as any).publish_results.map((r: any, idx: number) => (
+                      <span key={r.platform || idx} className={`my-listings__publish-badge ${r.success ? "my-listings__publish-badge--ok" : "my-listings__publish-badge--fail"}`}>
+                        {String(r.platform_name || r.platform || "")}: {r.success ? (
+                          r.external_url
+                            ? <a href={String(r.external_url)} target="_blank" rel="noopener noreferrer">게시됨</a>
+                            : <span>성공</span>
+                        ) : <span>실패</span>}
                       </span>
                     ))}
                   </div>
