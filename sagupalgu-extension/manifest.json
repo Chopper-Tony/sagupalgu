@@ -22,7 +22,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://m.bunjang.co.kr/sell/edit*"],
+      "matches": ["*://m.bunjang.co.kr/products/new*"],
       "js": ["bunjang_publish.js"],
       "run_at": "document_idle"
     },

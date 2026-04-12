@@ -159,7 +159,7 @@ async function handleJoongnaPublish(publishData, sessionId, serverUrl) {
  */
 async function handleBunjangPublish(publishData, sessionId, serverUrl) {
   const url = serverUrl || DEFAULT_SERVER_URL;
-  const WRITE_URL = "https://m.bunjang.co.kr/sell/edit";
+  const WRITE_URL = "https://m.bunjang.co.kr/products/new";
 
   const tab = await chrome.tabs.create({ url: WRITE_URL, active: true });
 
