@@ -115,26 +115,34 @@
     }
 
     // 2단계: 컨테이너 내부에서 텍스트 매칭 + 실제 좌표 기반 클릭
+    function simulateClick(el) {
+      el.scrollIntoView({ block: "center" });
+      const rect = el.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 };
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+      console.log(`[사구팔구] 카테고리 클릭 좌표: (${Math.round(x)}, ${Math.round(y)}), 태그: ${el.tagName}, text: "${el.innerText?.trim()}"`);
+    }
+
     function clickInColumn(column, name) {
       const items = column.querySelectorAll("li, a, span, div, p");
       for (const item of items) {
         const text = (item.innerText || item.textContent || "").trim();
         if (text === name) {
-          item.scrollIntoView({ block: "center" });
+          // 클릭 대상: 내부 <a> 우선, 없으면 자기 자신
+          const anchor = item.querySelector("a");
+          const target = anchor || item;
+          simulateClick(target);
 
-          // React 앱은 좌표가 있는 MouseEvent만 인식
-          const rect = item.getBoundingClientRect();
-          const x = rect.left + rect.width / 2;
-          const y = rect.top + rect.height / 2;
-          const eventOpts = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 };
-
-          item.dispatchEvent(new MouseEvent("pointerdown", eventOpts));
-          item.dispatchEvent(new MouseEvent("mousedown", eventOpts));
-          item.dispatchEvent(new MouseEvent("pointerup", eventOpts));
-          item.dispatchEvent(new MouseEvent("mouseup", eventOpts));
-          item.dispatchEvent(new MouseEvent("click", eventOpts));
-
-          console.log(`[사구팔구] 카테고리 클릭 좌표: (${Math.round(x)}, ${Math.round(y)}), 태그: ${item.tagName}, text: "${text}"`);
+          // <a>로 안 되면 <li> 자체도 시도
+          if (anchor) {
+            simulateClick(item);
+          }
           return true;
         }
       }
