@@ -72,13 +72,11 @@
   // ── 카테고리 선택 ────────────────────────────────────────
 
   async function selectCategory(category) {
-    if (!category) {
-      console.warn("[사구팔구] 카테고리 정보 없음 — 스킵");
-      return;
-    }
-
     // 번개장터 products/new: 대분류 목록이 이미 노출된 3단 셀렉터
-    // 카테고리 매핑 (AI가 생성한 카테고리 → 번개장터 대분류)
+    // 매핑 실패 시 "기타"를 폴백으로 선택
+
+    const FALLBACK = "기타";
+
     const categoryMap = {
       "스마트폰": "디지털기기",
       "태블릿": "디지털기기",
@@ -87,28 +85,46 @@
       "음향기기": "디지털기기",
       "카메라": "디지털기기",
       "패션": "남성의류",
-      "문구": "도서/음반/문구",
-      "기타": "기타 중고물품",
+      "문구": "도서/티켓/문구",
+      "기타": FALLBACK,
     };
 
-    const targetCategory = categoryMap[category] || category;
+    const targetCategory = (category && categoryMap[category]) || FALLBACK;
 
-    // 대분류 목록에서 매칭 항목 클릭
-    const allItems = document.querySelectorAll(
-      "li, a, span, div"
-    );
-    for (const item of allItems) {
-      const text = item.textContent.trim();
-      if (text === targetCategory) {
-        item.scrollIntoView({ block: "center" });
-        item.click();
-        console.log(`[사구팔구] 카테고리 대분류 선택: ${targetCategory} (원본: ${category})`);
-        await sleep(1000);
-        return;
+    // 대분류 리스트에서 클릭 가능한 항목 찾기
+    function clickCategoryItem(name) {
+      // 카테고리 영역 내의 li/a 요소만 탐색 (검색결과 등 오매칭 방지)
+      const items = document.querySelectorAll("li a, li");
+      for (const item of items) {
+        // 자식 텍스트만 확인 (하위 노드 텍스트 제외)
+        const directText = Array.from(item.childNodes)
+          .filter((n) => n.nodeType === Node.TEXT_NODE)
+          .map((n) => n.textContent.trim())
+          .join("");
+        const text = directText || item.textContent.trim();
+        if (text === name) {
+          item.scrollIntoView({ block: "center" });
+          item.click();
+          return true;
+        }
       }
+      return false;
     }
 
-    console.warn(`[사구팔구] 카테고리 '${targetCategory}' 매칭 실패 — 수동 선택 필요`);
+    if (clickCategoryItem(targetCategory)) {
+      console.log(`[사구팔구] 카테고리 선택: ${targetCategory} (원본: ${category || "없음"})`);
+      await sleep(1000);
+      return;
+    }
+
+    // 폴백: "기타" 선택
+    if (targetCategory !== FALLBACK && clickCategoryItem(FALLBACK)) {
+      console.log(`[사구팔구] 카테고리 매핑 실패 → 폴백 '${FALLBACK}' 선택 (원본: ${category})`);
+      await sleep(1000);
+      return;
+    }
+
+    console.warn(`[사구팔구] 카테고리 '${FALLBACK}'도 찾지 못함 — 수동 선택 필요`);
   }
 
   // ── 상태 선택 ────────────────────────────────────────────
