@@ -142,7 +142,11 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
                   background: "#1e293b", padding: "6px 8px", borderRadius: "4px",
                   marginTop: "4px", cursor: "pointer", wordBreak: "break-all",
                 }}
-                onClick={() => navigator.clipboard.writeText(sessionId)}
+                onClick={() => {
+                  if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(sessionId).catch(() => {});
+                  }
+                }}
                 title="클릭하여 복사"
               >
                 {sessionId}
