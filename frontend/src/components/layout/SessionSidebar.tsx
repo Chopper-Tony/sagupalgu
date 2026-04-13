@@ -61,12 +61,28 @@ export function SessionSidebar({ sessions, activeId, onSelect, onNew }: SessionS
   };
 
   const handleCopyToken = () => {
-    if (connectToken) {
-      navigator.clipboard.writeText(connectToken);
-      setTokenCopied(true);
-      setTimeout(() => setTokenCopied(false), 3000);
+    if (!connectToken) return;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(connectToken).catch(() => {
+        fallbackCopy(connectToken);
+      });
+    } else {
+      fallbackCopy(connectToken);
     }
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 3000);
   };
+
+  function fallbackCopy(text: string) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
 
   return (
     <div className="session-sidebar">

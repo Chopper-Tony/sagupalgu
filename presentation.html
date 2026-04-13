@@ -163,7 +163,7 @@
     <div class="pipeline-step" style="border-color:#bc8cff;"><div class="step-num" style="background:#bc8cff;">3</div> 사용자 확정 또는 직접 입력</div>
     <div class="pipeline-step" style="border-color:#f0883e;"><div class="step-num" style="background:#f0883e;">4</div> 시세 크롤링 + 가격 전략 (Goal-driven)</div>
     <div class="pipeline-step" style="border-color:#f85149;"><div class="step-num" style="background:#f85149;">5</div> AI 판매글 생성 → Critic 비평 → 재작성 루프</div>
-    <div class="pipeline-step" style="border-color:#58a6ff;"><div class="step-num" style="background:#58a6ff;">6</div> 번개장터 + 중고나라 동시 게시 (Playwright)</div>
+    <div class="pipeline-step" style="border-color:#58a6ff;"><div class="step-num" style="background:#58a6ff;">6</div> 크롬 익스텐션 Content Script로 자동 게시 (사용자 브라우저)</div>
   </div>
 </section>
 
@@ -184,7 +184,7 @@
       <div class="stat-label">Agentic Loop</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number purple">508</div>
+      <div class="stat-number purple">581</div>
       <div class="stat-label">테스트</div>
     </div>
   </div>
@@ -306,9 +306,10 @@
           <tr><td>LLM</td><td>GPT-4.1-mini · Gemini · Solar</td></tr>
           <tr><td>Vision</td><td>GPT-4.1-mini · Gemini 2.5 Flash</td></tr>
           <tr><td>DB</td><td>Supabase (pgvector)</td></tr>
+          <tr><td>게시</td><td>Chrome Extension Content Script</td></tr>
           <tr><td>크롤러</td><td>Playwright</td></tr>
           <tr><td>프론트엔드</td><td>React 18 + TypeScript</td></tr>
-          <tr><td>배포</td><td>Docker Compose + EC2</td></tr>
+          <tr><td>배포</td><td>Docker 4컨테이너 + Caddy HTTPS</td></tr>
         </tbody>
       </table>
     </div>
@@ -430,6 +431,74 @@ created → images_attached → analyzing
   </div>
 </section>
 
+<!-- ========== SLIDE 12.5: PUBLISH ARCHITECTURE SHIFT ========== -->
+<section>
+  <h2>게시 아키텍처 대전환</h2>
+  <div class="two-col" style="margin-top:20px;">
+    <div>
+      <h3 class="red" style="font-size:0.8em;">Before: 서버 Playwright</h3>
+      <ul style="font-size:0.6em; color:#8b949e;">
+        <li>EC2(미국)에서 headless Chrome 실행</li>
+        <li>서버 IP → <strong class="red">번개장터 계정 영구정지</strong></li>
+        <li>AWS IP 대역 → <strong class="red">중고나라 CloudFront 403</strong></li>
+        <li>Chromium 메모리 1.5GB 점유</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="green" style="font-size:0.8em;">After: Chrome Extension Content Script</h3>
+      <ul style="font-size:0.6em;">
+        <li>사용자 브라우저에서 직접 게시</li>
+        <li>사용자 IP/쿠키/핑거프린트 그대로</li>
+        <li><strong class="green">자동화 탐지 거의 0</strong></li>
+        <li>서버 메모리 부담 제거</li>
+      </ul>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top:20px;">
+    <strong>핵심 난제 해결:</strong> 이미지 업로드 — 브라우저 보안상 <code>input[type=file]</code> 프로그래밍 주입 불가<br>
+    <span class="accent">→ CDP Runtime.evaluate + base64→File + React fiber onChange 직접 호출</span>
+  </div>
+</section>
+
+<!-- ========== SLIDE 13.5: SELF MARKET + SELLER COPILOT ========== -->
+<section>
+  <h2>자체 마켓 + 셀러 코파일럿</h2>
+  <p style="font-size:0.65em; color:#8b949e;">외부 플랫폼 리스크 대응 → 자체 마켓을 주력 자산으로 전환</p>
+  <div class="two-col" style="margin-top:16px;">
+    <div>
+      <h3 style="font-size:0.75em;">마켓 기능</h3>
+      <ul style="font-size:0.58em;">
+        <li>상품 목록 · 상세 · 검색 · 카테고리 필터</li>
+        <li>판매 상태 관리 (available/reserved/sold)</li>
+        <li>정렬 (최신순/가격순) · 찜하기 · 최근 본 상품</li>
+        <li>구매 문의 (DB 저장 + Discord 알림)</li>
+        <li>판매자 프로필 카드</li>
+      </ul>
+      <h3 style="font-size:0.75em; margin-top:12px;">판매자 대시보드</h3>
+      <ul style="font-size:0.58em;">
+        <li>내 상품 관리 (#/my-listings)</li>
+        <li>문의 관리 + 응답 (자동 상태 전이)</li>
+        <li>재등록 원클릭 (세션 복제)</li>
+        <li>성과 요약 (조회수 · 시세 대비 위치)</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.75em;">셀러 코파일럿 <span class="purple">(AI)</span></h3>
+      <ul style="font-size:0.58em;">
+        <li><span class="purple">문의 응대 AI</span> — LLM 답변 초안 + goal별 톤</li>
+        <li><span class="purple">자동 가격 제안</span> — 3일/7일/14일 무문의 감지</li>
+        <li><span class="accent">Publish Visibility</span> — 외부 플랫폼 게시 상태 표시</li>
+      </ul>
+      <div class="highlight-box" style="margin-top:12px; font-size:0.6em;">
+        <strong>설계 원칙</strong> (CTO 6명 합의)<br>
+        1. 거래 루프를 먼저 닫는다<br>
+        2. AI는 데이터가 쌓인 뒤 얹는다<br>
+        3. 대시보드/지표는 마지막
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ========== SLIDE 13: FRONTEND ========== -->
 <section>
   <h2>프론트엔드</h2>
@@ -478,15 +547,15 @@ created → images_attached → analyzing
   <h2>테스트 전략</h2>
   <div class="stat-grid">
     <div class="stat-card">
-      <div class="stat-number green">508</div>
+      <div class="stat-number green">581</div>
       <div class="stat-label">전체 테스트</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number accent">~300</div>
-      <div class="stat-label">Unit (0.5초)</div>
+      <div class="stat-number accent">~380</div>
+      <div class="stat-label">Unit (10초)</div>
     </div>
     <div class="stat-card">
-      <div class="stat-number orange">~120</div>
+      <div class="stat-number orange">~180</div>
       <div class="stat-label">Integration</div>
     </div>
     <div class="stat-card">
@@ -527,7 +596,7 @@ created → images_attached → analyzing
     <div style="font-size:1.2em; color:#30363d;">▼</div>
     <div class="flow-box" style="width:80%; border-color:#7ee787;">
       <strong class="green">Service Layer</strong><br>
-      <span style="font-size:0.8em;">SessionService · ListingService · PublishService · RecoveryService</span>
+      <span style="font-size:0.8em;">SessionService · PublishOrchestrator · SaleTracker · SellerCopilotService</span>
     </div>
     <div style="font-size:1.2em; color:#30363d;">▼</div>
     <div class="flow-box" style="width:80%; border-color:#bc8cff;">
@@ -542,7 +611,7 @@ created → images_attached → analyzing
     <div style="font-size:1.2em; color:#30363d;">▼</div>
     <div class="flow-box" style="width:80%; border-color:#f85149;">
       <strong class="red">Infrastructure</strong><br>
-      <span style="font-size:0.8em;">Supabase · Playwright Publishers · Storage · Discord</span>
+      <span style="font-size:0.8em;">Supabase · Chrome Extension · Playwright · Storage · Discord</span>
     </div>
   </div>
 </section>
@@ -571,7 +640,7 @@ created → images_attached → analyzing
     <div>
       <h3 style="font-size:0.7em;">코드 품질</h3>
       <ul style="font-size:0.58em;">
-        <li><strong>76 마일스톤</strong> CTO 코드리뷰 반복</li>
+        <li><strong>149 마일스톤</strong> CTO 코드리뷰 반복</li>
         <li><strong>DI 완전 적용</strong> — 테스트 격리</li>
         <li><strong>도메인 예외 5종</strong> — 글로벌 핸들러 단일</li>
         <li><strong>facade 패턴</strong> — 툴 import 단일 진입점</li>
@@ -579,10 +648,10 @@ created → images_attached → analyzing
       </ul>
       <h3 style="font-size:0.7em; margin-top:12px;">배포</h3>
       <ul style="font-size:0.58em;">
-        <li>Docker Compose (backend + nginx frontend)</li>
-        <li>GitHub Actions CI/CD</li>
-        <li>AWS EC2 자동 배포</li>
-        <li>Discord 배포 알림</li>
+        <li>Docker 4컨테이너 (Caddy + backend + worker + frontend)</li>
+        <li>GitHub Actions CI/CD + Rolling Restart</li>
+        <li>AWS EC2 + Caddy HTTPS 자동 인증서</li>
+        <li>Discord 배포/장애 알림</li>
       </ul>
     </div>
   </div>
@@ -609,21 +678,29 @@ created → images_attached → analyzing
       <div style="flex:1; background:linear-gradient(90deg, #8957e5 0%, #f0883e 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">E2E 봉합 · 게시 신뢰성 · CTO 리뷰 대응</div>
     </div>
     <div style="display:flex; align-items:center; margin:8px 0;">
-      <div style="width:100px; color:#8b949e;">M61~76+</div>
+      <div style="width:100px; color:#8b949e;">M61~M99</div>
       <div style="flex:1; background:linear-gradient(90deg, #f0883e 0%, #f85149 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">보안 · SSE · 병렬 게시 · UI 완성 · 플랫폼 로그인</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M100~M143</div>
+      <div style="flex:1; background:linear-gradient(90deg, #f85149 0%, #58a6ff 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">Content Script 전환 · 익스텐션 · EC2 · Job Queue · 자체 마켓</div>
+    </div>
+    <div style="display:flex; align-items:center; margin:8px 0;">
+      <div style="width:100px; color:#8b949e;">M144~M149</div>
+      <div style="flex:1; background:linear-gradient(90deg, #58a6ff 0%, #7ee787 100%); height:24px; border-radius:4px; display:flex; align-items:center; padding-left:12px; color:#fff; font-size:0.9em;">마켓 고도화 · 셀러 코파일럿 · 대시보드 · 테스트 581개</div>
     </div>
   </div>
   <div class="stat-grid" style="margin-top:16px;">
     <div class="stat-card" style="padding:16px 24px;">
-      <div class="stat-number accent" style="font-size:1.6em;">76+</div>
+      <div class="stat-number accent" style="font-size:1.6em;">149</div>
       <div class="stat-label">마일스톤</div>
     </div>
     <div class="stat-card" style="padding:16px 24px;">
-      <div class="stat-number green" style="font-size:1.6em;">508</div>
+      <div class="stat-number green" style="font-size:1.6em;">581</div>
       <div class="stat-label">테스트</div>
     </div>
     <div class="stat-card" style="padding:16px 24px;">
-      <div class="stat-number orange" style="font-size:1.6em;">92</div>
+      <div class="stat-number orange" style="font-size:1.6em;">95+</div>
       <div class="stat-label">CTO 점수</div>
     </div>
   </div>
@@ -638,7 +715,7 @@ created → images_attached → analyzing
   <div style="margin-top:40px;">
     <div class="highlight-box">
       <span style="font-size:0.7em;">
-        <strong>7</strong> AI 에이전트 · <strong>10</strong> 툴 · <strong>3</strong> Agentic Loop · <strong>508</strong> 테스트<br>
+        <strong>7</strong> AI 에이전트 · <strong>10</strong> 툴 · <strong>3</strong> Agentic Loop · <strong>581</strong> 테스트<br>
         <span class="dim" style="font-size:0.9em;">사진 한 장 → 분석 → 전략 → 카피 → 비평 → 게시 자동화</span>
       </span>
     </div>
