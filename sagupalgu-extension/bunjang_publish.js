@@ -72,18 +72,18 @@
   // ── 카테고리 선택 ────────────────────────────────────────
 
   async function selectCategory(category) {
-    // 번개장터 products/new: 대분류 목록이 이미 노출된 3단 셀렉터
+    // 번개장터 products/new: 대분류 목록이 스크롤 가능한 3단 셀렉터로 노출
     // 매핑 실패 시 "기타"를 폴백으로 선택
 
     const FALLBACK = "기타";
 
     const categoryMap = {
-      "스마트폰": "디지털기기",
-      "태블릿": "디지털기기",
-      "노트북": "디지털기기",
-      "가전": "생활가전",
-      "음향기기": "디지털기기",
-      "카메라": "디지털기기",
+      "스마트폰": "디지털",
+      "태블릿": "디지털",
+      "노트북": "디지털",
+      "가전": "가전제품",
+      "음향기기": "디지털",
+      "카메라": "디지털",
       "패션": "남성의류",
       "문구": "도서/티켓/문구",
       "기타": FALLBACK,
@@ -91,40 +91,78 @@
 
     const targetCategory = (category && categoryMap[category]) || FALLBACK;
 
-    // 대분류 리스트에서 클릭 가능한 항목 찾기
-    function clickCategoryItem(name) {
-      // textContent가 정확히 name인 가장 안쪽(innermost) 요소를 클릭
-      const all = document.querySelectorAll("li, a, span, div");
-      let best = null;
-      for (const el of all) {
-        if (el.textContent.trim() === name) {
-          if (!best || el.innerHTML.length < best.innerHTML.length) {
-            best = el;
-          }
+    // 1단계: 카테고리 첫 번째 컬럼(대분류 스크롤 컨테이너) 찾기
+    // "중분류 선택" 텍스트가 있는 영역의 왼쪽 형제 컬럼
+    function findCategoryColumn() {
+      // 스크롤 가능한 컨테이너를 찾는다 (overflow: auto/scroll + 세로 높이 200px 이상)
+      const containers = document.querySelectorAll("ul, div, ol");
+      for (const el of containers) {
+        const style = getComputedStyle(el);
+        const hasScroll = style.overflowY === "auto" || style.overflowY === "scroll";
+        const tallEnough = el.offsetHeight >= 150;
+        const hasCategories = el.textContent.includes("여성의류") && el.textContent.includes("남성의류");
+        if (hasScroll && tallEnough && hasCategories) {
+          return el;
         }
       }
-      if (best) {
-        best.scrollIntoView({ block: "center" });
-        best.click();
-        return true;
+      // 폴백: "여성의류" 텍스트를 포함하는 가장 작은 스크롤 컨테이너
+      for (const el of containers) {
+        if (el.scrollHeight > el.clientHeight && el.textContent.includes("여성의류")) {
+          return el;
+        }
+      }
+      return null;
+    }
+
+    // 2단계: 컨테이너 내부에서 텍스트 매칭 + 클릭
+    function clickInColumn(column, name) {
+      const items = column.querySelectorAll("li, a, span, div, p");
+      for (const item of items) {
+        // innerText로 비교 (렌더링된 텍스트만, 숨김 요소 제외)
+        const text = (item.innerText || item.textContent || "").trim();
+        if (text === name) {
+          item.scrollIntoView({ block: "center" });
+          item.click();
+          // 클릭 이벤트가 안 먹힐 수 있으므로 mousedown+mouseup도 발사
+          item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          item.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          item.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          return true;
+        }
       }
       return false;
     }
 
-    if (clickCategoryItem(targetCategory)) {
+    const column = findCategoryColumn();
+    if (!column) {
+      console.warn("[사구팔구] 카테고리 컬럼을 찾지 못함 — 수동 선택 필요");
+      return;
+    }
+
+    console.log(`[사구팔구] 카테고리 컬럼 발견, scrollHeight=${column.scrollHeight}, clientHeight=${column.clientHeight}`);
+
+    // 먼저 매핑된 카테고리 시도
+    if (clickInColumn(column, targetCategory)) {
       console.log(`[사구팔구] 카테고리 선택: ${targetCategory} (원본: ${category || "없음"})`);
       await sleep(1000);
       return;
     }
 
-    // 폴백: "기타" 선택
-    if (targetCategory !== FALLBACK && clickCategoryItem(FALLBACK)) {
-      console.log(`[사구팔구] 카테고리 매핑 실패 → 폴백 '${FALLBACK}' 선택 (원본: ${category})`);
+    // 스크롤을 끝까지 내린 후 "기타" 폴백
+    column.scrollTop = column.scrollHeight;
+    await sleep(500);
+
+    if (clickInColumn(column, FALLBACK)) {
+      console.log(`[사구팔구] 카테고리 폴백 '${FALLBACK}' 선택 (원본: ${category || "없음"})`);
       await sleep(1000);
       return;
     }
 
     console.warn(`[사구팔구] 카테고리 '${FALLBACK}'도 찾지 못함 — 수동 선택 필요`);
+    // 디버깅: 컬럼 내 모든 항목 출력
+    const items = column.querySelectorAll("li, a, span, div");
+    const texts = [...new Set([...items].map((i) => (i.innerText || "").trim()).filter(Boolean))];
+    console.log(`[사구팔구] 컬럼 내 항목 목록:`, texts.slice(0, 30));
   }
 
   // ── 상태 선택 ────────────────────────────────────────────
