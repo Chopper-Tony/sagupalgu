@@ -93,20 +93,20 @@
 
     // 대분류 리스트에서 클릭 가능한 항목 찾기
     function clickCategoryItem(name) {
-      // 카테고리 영역 내의 li/a 요소만 탐색 (검색결과 등 오매칭 방지)
-      const items = document.querySelectorAll("li a, li");
-      for (const item of items) {
-        // 자식 텍스트만 확인 (하위 노드 텍스트 제외)
-        const directText = Array.from(item.childNodes)
-          .filter((n) => n.nodeType === Node.TEXT_NODE)
-          .map((n) => n.textContent.trim())
-          .join("");
-        const text = directText || item.textContent.trim();
-        if (text === name) {
-          item.scrollIntoView({ block: "center" });
-          item.click();
-          return true;
+      // textContent가 정확히 name인 가장 안쪽(innermost) 요소를 클릭
+      const all = document.querySelectorAll("li, a, span, div");
+      let best = null;
+      for (const el of all) {
+        if (el.textContent.trim() === name) {
+          if (!best || el.innerHTML.length < best.innerHTML.length) {
+            best = el;
+          }
         }
+      }
+      if (best) {
+        best.scrollIntoView({ block: "center" });
+        best.click();
+        return true;
       }
       return false;
     }
