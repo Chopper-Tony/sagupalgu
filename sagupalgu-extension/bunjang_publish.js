@@ -114,19 +114,27 @@
       return null;
     }
 
-    // 2단계: 컨테이너 내부에서 텍스트 매칭 + 클릭
+    // 2단계: 컨테이너 내부에서 텍스트 매칭 + 실제 좌표 기반 클릭
     function clickInColumn(column, name) {
       const items = column.querySelectorAll("li, a, span, div, p");
       for (const item of items) {
-        // innerText로 비교 (렌더링된 텍스트만, 숨김 요소 제외)
         const text = (item.innerText || item.textContent || "").trim();
         if (text === name) {
           item.scrollIntoView({ block: "center" });
-          item.click();
-          // 클릭 이벤트가 안 먹힐 수 있으므로 mousedown+mouseup도 발사
-          item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-          item.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-          item.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+          // React 앱은 좌표가 있는 MouseEvent만 인식
+          const rect = item.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const eventOpts = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 };
+
+          item.dispatchEvent(new MouseEvent("pointerdown", eventOpts));
+          item.dispatchEvent(new MouseEvent("mousedown", eventOpts));
+          item.dispatchEvent(new MouseEvent("pointerup", eventOpts));
+          item.dispatchEvent(new MouseEvent("mouseup", eventOpts));
+          item.dispatchEvent(new MouseEvent("click", eventOpts));
+
+          console.log(`[사구팔구] 카테고리 클릭 좌표: (${Math.round(x)}, ${Math.round(y)}), 태그: ${item.tagName}, text: "${text}"`);
           return true;
         }
       }
