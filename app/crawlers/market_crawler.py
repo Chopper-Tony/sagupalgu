@@ -89,9 +89,10 @@ class MarketCrawler:
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
+            "Chrome/131.0.0.0 Safari/537.36"
         ),
-        "Accept-Language": "ko-KR,ko;q=0.9",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8",
         "Referer": "https://www.bunjang.co.kr/",
     }
 
@@ -167,10 +168,16 @@ class MarketCrawler:
             "Referer": "https://web.joongna.com/",
             "Origin": "https://web.joongna.com",
         }
-        timeout = aiohttp.ClientTimeout(total=8)
+        timeout = aiohttp.ClientTimeout(total=10)
 
-        # __NEXT_DATA__ 에서 확인된 실제 검색 API (get-search-products)
-        # POST 방식, web.joongna.com 내부 Next.js API 라우트 사용
+        # 0) 쿠키 프리페치 — 홈페이지 방문으로 세션 쿠키 확보
+        try:
+            async with session.get("https://web.joongna.com/", headers=headers, timeout=timeout) as _:
+                pass
+        except Exception:
+            pass
+
+        # 1) 내부 Next.js API 라우트 (POST)
         search_payload = {
             "categoryFilter": [{"categoryDepth": 0, "categorySeq": 0}],
             "firstQuantity": limit,
@@ -194,6 +201,7 @@ class MarketCrawler:
             post_headers = {
                 **headers,
                 "Content-Type": "application/json",
+                "Accept": "application/json, text/plain, */*",
             }
             async with session.post(
                 "https://web.joongna.com/api/search/products",
@@ -216,7 +224,32 @@ class MarketCrawler:
         except (aiohttp.ClientError, json.JSONDecodeError, ValueError, KeyError) as e:
             logger.debug(f"[중고나라] POST 실패: {e}")
 
-        # API 실패 → __NEXT_DATA__ HTML 파싱
+        # 2) 모바일 검색 API (GET) — 대체 엔드포인트
+        if not content:
+            try:
+                import urllib.parse
+                encoded_q = urllib.parse.quote(query)
+                mobile_url = f"https://m.joongna.com/api/search/v3?keyword={encoded_q}&page=0&size={limit}"
+                mobile_headers = {
+                    **self.HEADERS,
+                    "Referer": "https://m.joongna.com/",
+                    "Accept": "application/json",
+                }
+                async with session.get(mobile_url, headers=mobile_headers, timeout=timeout) as resp:
+                    if resp.status == 200:
+                        data = await resp.json(content_type=None)
+                        content = (
+                            data.get("data", {}).get("items") or
+                            data.get("data", {}).get("content") or
+                            data.get("items") or
+                            []
+                        )
+                        if content:
+                            logger.info(f"[중고나라] 모바일 API 성공")
+            except Exception as e:
+                logger.debug(f"[중고나라] 모바일 API 실패: {e}")
+
+        # 3) __NEXT_DATA__ HTML 파싱
         if not content:
             logger.warning("[중고나라] API 실패 → __NEXT_DATA__ fallback")
             return await self._fetch_joongna_html(session, query, limit)
