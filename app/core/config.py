@@ -168,6 +168,13 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------
+    # 이메일 알림 (Gmail SMTP)
+    # ------------------------------
+
+    smtp_email: str = Field(default="", alias="SMTP_EMAIL")
+    smtp_app_password: str = Field(default="", alias="SMTP_APP_PASSWORD")
+
+    # ------------------------------
     # CORS
     # ------------------------------
 

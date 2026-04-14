@@ -112,8 +112,15 @@ async def submit_inquiry(
     )
     logger.info("inquiry_created listing=%s inquiry=%s", session_id, inquiry.get("id"))
 
-    # Discord 알림 (보조 — 실패해도 OK)
-    sent = await _send_inquiry_discord(
+    # 알림 (보조 — 실패해도 OK)
+    discord_sent = await _send_inquiry_discord(
+        session_id=session_id,
+        product_title=title,
+        name=body.name,
+        contact=body.contact,
+        message=body.message,
+    )
+    email_sent = await _send_inquiry_email(
         session_id=session_id,
         product_title=title,
         name=body.name,
@@ -121,7 +128,7 @@ async def submit_inquiry(
         message=body.message,
     )
 
-    return {"success": True, "inquiry_id": inquiry.get("id"), "discord_sent": sent}
+    return {"success": True, "inquiry_id": inquiry.get("id"), "discord_sent": discord_sent, "email_sent": email_sent}
 
 
 # ── 판매자 전용 (인증 필요) ─────────────────────────────
@@ -658,4 +665,50 @@ async def _send_inquiry_discord(
 
     except Exception as e:
         logger.warning("inquiry_discord_failed session=%s error=%s", session_id, e, exc_info=True)
+        return False
+
+
+async def _send_inquiry_email(
+    session_id: str,
+    product_title: str,
+    name: str,
+    contact: str,
+    message: str,
+) -> bool:
+    """판매자에게 구매 문의 이메일 알림을 전송한다."""
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+
+        smtp_email = os.getenv("SMTP_EMAIL")
+        smtp_password = os.getenv("SMTP_APP_PASSWORD")
+        if not smtp_email or not smtp_password:
+            logger.info("SMTP 미설정, 이메일 알림 생략 session=%s", session_id)
+            return False
+
+        subject = f"[사구팔구] 구매 문의 - {product_title}"
+        body = (
+            f"상품: {product_title}\n"
+            f"세션: {session_id}\n"
+            f"─────────────────────\n"
+            f"문의자: {name}\n"
+            f"연락처: {contact}\n"
+            f"─────────────────────\n"
+            f"메시지:\n{message}\n"
+        )
+
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = subject
+        msg["From"] = smtp_email
+        msg["To"] = smtp_email  # 판매자 본인에게 전송
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(smtp_email, smtp_password)
+            server.send_message(msg)
+
+        logger.info("inquiry_email_sent session=%s name=%s", session_id, name)
+        return True
+
+    except Exception as e:
+        logger.warning("inquiry_email_failed session=%s error=%s", session_id, e, exc_info=True)
         return False
