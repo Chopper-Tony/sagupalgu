@@ -34,13 +34,15 @@
   margin-bottom: 1.5rem;
 }
 .my-listings__filter-btn {
-  padding: 6px 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: var(--btn-padding);
+  border: var(--btn-border-width) solid var(--border);
+  border-radius: var(--btn-radius);
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--btn-font-size);
+  line-height: var(--btn-line-height);
+  font-weight: var(--btn-font-weight);
+  box-sizing: border-box;
   cursor: pointer;
 }
 .my-listings__filter-btn--active {

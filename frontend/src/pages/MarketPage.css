@@ -145,13 +145,13 @@
   right: 86px;
   z-index: 9998;
   color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1;
-  font-weight: 500;
   text-decoration: none;
-  padding: 6px 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: var(--btn-padding);
+  font-size: var(--btn-font-size);
+  line-height: var(--btn-line-height);
+  font-weight: var(--btn-font-weight);
+  border: var(--btn-border-width) solid var(--border);
+  border-radius: var(--btn-radius);
   background: var(--bg-secondary);
   box-sizing: border-box;
 }

@@ -27,6 +27,24 @@
   --chat-max-width: 720px;
   --radius: 8px;
   --radius-lg: 12px;
+
+  /* 공통 버튼 토큰 (+ 새 판매 기준) */
+  --btn-padding: 6px 14px;
+  --btn-font-size: 13px;
+  --btn-line-height: 1;
+  --btn-font-weight: 500;
+  --btn-radius: 8px;
+  --btn-border-width: 1px;
+}
+
+/* 공통 버튼 크기 유틸 */
+.btn-size-std {
+  padding: var(--btn-padding);
+  font-size: var(--btn-font-size);
+  line-height: var(--btn-line-height);
+  font-weight: var(--btn-font-weight);
+  border-radius: var(--btn-radius);
+  box-sizing: border-box;
 }
 
 /* 다크 테마 */
