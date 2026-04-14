@@ -26,10 +26,24 @@ def build_copy_prompt(
     median_price = market_context.get("median_price", 0)
     price_band = market_context.get("price_band", [])
     sample_count = market_context.get("sample_count", 0)
+    reference_listings = market_context.get("reference_listings") or []
 
     recommended_price = strategy.get("recommended_price", 0)
     goal = strategy.get("goal", "fast_sell")
     negotiation_policy = strategy.get("negotiation_policy", "")
+
+    # 참고 매물 컨텍스트 (실제 거래 패턴 학습용)
+    ref_lines = ""
+    if reference_listings:
+        ref_items = []
+        for item in reference_listings[:8]:
+            title = item.get("title", "")
+            price = item.get("price", 0)
+            platform = item.get("platform", "")
+            if title and price:
+                ref_items.append(f"  - {title} | {price:,}원 ({platform})")
+        if ref_items:
+            ref_lines = "\n".join(ref_items)
 
     prompt = f"""
 You are an expert seller copilot for secondhand marketplace listings.
@@ -50,6 +64,7 @@ Rules:
 - Reflect uncertainty conservatively.
 - Tags must be short and useful, maximum 5.
 - Do not wrap JSON in markdown fences.
+- Reference the listing patterns of similar sold items below to write a more effective listing.
 
 Product:
 - brand: {brand}
@@ -70,6 +85,9 @@ Strategy:
 Image paths:
 - {image_paths}
 """.strip()
+
+    if ref_lines:
+        prompt += f"\n\nReference listings (similar items currently/recently on market):\n{ref_lines}\n\nAnalyze the title patterns, keywords, and pricing of these listings to craft a competitive listing."
 
     if tool_calls_context:
         prompt += f"\n\nAgent tool call history (for context):\n{tool_calls_context}"
