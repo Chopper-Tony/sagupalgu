@@ -140,23 +140,12 @@
   align-items: center;
 }
 .market-my-listings-link {
-  position: fixed;
-  top: 12px;
-  right: 86px;
-  z-index: 9998;
-  color: var(--text-primary);
+  color: var(--accent);
+  font-size: 0.875rem;
   text-decoration: none;
-  padding: var(--btn-padding);
-  font-size: var(--btn-font-size);
-  line-height: var(--btn-line-height);
-  font-weight: var(--btn-font-weight);
-  border: var(--btn-border-width) solid var(--border);
-  border-radius: var(--btn-radius);
-  background: var(--bg-secondary);
-  box-sizing: border-box;
 }
 .market-my-listings-link:hover {
-  background: rgba(37, 99, 235, 0.1);
+  text-decoration: underline;
 }
 
 /* 카테고리 필터 */
@@ -448,10 +437,5 @@
   .market-price-input {
     max-width: none;
     flex: 1 1 40%;
-  }
-  .market-my-listings-link {
-    font-size: 11px;
-    padding: 4px 8px;
-    right: 70px;
   }
 }

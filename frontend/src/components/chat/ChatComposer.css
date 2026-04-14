@@ -97,6 +97,21 @@
 
 @media (max-width: 768px) {
   .chat-composer {
-    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 6px;
+  }
+  .chat-composer__input {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+  .chat-composer__upload-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+  .chat-composer__send-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 }
