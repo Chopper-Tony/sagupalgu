@@ -456,23 +456,24 @@
       submitBtn.scrollIntoView({ block: "center" });
       submitBtn.click();
 
-      // ⑧ 결과 대기 — URL이 변경되면 성공
+      // ⑧ 결과 대기 — URL 변경 polling (최대 10초)
       steps.push("결과 대기");
-      await sleep(4000);
+      let currentUrl = window.location.href;
+      for (let i = 0; i < 20; i++) {
+        await sleep(500);
+        currentUrl = window.location.href;
+        if (!currentUrl.includes("form?type=regist")) break;
+      }
 
-      const currentUrl = window.location.href;
       if (currentUrl.includes("form?type=regist")) {
         throw new Error("등록 후에도 글쓰기 폼에 머뭄 — 필수 항목 누락 가능");
       }
 
-      // 상품 ID 추출
-      const match = currentUrl.match(/\/product\/(\d+)/) ||
-                    currentUrl.match(/completeSeq=(\d+)/) ||
-                    currentUrl.match(/\/(\d+)(?:\?|$)/);
-
-      // completeSeq URL → 실제 상품 페이지 URL로 변환
+      // 상품 ID 추출 (completeSeq 우선)
+      const match = currentUrl.match(/completeSeq=(\d+)/) ||
+                    currentUrl.match(/\/product\/(\d+)/);
       const listingId = match ? match[1] : null;
-      const listingUrl = (listingId && currentUrl.includes("completeSeq"))
+      const listingUrl = listingId
         ? `https://web.joongna.com/product/${listingId}`
         : currentUrl;
 

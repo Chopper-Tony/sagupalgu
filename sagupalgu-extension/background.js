@@ -317,41 +317,14 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
           // files 설정
           input.files = dt.files;
 
-          // React fiber에서 onChange 핸들러 직접 호출
-          const keys = Object.keys(input);
-          const reactKey = keys.find(k =>
-            k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
-          );
-          let reactCalled = false;
-          if (reactKey) {
-            let fiber = input[reactKey];
-            while (fiber) {
-              if (fiber.memoizedProps && fiber.memoizedProps.onChange) {
-                // 가짜 이벤트 객체 생성 (React가 기대하는 형태)
-                const fakeEvent = {
-                  target: input,
-                  currentTarget: input,
-                  preventDefault: function() {},
-                  stopPropagation: function() {},
-                  nativeEvent: new Event('change'),
-                };
-                fiber.memoizedProps.onChange(fakeEvent);
-                reactCalled = true;
-                break;
-              }
-              fiber = fiber.return;
-            }
-          }
-
-          // React onChange가 호출되지 않았을 때만 표준 이벤트 발생 (중복 업로드 방지)
-          if (!reactCalled) {
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-          }
+          // 표준 이벤트만 발사 — React event delegation이 bubbling을 자동 처리
+          // React fiber 직접 호출은 이중 업로드를 유발하므로 제거
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
 
           return JSON.stringify({
             ok: true,
             fileCount: dt.files.length,
-            reactCalled: reactCalled,
             inputFiles: input.files.length,
           });
         })()
