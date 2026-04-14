@@ -24,19 +24,24 @@
 }
 
 .chat-composer__upload-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  font-size: 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  color: #fff;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.12s;
 }
 
 .chat-composer__upload-btn:hover {
-  background: var(--bg-hover);
+  background: var(--accent-hover);
 }
 
 .chat-composer__input {
