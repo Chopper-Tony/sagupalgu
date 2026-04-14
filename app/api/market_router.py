@@ -156,6 +156,11 @@ async def chat_with_product(
     workflow_meta = row.get("workflow_meta_jsonb") or {}
     market_context = workflow_meta.get("market_context") or {}
 
+    # 컨텍스트 부족 체크
+    has_context = bool(canonical.get("title") or canonical.get("description"))
+    if not has_context:
+        return {"reply": "이 상품에 대한 정보가 부족합니다. 판매자에게 직접 문의해주세요.", "source": "fallback_no_context"}
+
     reply = await _generate_chat_reply(
         message=body.message,
         title=canonical.get("title", ""),
@@ -172,10 +177,9 @@ async def chat_with_product(
         sale_status=_get_sale_status(row),
     )
 
-    if not reply:
-        reply = "현재 AI 상담이 불가합니다. 판매자에게 직접 문의해주세요."
-
-    return {"reply": reply, "source": "llm" if reply != "현재 AI 상담이 불가합니다. 판매자에게 직접 문의해주세요." else "fallback"}
+    if reply:
+        return {"reply": reply, "source": "llm"}
+    return {"reply": "AI 상담 서비스에 일시적 문제가 있습니다. 잠시 후 다시 시도해주세요.", "source": "fallback_error"}
 
 
 async def _generate_chat_reply(
@@ -209,10 +213,14 @@ async def _generate_chat_reply(
 
         system_prompt = (
             f"너는 중고거래 상품 상담 AI입니다.\n"
-            f"아래 상품 정보를 기반으로 구매자의 질문에 친절하게 답변하세요.\n"
-            f"상품 정보에 없는 내용 중 제품 일반 스펙(용량, eSIM, 크기, 출시일 등)은 네가 아는 지식으로 보충하세요.\n"
-            f"판매자 개별 상태(흠집, 배터리 수명 등)는 정보 없으면 '판매자에게 직접 문의해주세요'로 안내하세요.\n"
-            f"한국어 존댓말로 1~4문장 이내로 답변하세요.\n\n"
+            f"아래 상품 정보를 기반으로 구매자의 질문에 친절하게 답변하세요.\n\n"
+            f"[답변 규칙]\n"
+            f"1. 상품 정보에서 확인된 내용은 '상품 설명에 따르면'으로 시작하세요.\n"
+            f"2. 제품 일반 스펙(용량, eSIM, 크기 등)은 '일반적으로 이 모델은'으로 시작하여 참고 정보임을 명시하세요.\n"
+            f"3. 절대 추정 금지 항목: 정품 여부, 구성품 포함 여부, 보증 상태, 배터리 잔량, 하자/결함 유무.\n"
+            f"   이 항목에 대한 질문은 반드시 '이 부분은 판매자에게 직접 확인해주세요'로 답하세요.\n"
+            f"4. 한국어 존댓말로 1~4문장 이내로 답변하세요.\n"
+            f"5. 확실하지 않은 정보는 단정하지 말고 '확인이 필요합니다'로 안내하세요.\n\n"
             f"[판매글 정보]\n"
             f"상품명: {title}\n"
             f"가격: {price:,}원\n"
