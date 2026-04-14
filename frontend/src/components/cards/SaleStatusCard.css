@@ -1,5 +1,5 @@
 .sale-status-card {
-  background: #1e1e22;
+  background: var(--bg-tertiary);
   border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
@@ -19,13 +19,13 @@
 .sale-status-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .sale-status-card__subtitle {
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -50,8 +50,8 @@
 
 .sale-status-card__unsold-btn {
   flex: 1;
-  background: #1e1e22;
-  border: 1px solid #3a3a3e;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
   color: #aaa;

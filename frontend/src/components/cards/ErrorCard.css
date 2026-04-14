@@ -1,5 +1,5 @@
 .error-card {
-  background: #1e1515;
+  background: var(--bg-tertiary);
   border: 1px solid #5a2020;
   border-radius: 12px;
   padding: 20px 24px;
@@ -37,7 +37,7 @@
 
 .error-card__details-summary {
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
@@ -60,7 +60,7 @@
 }
 
 .error-card__action-btn {
-  background: #2a1515;
+  background: var(--bg-hover);
   border: 1px solid #5a2020;
   border-radius: 6px;
   padding: 6px 14px;
@@ -70,5 +70,5 @@
 }
 
 .error-card__action-btn:hover {
-  background: #3a1515;
+  background: var(--bg-hover);
 }

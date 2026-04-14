@@ -1,5 +1,5 @@
 .publish-result-card {
-  background: #1e1e22;
+  background: var(--bg-tertiary);
   border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
@@ -19,13 +19,13 @@
 .publish-result-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .publish-result-card__subtitle {
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -64,7 +64,7 @@
 
 .publish-result-card__result-platform {
   font-size: 13px;
-  color: #ececec;
+  color: var(--text-primary);
 }
 
 .publish-result-card__result-link {
@@ -89,7 +89,7 @@
 
 .publish-result-card__status-btn {
   background: #1e2a3a;
-  border: 1px solid #2a3a5e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 16px;
   color: #60a5fa;
@@ -98,4 +98,4 @@
   align-self: flex-start;
 }
 
-.publish-result-card__status-btn:hover { background: #16213e; }
+.publish-result-card__status-btn:hover { background: var(--bg-secondary); }

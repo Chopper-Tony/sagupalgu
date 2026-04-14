@@ -1,5 +1,5 @@
 .product-confirm-card {
-  background: #1e1e22;
+  background: var(--bg-tertiary);
   border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
@@ -22,13 +22,13 @@
 .product-confirm-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .product-confirm-card__subtitle {
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
   line-height: 1.5;
 }
@@ -41,8 +41,8 @@
 }
 
 .product-confirm-card__candidate {
-  background: #16213e;
-  border: 1px solid #2a3a5e;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 16px;
   cursor: pointer;
@@ -66,12 +66,12 @@
 .product-confirm-card__candidate-name {
   font-size: 14px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
 }
 
 .product-confirm-card__candidate-category {
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
   background: var(--bg-hover);
   padding: 2px 8px;
   border-radius: 4px;
@@ -92,7 +92,7 @@
 
 .product-confirm-card__confidence-label {
   font-size: 11px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 /* 직접 입력 */
@@ -118,10 +118,10 @@
 
 .product-confirm-card__input {
   background: var(--bg-primary);
-  border: 1px solid #3a3a3e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #ececec;
+  color: var(--text-primary);
   font-size: 13px;
 }
 
@@ -176,7 +176,7 @@
   color: #f59e0b;
   margin: 0;
   padding: 8px 12px;
-  background: #1a1a10;
+  background: var(--bg-secondary);
   border: 1px solid #3a3a1e;
   border-radius: 6px;
 }

@@ -5,8 +5,8 @@
 }
 
 .image-upload-card__dropzone {
-  background: #1e1e22;
-  border: 2px dashed #3a3a3e;
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--border);
   border-radius: 12px;
   padding: 40px 24px;
   display: flex;
@@ -19,7 +19,7 @@
 
 .image-upload-card__dropzone:hover {
   border-color: #2563eb;
-  background: #16213e;
+  background: var(--bg-secondary);
 }
 
 .image-upload-card__icon {
@@ -29,7 +29,7 @@
 .image-upload-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0;
 }
 

@@ -1,5 +1,5 @@
 .draft-card {
-  background: #1e1e22;
+  background: var(--bg-tertiary);
   border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
@@ -19,7 +19,7 @@
 .draft-card__title {
   font-size: 14px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -27,15 +27,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #16213e;
-  border: 1px solid #2a3a5e;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
 }
 
 .draft-card__market-label {
   font-size: 11px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .draft-card__market-price {
@@ -78,7 +78,7 @@
 .draft-card__listing-title {
   font-size: 15px;
   font-weight: 700;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -105,7 +105,7 @@
 
 .draft-card__tag {
   font-size: 11px;
-  color: #888;
+  color: var(--text-muted);
   background: var(--bg-hover);
   padding: 2px 8px;
   border-radius: 4px;
@@ -124,16 +124,16 @@
 
 .draft-card__platform-btn {
   background: var(--bg-hover);
-  border: 1px solid #3a3a3e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .draft-card__platform-btn--selected {
-  background: #16213e;
+  background: var(--bg-secondary);
   border-color: #2563eb;
   color: #60a5fa;
 }
@@ -164,15 +164,15 @@
 
 .draft-card__rewrite-btn {
   background: transparent;
-  border: 1px solid #3a3a3e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 20px;
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
 }
 
-.draft-card__rewrite-btn:hover { border-color: #888; color: #ececec; }
+.draft-card__rewrite-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
 
 .draft-card__rewrite {
   display: flex;
@@ -184,10 +184,10 @@
 
 .draft-card__rewrite-input {
   background: var(--bg-primary);
-  border: 1px solid #3a3a3e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
-  color: #ececec;
+  color: var(--text-primary);
   font-size: 13px;
   resize: vertical;
   font-family: inherit;
@@ -217,7 +217,7 @@
 
 .draft-card__edit-label {
   font-size: 12px;
-  color: #888;
+  color: var(--text-muted);
   margin-bottom: -4px;
 }
 
@@ -231,7 +231,7 @@
 
 .draft-card__feedback-title {
   font-size: 13px;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 12px;
 }
 
@@ -252,14 +252,14 @@
 
 .draft-card__feedback-table tbody td {
   padding: 8px;
-  border-bottom: 1px solid #1e1e22;
+  border-bottom: 1px solid var(--bg-tertiary);
   vertical-align: top;
   color: #aaa;
   line-height: 1.5;
 }
 
 .draft-card__feedback-type {
-  color: #ececec;
+  color: var(--text-primary);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -306,7 +306,7 @@
 
 .draft-card__agent-trace-title {
   font-size: 13px;
-  color: #ececec;
+  color: var(--text-primary);
   font-weight: 600;
   padding: 12px 14px;
   cursor: pointer;
@@ -341,7 +341,7 @@
 
 .draft-card__agent-plan-focus {
   font-size: 13px;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 6px;
   font-weight: 500;
 }
