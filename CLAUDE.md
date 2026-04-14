@@ -17,7 +17,7 @@ LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
 - **Listing LLM**: OpenAI gpt-4.1-mini → Gemini → Solar (fallback 체인)
 - **DB**: Supabase (PostgreSQL + pgvector)
 - **게시**: 크롬 익스텐션 Content Script (CDP 이미지 업로드)
-- **프론트엔드**: React 18 + TypeScript + Vite
+- **프론트엔드**: React 19 + TypeScript + Vite
 - **배포**: Docker Compose (4 컨테이너) + Caddy HTTPS + GitHub Actions CI/CD
 
 ## 주요 명령어

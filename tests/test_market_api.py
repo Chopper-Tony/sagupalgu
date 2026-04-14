@@ -200,7 +200,8 @@ class TestStatusChange:
 
     @pytest.mark.unit
     def test_change_invalid_transition(self, client, mock_repo):
-        mock_repo.update_sale_status.return_value = "INVALID_TRANSITION"
+        from app.domain.exceptions import InvalidStateTransitionError
+        mock_repo.update_sale_status.side_effect = InvalidStateTransitionError("전이 불가")
         resp = client.patch(f"{BASE}/my-listings/sess-001/status",
                             json={"sale_status": "reserved"},
                             headers={"X-Dev-User-Id": "seller-1"})

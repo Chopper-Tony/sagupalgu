@@ -137,12 +137,6 @@ class Settings(BaseSettings):
     run_publish_worker: bool = Field(
         default=True,
         alias="RUN_PUBLISH_WORKER",
-        description="True=이 프로세스에서 워커 실행. API전용 컨테이너에서는 False.",
-    )
-
-    run_publish_worker: bool = Field(
-        default=True,
-        alias="RUN_PUBLISH_WORKER",
         description="True=API 서버 시작 시 워커도 시작, False=API 전용 (워커 별도 실행)",
     )
 

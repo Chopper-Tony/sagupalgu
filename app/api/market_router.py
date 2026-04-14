@@ -311,8 +311,7 @@ async def update_listing_sale_status(
     )
     if result is None:
         raise HTTPException(status_code=404, detail="상품을 찾을 수 없거나 권한이 없습니다")
-    if result == "INVALID_TRANSITION":
-        raise HTTPException(status_code=409, detail="현재 상태에서 해당 전이가 불가능합니다")
+    # InvalidStateTransitionError는 main.py 글로벌 핸들러에서 409로 변환
 
     return {"success": True, "sale_status": new_status}
 

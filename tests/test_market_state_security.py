@@ -105,7 +105,8 @@ class TestStateSafety:
     @pytest.mark.unit
     def test_sold_item_rejects_status_change(self, client, mock_repo):
         """sold 상품에 status 변경 → 409 (전이 불가)."""
-        mock_repo.update_sale_status.return_value = "INVALID_TRANSITION"
+        from app.domain.exceptions import InvalidStateTransitionError
+        mock_repo.update_sale_status.side_effect = InvalidStateTransitionError("전이 불가")
         resp = client.patch(f"{BASE}/my-listings/sess-001/status",
                             json={"sale_status": "available"}, headers=S1)
         assert resp.status_code == 409
