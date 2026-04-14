@@ -2,19 +2,19 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>사구팔구 연동</title>
+  <title>사구팔구</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 320px;
+      width: 300px;
       font-family: 'Noto Sans KR', -apple-system, sans-serif;
       background: #1a1a2e;
       color: #e0e0e0;
       padding: 16px;
     }
-    h1 { font-size: 16px; margin-bottom: 12px; color: #fff; }
-    .section { margin-bottom: 16px; }
-    .section-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+    h1 { font-size: 16px; margin-bottom: 14px; color: #fff; }
+    .section { margin-bottom: 14px; }
+    .section-label { font-size: 11px; color: #888; margin-bottom: 6px; }
     input[type="text"] {
       width: 100%;
       padding: 8px 10px;
@@ -42,7 +42,7 @@
     .status-connected { background: #064e3b; color: #6ee7b7; }
     .status-expired { background: #78350f; color: #fbbf24; }
     .status-disconnected { background: #333; color: #888; }
-    .connect-btn {
+    .btn {
       padding: 6px 14px;
       border: none;
       border-radius: 6px;
@@ -52,8 +52,13 @@
       cursor: pointer;
       font-weight: 600;
     }
-    .connect-btn:hover { background: #1d4ed8; }
-    .connect-btn:disabled { background: #444; cursor: not-allowed; }
+    .btn:hover { background: #1d4ed8; }
+    .btn:disabled { background: #444; cursor: not-allowed; }
+    .btn-full { width: 100%; padding: 10px; font-size: 13px; margin-bottom: 6px; }
+    .btn-green { background: #059669; }
+    .btn-green:hover { background: #047857; }
+    .btn-red { background: #dc2626; }
+    .btn-red:hover { background: #b91c1c; }
     .message {
       font-size: 12px;
       margin-top: 8px;
@@ -63,47 +68,36 @@
     .message-success { background: #064e3b; color: #6ee7b7; }
     .message-error { background: #7f1d1d; color: #fca5a5; }
     .message-info { background: #1e3a5f; color: #93c5fd; }
+    .divider { border-top: 1px solid #333; margin: 12px 0; }
   </style>
 </head>
 <body>
-  <h1>사구팔구 플랫폼 연동</h1>
+  <h1>사구팔구</h1>
 
+  <!-- 플랫폼 연결 -->
   <div class="section">
-    <div class="section-label">연결 토큰 (웹앱에서 복사)</div>
-    <input type="text" id="token-input" placeholder="웹앱에서 발급받은 토큰을 붙여넣으세요">
-  </div>
-
-  <div class="section">
-    <div class="section-label">플랫폼</div>
+    <div class="section-label">플랫폼 연결</div>
     <div class="platform-row">
       <span class="platform-name">번개장터</span>
       <span id="status-bunjang" class="platform-status status-disconnected">미연동</span>
-      <button class="connect-btn" id="btn-bunjang" data-platform="bunjang">연결</button>
+      <button class="btn connect-btn" id="btn-bunjang" data-platform="bunjang">연결</button>
     </div>
     <div class="platform-row">
       <span class="platform-name">중고나라</span>
       <span id="status-joongna" class="platform-status status-disconnected">미연동</span>
-      <button class="connect-btn" id="btn-joongna" data-platform="joongna">연결</button>
+      <button class="btn connect-btn" id="btn-joongna" data-platform="joongna">연결</button>
     </div>
   </div>
 
   <div id="message-area"></div>
 
-  <div class="section" style="margin-top: 12px;">
-    <div class="section-label">자동 게시</div>
-    <input type="text" id="session-id-input" placeholder="세션 ID (웹앱에서 복사)" style="margin-bottom: 8px;">
-    <button class="connect-btn" id="btn-publish-joongna" style="width:100%; padding: 10px; font-size: 13px; background: #059669; margin-bottom: 6px;">
-      중고나라 자동 게시
-    </button>
-    <button class="connect-btn" id="btn-publish-bunjang" style="width:100%; padding: 10px; font-size: 13px; background: #dc2626;">
-      번개장터 자동 게시
-    </button>
-  </div>
+  <div class="divider"></div>
 
-  <div class="section" style="margin-top: 12px;">
-    <div class="section-label">서버 URL (고급)</div>
-    <input type="text" id="server-url" value="http://34.239.155.255">
-  </div>
+  <!-- 서버 URL (접힘) -->
+  <details style="font-size: 11px; color: #666;">
+    <summary style="cursor: pointer;">서버 URL (고급)</summary>
+    <input type="text" id="server-url" value="http://34.239.155.255" style="margin-top: 6px;">
+  </details>
 
   <script src="popup.js"></script>
 </body>

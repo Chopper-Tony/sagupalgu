@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { AppShell } from "./components/layout/AppShell";
 import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -258,9 +259,9 @@ export default function App() {
   };
 
   // 마켓/대시보드 페이지는 별도 렌더링
-  if (page === "market") return <MarketPage />;
-  if (page === "market-detail" && marketDetailId) return <MarketDetailPage sessionId={marketDetailId} />;
-  if (page === "my-listings") return <MyListingsPage />;
+  if (page === "market") return <><ThemeToggle /><MarketPage /></>;
+  if (page === "market-detail" && marketDetailId) return <><ThemeToggle /><MarketDetailPage sessionId={marketDetailId} /></>;
+  if (page === "my-listings") return <><ThemeToggle /><MyListingsPage /></>;
 
   const sidebarSessions = sessions.map((s) => ({
     id: s.id,
@@ -269,6 +270,7 @@ export default function App() {
   }));
 
   return (
+    <><ThemeToggle />
     <AppShell
       sidebar={
         <SessionSidebar
@@ -294,5 +296,6 @@ export default function App() {
         </div>
       }
     />
+    </>
   );
 }
