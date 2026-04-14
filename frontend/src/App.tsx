@@ -145,13 +145,30 @@ export default function App() {
   };
 
   const handleUploadImages = async (files: File[]) => {
-    if (!activeId) return;
+    let sessionId = activeId;
+
+    // 세션이 없으면 자동 생성 (모바일 UX: + 버튼으로 바로 업로드)
+    if (!sessionId) {
+      try {
+        const s = await api.createSession();
+        setSessions((prev) => [{ id: s.session_id, lastKnownStatus: s.status as SessionStatus, updatedAt: new Date().toISOString() }, ...prev]);
+        setActiveId(s.session_id);
+        setSession(s);
+        setTimeline([]);
+        setLastRenderedStatus(null);
+        sessionId = s.session_id;
+      } catch {
+        pushItem({ type: "error", code: "create_failed", message: "세션 생성에 실패했습니다." });
+        return;
+      }
+    }
+
     pushItem({ type: "user_message", text: `📷 사진 ${files.length}장을 업로드했습니다` });
     pushItem({ type: "progress", status: "images_uploaded", message: "이미지를 분석하고 있습니다..." });
     try {
-      await api.uploadImages(activeId, files);
+      await api.uploadImages(sessionId, files);
       // 업로드 후 자동으로 분석 시작
-      const analyzed = await api.analyzeSession(activeId);
+      const analyzed = await api.analyzeSession(sessionId);
       setSession(analyzed);
     } catch (e: unknown) {
       pushItem({ type: "error", code: "upload_failed", message: friendlyError(e) });
