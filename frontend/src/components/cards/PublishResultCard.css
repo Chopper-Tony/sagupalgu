@@ -81,14 +81,14 @@
 }
 
 .publish-result-card__extension-notice {
-  background: #0f172a;
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
 }
 
 .publish-result-card__status-btn {
-  background: #1e2a3a;
+  background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 16px;

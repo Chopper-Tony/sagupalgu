@@ -138,8 +138,8 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
             {sessionId && (
               <code
                 style={{
-                  display: "block", fontSize: "11px", color: "#e0e0e0",
-                  background: "#1e293b", padding: "6px 8px", borderRadius: "4px",
+                  display: "block", fontSize: "11px", color: "var(--text-secondary)",
+                  background: "var(--bg-tertiary)", padding: "6px 8px", borderRadius: "4px",
                   marginTop: "4px", cursor: "pointer", wordBreak: "break-all",
                 }}
                 onClick={() => {
