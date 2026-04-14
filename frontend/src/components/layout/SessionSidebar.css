@@ -23,10 +23,12 @@
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: var(--radius);
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: var(--btn-padding);
+  font-size: var(--btn-font-size);
+  line-height: var(--btn-line-height);
+  font-weight: var(--btn-font-weight);
+  border-radius: var(--btn-radius);
+  box-sizing: border-box;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -174,9 +176,9 @@
 
 .session-sidebar__nav-link {
   display: block;
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border, #d1d5db);
+  padding: var(--btn-padding);
+  border-radius: var(--btn-radius);
+  border: var(--btn-border-width) solid var(--border, #d1d5db);
   text-decoration: none;
   color: var(--text-secondary, #4b5563);
   font-size: 13px;
