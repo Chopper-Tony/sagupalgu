@@ -107,3 +107,15 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build  #
 - Supabase Storage: Public 버킷 `product-images` 활성화
 - 번개장터 자동 게시: Content Script + React 이벤트 체인 방식
 - 중고나라 자동 게시: Content Script 방식
+
+## EC2 IP 변경 시 필수 체크리스트
+
+Elastic IP 미확보 상태. EC2 재시작 시 퍼블릭 IP가 바뀌므로 아래를 반드시 수행:
+
+1. **익스텐션 코드 IP 업데이트** (3개 파일):
+   - `sagupalgu-extension/background.js` → `DEFAULT_SERVER_URL`
+   - `sagupalgu-extension/popup.js` → `DEFAULT_SERVER_URL`
+   - `sagupalgu-extension/popup.html` → input value
+2. **커밋 + 푸시 + EC2 배포** (`git pull && docker compose up --build -d`)
+3. **익스텐션 새로고침** (chrome://extensions)
+4. **동작 확인**: 셀러 코파일럿 접속 + 플랫폼 연동 테스트
