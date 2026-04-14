@@ -193,7 +193,10 @@ class SessionRepository:
 
         current_status = _get_sale_status(session)
         if current_status not in allowed_from:
-            return "INVALID_TRANSITION"
+            from app.domain.exceptions import InvalidStateTransitionError
+            raise InvalidStateTransitionError(
+                f"판매 상태 전이 불가: {current_status} → {new_status} (허용: {allowed_from})"
+            )
 
         listing_data = dict(session.get("listing_data_jsonb") or {})
         listing_data["sale_status"] = new_status

@@ -2,10 +2,10 @@
 
 > 사진 한 장으로 상품 분석부터 판매글 작성, 게시까지 자동화하는 LangGraph Agentic Workflow 플랫폼
 
-[![Tests](https://img.shields.io/badge/tests-508%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-596%20BE%20%2B%2060%20FE%20passed-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.11-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)]()
-[![React](https://img.shields.io/badge/React-18-61DAFB)]()
+[![React](https://img.shields.io/badge/React-19-61DAFB)]()
 
 ---
 
@@ -78,7 +78,7 @@ START
 | **Vision** | OpenAI gpt-4.1-mini (기본) · Gemini 2.5 Flash (설정에 따라 전환) |
 | **DB** | Supabase (PostgreSQL + pgvector) |
 | **크롤러** | Playwright (웹 자동화) |
-| **프론트엔드** | React 18 + TypeScript + Vite |
+| **프론트엔드** | React 19 + TypeScript + Vite |
 | **배포** | Docker Compose (backend + frontend nginx) |
 
 ---
@@ -117,7 +117,7 @@ cd frontend && npm install && npm run dev
 ## 테스트
 
 ```bash
-# 전체 테스트 (508개)
+# 전체 테스트 (596개)
 python -m pytest tests/
 
 # unit 테스트만 (0.5초)
@@ -181,7 +181,7 @@ frontend/
 ├── src/hooks/      # 스마트 폴링 (useSession)
 ├── src/lib/        # API 클라이언트, 상태 매핑
 └── src/types/      # TypeScript 타입 (자동 동기화)
-tests/              # 508개 테스트 (unit + integration + E2E)
+tests/              # 596개 테스트 (unit + integration + E2E)
 docs/               # 아키텍처 문서, 배포 가이드
 ```
 
