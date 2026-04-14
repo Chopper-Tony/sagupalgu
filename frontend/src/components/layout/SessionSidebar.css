@@ -167,23 +167,26 @@
 
 .session-sidebar__nav {
   margin-top: auto;
-  padding: 10px 16px 12px;
+  padding: 12px 16px 20px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  gap: 8px;
   border-top: 1px solid var(--border, #30363d);
 }
 
 .session-sidebar__nav-link {
   display: block;
-  padding: var(--btn-padding);
+  flex: 1;
+  padding: 9px 14px;
   border-radius: var(--btn-radius);
   border: var(--btn-border-width) solid var(--border, #d1d5db);
   text-decoration: none;
   color: var(--text-secondary, #4b5563);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--btn-font-size);
+  line-height: var(--btn-line-height);
+  font-weight: var(--btn-font-weight);
   text-align: center;
+  box-sizing: border-box;
 }
 
 .session-sidebar__nav-link:hover {

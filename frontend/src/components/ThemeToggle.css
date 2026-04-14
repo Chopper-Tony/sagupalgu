@@ -8,3 +8,12 @@
   color: var(--text-primary);
   cursor: pointer;
 }
+
+@media (max-width: 768px) {
+  .theme-toggle {
+    top: 8px;
+    right: 8px;
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+}
