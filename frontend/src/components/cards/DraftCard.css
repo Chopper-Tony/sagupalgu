@@ -1,6 +1,6 @@
 .draft-card {
   background: #1e1e22;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
   display: flex;
@@ -61,13 +61,13 @@
   height: 100px;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   flex-shrink: 0;
 }
 
 .draft-card__content {
-  background: #0f0f10;
-  border: 1px solid #2a2a2e;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-hover);
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -106,7 +106,7 @@
 .draft-card__tag {
   font-size: 11px;
   color: #888;
-  background: #2a2a2e;
+  background: var(--bg-hover);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -123,7 +123,7 @@
 }
 
 .draft-card__platform-btn {
-  background: #2a2a2e;
+  background: var(--bg-hover);
   border: 1px solid #3a3a3e;
   border-radius: 6px;
   padding: 6px 14px;
@@ -155,7 +155,7 @@
 }
 
 .draft-card__approve-btn:disabled {
-  background: #2a2a2e;
+  background: var(--bg-hover);
   color: #555;
   cursor: default;
 }
@@ -179,11 +179,11 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 12px;
-  border-top: 1px solid #2a2a2e;
+  border-top: 1px solid var(--bg-hover);
 }
 
 .draft-card__rewrite-input {
-  background: #0f0f10;
+  background: var(--bg-primary);
   border: 1px solid #3a3a3e;
   border-radius: 6px;
   padding: 10px 12px;
@@ -210,7 +210,7 @@
 }
 
 .draft-card__rewrite-submit:disabled {
-  background: #2a2a2e;
+  background: var(--bg-hover);
   color: #555;
   cursor: default;
 }
@@ -223,8 +223,8 @@
 
 /* AI 품질 평가 */
 .draft-card__feedback {
-  background: #161b22;
-  border: 1px solid #2a2a2e;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-hover);
   border-radius: 8px;
   padding: 14px 16px;
 }
@@ -246,7 +246,7 @@
   color: #666;
   font-weight: 500;
   padding: 6px 8px;
-  border-bottom: 1px solid #2a2a2e;
+  border-bottom: 1px solid var(--bg-hover);
   white-space: nowrap;
 }
 
@@ -294,8 +294,8 @@
 
 /* Agent Decision Visualization */
 .draft-card__agent-trace {
-  background: #161b22;
-  border: 1px solid #2a2a2e;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-hover);
   border-radius: 8px;
   padding: 0;
 }

@@ -3,7 +3,7 @@
   align-items: center;
   gap: 16px;
   background: #1e1e22;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
 }

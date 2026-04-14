@@ -1,6 +1,6 @@
 .publish-result-card {
   background: #1e1e22;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
   display: flex;
@@ -39,8 +39,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #0f0f10;
-  border: 1px solid #2a2a2e;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-hover);
   border-radius: 6px;
   padding: 10px 14px;
 }
@@ -82,7 +82,7 @@
 
 .publish-result-card__extension-notice {
   background: #0f172a;
-  border: 1px solid #1e3a5f;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
 }

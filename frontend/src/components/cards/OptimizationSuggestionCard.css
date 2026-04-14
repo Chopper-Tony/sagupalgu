@@ -1,6 +1,6 @@
 .optimization-card {
   background: #1e1e22;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
   display: flex;
@@ -30,8 +30,8 @@
 }
 
 .optimization-card__body {
-  background: #0f0f10;
-  border: 1px solid #2a2a2e;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-hover);
   border-radius: 8px;
   padding: 14px 16px;
   display: flex;
@@ -78,4 +78,4 @@
   cursor: pointer;
 }
 
-.optimization-card__restart-btn:hover { background: #2a2a2e; }
+.optimization-card__restart-btn:hover { background: var(--bg-hover); }
