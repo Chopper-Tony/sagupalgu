@@ -60,6 +60,7 @@ class MarketContext(TypedDict, total=False):
     median_price: Optional[int]
     sample_count: int
     crawler_sources: List[str]
+    reference_listings: List[Dict[str, Any]]  # 크롤링된 유사 매물 (제목+가격)
 
 
 class PricingStrategy(TypedDict, total=False):

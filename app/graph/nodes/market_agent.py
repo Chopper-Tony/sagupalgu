@@ -119,6 +119,7 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
             "price_band": crawl_output.get("price_band") or [],
             "sample_count": sample_count,
             "crawler_sources": crawl_output.get("crawler_sources") or [],
+            "reference_listings": crawl_output.get("raw_listings") or [],
         }
 
     state["market_context"] = MarketContext(
@@ -126,6 +127,7 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         median_price=market_context_result.get("median_price"),
         sample_count=_safe_int(market_context_result.get("sample_count"), 0),
         crawler_sources=market_context_result.get("crawler_sources") or [],
+        reference_listings=market_context_result.get("reference_listings") or [],
     )
     state["checkpoint"] = "B_market_complete"
     state["status"] = "market_analyzing"
