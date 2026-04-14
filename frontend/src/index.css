@@ -1,6 +1,25 @@
 /* ── 사구팔구 글로벌 스타일 ─────────────────────────────── */
+
+/* 라이트 테마 (기본) */
 :root {
   /* 색상 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border: #d1d5db;
+  --accent: #10a37f;
+  --accent-hover: #0d8c6d;
+  --accent-light: rgba(16, 163, 127, 0.1);
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --shadow: rgba(0, 0, 0, 0.08) 0 4px 12px;
+
+/* 다크 테마 */
+[data-theme="dark"] {
   --bg-primary: #0f0f10;
   --bg-secondary: #1a1a1d;
   --bg-tertiary: #222225;
@@ -15,6 +34,7 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --shadow: rgba(0, 0, 0, 0.3) 0 4px 12px;
+}
 
   /* 타이포그래피 */
   --font-sans: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
