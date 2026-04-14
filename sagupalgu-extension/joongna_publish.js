@@ -470,10 +470,16 @@
                     currentUrl.match(/completeSeq=(\d+)/) ||
                     currentUrl.match(/\/(\d+)(?:\?|$)/);
 
+      // completeSeq URL → 실제 상품 페이지 URL로 변환
+      const listingId = match ? match[1] : null;
+      const listingUrl = (listingId && currentUrl.includes("completeSeq"))
+        ? `https://web.joongna.com/product/${listingId}`
+        : currentUrl;
+
       return {
         success: true,
-        listing_url: currentUrl,
-        listing_id: match ? match[1] : null,
+        listing_url: listingUrl,
+        listing_id: listingId,
         steps,
       };
     } catch (e) {
