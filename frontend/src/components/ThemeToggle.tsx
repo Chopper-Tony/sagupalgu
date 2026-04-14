@@ -25,7 +25,7 @@ export function ThemeToggle() {
       style={{
         position: "fixed",
         top: 12,
-        right: 12,
+        right: 120,
         zIndex: 9999,
         padding: "6px 12px",
         borderRadius: 6,

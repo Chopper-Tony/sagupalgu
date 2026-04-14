@@ -1,5 +1,5 @@
 .publish-approval-card {
-  background: #1e1e22;
+  background: var(--bg-tertiary);
   border: 1px solid var(--bg-hover);
   border-radius: 12px;
   padding: 20px 24px;
@@ -19,13 +19,13 @@
 .publish-approval-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .publish-approval-card__subtitle {
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -42,7 +42,7 @@
 .publish-approval-card__listing-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ececec;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -61,8 +61,8 @@
 .publish-approval-card__platform {
   font-size: 12px;
   color: #60a5fa;
-  background: #16213e;
-  border: 1px solid #2a3a5e;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   padding: 4px 10px;
   border-radius: 4px;
 }
@@ -87,12 +87,12 @@
 
 .publish-approval-card__edit-btn {
   background: transparent;
-  border: 1px solid #3a3a3e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 20px;
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
 }
 
-.publish-approval-card__edit-btn:hover { border-color: #888; color: #ececec; }
+.publish-approval-card__edit-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
