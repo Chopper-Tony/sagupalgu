@@ -131,6 +131,124 @@ async def submit_inquiry(
     return {"success": True, "inquiry_id": inquiry.get("id"), "discord_sent": discord_sent, "email_sent": email_sent}
 
 
+# ── 구매자용 AI 상품 챗봇 ──────────────────────────────
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/{session_id}/chat")
+async def chat_with_product(
+    session_id: str,
+    body: ChatRequest,
+    repo: SessionRepository = Depends(get_session_repository),
+) -> dict[str, Any]:
+    """구매자가 상품에 대해 AI에게 질문한다. 상품 정보 + LLM 지식 기반 답변."""
+    row = repo.get_completed_by_id(session_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
+
+    listing_data = row.get("listing_data_jsonb") or {}
+    canonical = listing_data.get("canonical_listing") or {}
+    product_data = row.get("product_data_jsonb") or {}
+    confirmed = product_data.get("confirmed_product") or {}
+    workflow_meta = row.get("workflow_meta_jsonb") or {}
+    market_context = workflow_meta.get("market_context") or {}
+
+    reply = await _generate_chat_reply(
+        message=body.message,
+        title=canonical.get("title", ""),
+        description=canonical.get("description", ""),
+        price=canonical.get("price", 0),
+        tags=canonical.get("tags") or [],
+        brand=confirmed.get("brand", ""),
+        model=confirmed.get("model", ""),
+        category=confirmed.get("category", ""),
+        confidence=confirmed.get("confidence", 0),
+        median_price=market_context.get("median_price"),
+        price_band=market_context.get("price_band") or [],
+        sample_count=market_context.get("sample_count", 0),
+        sale_status=_get_sale_status(row),
+    )
+
+    if not reply:
+        reply = "현재 AI 상담이 불가합니다. 판매자에게 직접 문의해주세요."
+
+    return {"reply": reply, "source": "llm" if reply != "현재 AI 상담이 불가합니다. 판매자에게 직접 문의해주세요." else "fallback"}
+
+
+async def _generate_chat_reply(
+    message: str,
+    title: str,
+    description: str,
+    price: int,
+    tags: list[str],
+    brand: str,
+    model: str,
+    category: str,
+    confidence: float,
+    median_price: int | None,
+    price_band: list,
+    sample_count: int,
+    sale_status: str,
+) -> str | None:
+    """상품 정보 기반 구매자 질문 AI 답변."""
+    try:
+        import httpx
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        api_key = getattr(settings, "openai_api_key", None)
+        if not api_key:
+            return None
+
+        market_info = ""
+        if median_price:
+            market_info = f"\n시세 중앙값: {median_price:,}원\n가격대: {price_band}\n표본: {sample_count}건"
+
+        system_prompt = (
+            f"너는 중고거래 상품 상담 AI입니다.\n"
+            f"아래 상품 정보를 기반으로 구매자의 질문에 친절하게 답변하세요.\n"
+            f"상품 정보에 없는 내용 중 제품 일반 스펙(용량, eSIM, 크기, 출시일 등)은 네가 아는 지식으로 보충하세요.\n"
+            f"판매자 개별 상태(흠집, 배터리 수명 등)는 정보 없으면 '판매자에게 직접 문의해주세요'로 안내하세요.\n"
+            f"한국어 존댓말로 1~4문장 이내로 답변하세요.\n\n"
+            f"[판매글 정보]\n"
+            f"상품명: {title}\n"
+            f"가격: {price:,}원\n"
+            f"설명: {description[:500]}\n"
+            f"태그: {', '.join(tags[:5])}\n\n"
+            f"[AI 분석 결과]\n"
+            f"브랜드: {brand}\n"
+            f"모델: {model}\n"
+            f"카테고리: {category}\n"
+            f"AI 확신도: {confidence}\n"
+            f"{market_info}\n"
+            f"판매 상태: {sale_status}"
+        )
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "gpt-4.1-mini",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": message},
+                    ],
+                    "max_tokens": 300,
+                    "temperature": 0.7,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.warning("product_chat_llm_failed: %s", e)
+        return None
+
+
 # ── 판매자 전용 (인증 필요) ─────────────────────────────
 
 

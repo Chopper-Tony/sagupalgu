@@ -145,6 +145,9 @@ export function MarketDetailPage({ sessionId }: Props) {
         </div>
       )}
 
+      {/* AI 상품 상담 챗봇 */}
+      <ProductChatbot sessionId={sessionId} />
+
       {/* 구매 문의 — 판매완료/예약중이면 비활성화 */}
       <div className="detail-inquiry-section">
         {item.sale_status === "sold" && (
@@ -214,6 +217,89 @@ export function MarketDetailPage({ sessionId }: Props) {
           등록일: {new Date(item.created_at).toLocaleDateString("ko-KR")}
         </p>
       )}
+    </div>
+  );
+}
+
+
+interface ChatMessage {
+  role: "user" | "ai";
+  text: string;
+}
+
+function ProductChatbot({ sessionId }: { sessionId: string }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "ai", text: "안녕하세요! 이 상품에 대해 궁금한 점을 물어보세요." },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const res = await api.chatWithProduct(sessionId, text);
+      setMessages((prev) => [...prev, { role: "ai", text: res.reply }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "ai", text: "답변을 가져오지 못했습니다. 잠시 후 다시 시도해주세요." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="detail-chatbot-section">
+        <button className="detail-chatbot-toggle" onClick={() => setOpen(true)}>
+          AI에게 상품 질문하기
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="detail-chatbot-section">
+      <div className="detail-chatbot">
+        <div className="detail-chatbot__header">
+          <span className="detail-chatbot__title">AI 상품 상담</span>
+          <button className="detail-chatbot__close" onClick={() => setOpen(false)}>X</button>
+        </div>
+        <div className="detail-chatbot__messages">
+          {messages.map((msg, i) => (
+            <div key={i} className={`detail-chatbot__msg detail-chatbot__msg--${msg.role}`}>
+              <span className="detail-chatbot__label">{msg.role === "ai" ? "AI" : "나"}</span>
+              <p>{msg.text}</p>
+            </div>
+          ))}
+          {loading && (
+            <div className="detail-chatbot__msg detail-chatbot__msg--ai">
+              <span className="detail-chatbot__label">AI</span>
+              <p className="detail-chatbot__typing">답변 작성 중...</p>
+            </div>
+          )}
+        </div>
+        <div className="detail-chatbot__input-row">
+          <input
+            type="text"
+            className="detail-chatbot__input"
+            placeholder="질문을 입력하세요..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            maxLength={500}
+            disabled={loading}
+          />
+          <button className="detail-chatbot__send" onClick={handleSend} disabled={loading || !input.trim()}>
+            전송
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -111,6 +111,11 @@ export const api = {
       `/market/${sessionId}/inquiry`, body
     ).then((r) => r.data),
 
+  chatWithProduct: (sessionId: string, message: string) =>
+    client.post<{ reply: string; source: string }>(
+      `/market/${sessionId}/chat`, { message }
+    ).then((r) => r.data),
+
   // 판매자 전용 (인증 필요)
   getMyListings: (saleStatusFilter?: string) =>
     client.get<{ items: import("../types/market").MyListingItem[]; total: number }>(
