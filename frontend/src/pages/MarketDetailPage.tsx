@@ -234,10 +234,17 @@ function ProductChatbot({ sessionId }: { sessionId: string }) {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
+  const MAX_QUESTIONS = 10;
 
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading) return;
+    if (questionCount >= MAX_QUESTIONS) {
+      setMessages((prev) => [...prev, { role: "ai", text: "질문 횟수를 초과했습니다. 추가 문의는 판매자에게 직접 연락해주세요." }]);
+      return;
+    }
+    setQuestionCount((c) => c + 1);
 
     setMessages((prev) => [...prev, { role: "user", text }]);
     setInput("");
