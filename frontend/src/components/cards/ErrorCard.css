@@ -26,7 +26,7 @@
 
 .error-card__message {
   font-size: 13px;
-  color: #ccc;
+  color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
 }
@@ -43,7 +43,7 @@
 }
 
 .error-card__details-summary:hover {
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 .error-card__code {

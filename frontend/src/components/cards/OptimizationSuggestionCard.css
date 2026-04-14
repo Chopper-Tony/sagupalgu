@@ -58,7 +58,7 @@
 
 .optimization-card__reason {
   font-size: 13px;
-  color: #aaa;
+  color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
 }
@@ -73,7 +73,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
 }

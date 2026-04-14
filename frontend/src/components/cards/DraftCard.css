@@ -35,7 +35,7 @@
 
 .draft-card__market-label {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .draft-card__market-price {
@@ -91,7 +91,7 @@
 
 .draft-card__description {
   font-size: 13px;
-  color: #aaa;
+  color: var(--text-secondary);
   margin: 0;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -105,7 +105,7 @@
 
 .draft-card__tag {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   background: var(--bg-hover);
   padding: 2px 8px;
   border-radius: 4px;
@@ -128,7 +128,7 @@
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
@@ -167,12 +167,12 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 20px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
 }
 
-.draft-card__rewrite-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.draft-card__rewrite-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
 
 .draft-card__rewrite {
   display: flex;
@@ -217,7 +217,7 @@
 
 .draft-card__edit-label {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-bottom: -4px;
 }
 
@@ -254,7 +254,7 @@
   padding: 8px;
   border-bottom: 1px solid var(--bg-tertiary);
   vertical-align: top;
-  color: #aaa;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -350,7 +350,7 @@
   margin: 0;
   padding-left: 20px;
   font-size: 12px;
-  color: #aaa;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 

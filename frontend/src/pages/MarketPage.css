@@ -140,12 +140,17 @@
   align-items: center;
 }
 .market-my-listings-link {
+  position: fixed;
+  top: 12px;
+  right: 90px;
+  z-index: 9998;
   color: var(--accent);
   font-size: 0.875rem;
   text-decoration: none;
   padding: 0.35rem 0.75rem;
   border: 1px solid var(--accent);
   border-radius: var(--radius-lg, 12px);
+  background: var(--bg-primary);
 }
 .market-my-listings-link:hover {
   background: rgba(37, 99, 235, 0.1);
