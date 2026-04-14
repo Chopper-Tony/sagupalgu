@@ -3,7 +3,7 @@
  * 토큰 자동 발급: 서버에서 토큰 발급 → 쿠키 수집 → 연결.
  */
 
-const DEFAULT_SERVER_URL = "http://34.239.155.255";
+const DEFAULT_SERVER_URL = "http://44.221.49.47";
 
 function getServerUrl() {
   return (document.getElementById("server-url")?.value || "").trim() || DEFAULT_SERVER_URL;
