@@ -343,8 +343,10 @@ async function uploadImagesViaCDP(tabId, imageUrls, serverUrl) {
             }
           }
 
-          // 표준 이벤트도 발생 (다른 리스너가 있을 수 있으므로)
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          // React onChange가 호출되지 않았을 때만 표준 이벤트 발생 (중복 업로드 방지)
+          if (!reactCalled) {
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
 
           return JSON.stringify({
             ok: true,
