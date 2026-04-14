@@ -8,97 +8,87 @@
     body {
       width: 300px;
       font-family: 'Noto Sans KR', -apple-system, sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      background: #f9fafb;
+      color: #111827;
       padding: 16px;
     }
-    h1 { font-size: 16px; margin-bottom: 14px; color: #fff; }
+    h1 { font-size: 16px; margin-bottom: 14px; color: #111827; }
     .section { margin-bottom: 14px; }
-    .section-label { font-size: 11px; color: #888; margin-bottom: 6px; }
-    input[type="text"] {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #333;
-      border-radius: 6px;
-      background: #16213e;
-      color: #fff;
-      font-size: 13px;
-      outline: none;
-    }
-    input:focus { border-color: #2563eb; }
+    .section-label { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
     .platform-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 8px 0;
-      border-bottom: 1px solid #222;
+      border-bottom: 1px solid #e5e7eb;
     }
-    .platform-name { font-size: 14px; }
+    .platform-name { font-size: 14px; color: #111827; }
     .platform-status {
       font-size: 11px;
       padding: 2px 8px;
       border-radius: 10px;
     }
-    .status-connected { background: #064e3b; color: #6ee7b7; }
-    .status-expired { background: #78350f; color: #fbbf24; }
-    .status-disconnected { background: #333; color: #888; }
+    .status-connected { background: #d1fae5; color: #065f46; }
+    .status-expired { background: #fef3c7; color: #92400e; }
+    .status-disconnected { background: #f3f4f6; color: #6b7280; }
     .btn {
       padding: 6px 14px;
       border: none;
       border-radius: 6px;
-      background: #2563eb;
+      background: #10a37f;
       color: #fff;
       font-size: 12px;
       cursor: pointer;
       font-weight: 600;
     }
-    .btn:hover { background: #1d4ed8; }
-    .btn:disabled { background: #444; cursor: not-allowed; }
-    .btn-full { width: 100%; padding: 10px; font-size: 13px; margin-bottom: 6px; }
-    .btn-green { background: #059669; }
-    .btn-green:hover { background: #047857; }
-    .btn-red { background: #dc2626; }
-    .btn-red:hover { background: #b91c1c; }
+    .btn:hover { background: #0d8c6d; }
+    .btn:disabled { background: #d1d5db; cursor: not-allowed; color: #9ca3af; }
+    .btn-disconnect {
+      background: transparent;
+      color: #ef4444;
+      border: 1px solid #ef4444;
+      font-size: 11px;
+      padding: 4px 10px;
+    }
+    .btn-disconnect:hover { background: #fef2f2; }
+    .btn-group { display: flex; gap: 4px; }
     .message {
       font-size: 12px;
       margin-top: 8px;
       padding: 6px 8px;
       border-radius: 4px;
     }
-    .message-success { background: #064e3b; color: #6ee7b7; }
-    .message-error { background: #7f1d1d; color: #fca5a5; }
-    .message-info { background: #1e3a5f; color: #93c5fd; }
-    .divider { border-top: 1px solid #333; margin: 12px 0; }
+    .message-success { background: #d1fae5; color: #065f46; }
+    .message-error { background: #fee2e2; color: #991b1b; }
+    .message-info { background: #dbeafe; color: #1e40af; }
   </style>
 </head>
 <body>
   <h1>사구팔구</h1>
 
-  <!-- 플랫폼 연결 -->
   <div class="section">
     <div class="section-label">플랫폼 연결</div>
     <div class="platform-row">
       <span class="platform-name">번개장터</span>
       <span id="status-bunjang" class="platform-status status-disconnected">미연동</span>
-      <button class="btn connect-btn" id="btn-bunjang" data-platform="bunjang">연결</button>
+      <div class="btn-group">
+        <button class="btn connect-btn" id="btn-bunjang" data-platform="bunjang">연결</button>
+        <button class="btn btn-disconnect disconnect-btn" id="btn-disconnect-bunjang" data-platform="bunjang" style="display:none;">해제</button>
+      </div>
     </div>
     <div class="platform-row">
       <span class="platform-name">중고나라</span>
       <span id="status-joongna" class="platform-status status-disconnected">미연동</span>
-      <button class="btn connect-btn" id="btn-joongna" data-platform="joongna">연결</button>
+      <div class="btn-group">
+        <button class="btn connect-btn" id="btn-joongna" data-platform="joongna">연결</button>
+        <button class="btn btn-disconnect disconnect-btn" id="btn-disconnect-joongna" data-platform="joongna" style="display:none;">해제</button>
+      </div>
     </div>
   </div>
 
   <div id="message-area"></div>
 
-  <div class="divider"></div>
-
-  <!-- 서버 URL (접힘) -->
-  <details style="font-size: 11px; color: #666;">
-    <summary style="cursor: pointer;">서버 URL (고급)</summary>
-    <input type="text" id="server-url" value="http://34.239.155.255" style="margin-top: 6px;">
-  </details>
-
+  <input type="hidden" id="server-url" value="http://34.239.155.255">
   <script src="popup.js"></script>
 </body>
 </html>

@@ -18,6 +18,17 @@
   --warning: #f59e0b;
   --shadow: rgba(0, 0, 0, 0.08) 0 4px 12px;
 
+  /* 타이포그래피 */
+  --font-sans: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  /* 레이아웃 */
+  --sidebar-width: 260px;
+  --chat-max-width: 720px;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
 /* 다크 테마 */
 [data-theme="dark"] {
   --bg-primary: #0f0f10;
@@ -34,17 +45,6 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --shadow: rgba(0, 0, 0, 0.3) 0 4px 12px;
-}
-
-  /* 타이포그래피 */
-  --font-sans: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
-
-  /* 레이아웃 */
-  --sidebar-width: 260px;
-  --chat-max-width: 720px;
-  --radius: 8px;
-  --radius-lg: 12px;
 }
 
 * {

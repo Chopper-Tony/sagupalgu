@@ -63,6 +63,6 @@
   height: 80px;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid #2a2a2e;
+  border: 1px solid var(--bg-hover);
   flex-shrink: 0;
 }
