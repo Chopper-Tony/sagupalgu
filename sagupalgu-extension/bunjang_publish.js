@@ -11,6 +11,38 @@
 (() => {
   "use strict";
 
+  // ── 플랫폼 Config (CTO 리뷰: 셀렉터/URL/매핑을 한 곳에서 관리) ──
+
+  const BUNJANG_CONFIG = {
+    // 폼 셀렉터
+    selectors: {
+      title: "input[placeholder='상품명을 입력해 주세요.']",
+      price: "input[placeholder*='가격을 입력']",
+      tag: "input[placeholder*='태그를 입력']",
+      description: "textarea",
+      submitButton: "등록하기",
+      modalClose: "button[aria-label='close'], button[aria-label='닫기'], [class*='modal'] button[class*='close']",
+      imageDetect: "img[src*='blob:'], img[src*='data:'], [class*='preview'] img, [class*='thumb'] img",
+    },
+    // 카테고리 매핑 (AI 카테고리 → 번개장터 대분류)
+    categoryMap: {
+      "스마트폰": "디지털",
+      "태블릿": "디지털",
+      "노트북": "디지털",
+      "가전": "가전제품",
+      "음향기기": "디지털",
+      "카메라": "디지털",
+      "패션": "남성의류",
+      "문구": "도서/티켓/문구",
+    },
+    categoryFallback: "기타",
+    // 상품상태 (우선순위 순)
+    conditionTargets: ["사용감 없음", "사용감 적음"],
+    // 성공 검증
+    successPattern: /\/products\/(\d+)/,
+    stayPattern: "products/new",
+  };
+
   // ── 유틸리티 ─────────────────────────────────────────────
 
   function sleep(ms) {
@@ -75,20 +107,8 @@
     // 번개장터 products/new: 대분류 목록이 스크롤 가능한 3단 셀렉터로 노출
     // 매핑 실패 시 "기타"를 폴백으로 선택
 
-    const FALLBACK = "기타";
-
-    const categoryMap = {
-      "스마트폰": "디지털",
-      "태블릿": "디지털",
-      "노트북": "디지털",
-      "가전": "가전제품",
-      "음향기기": "디지털",
-      "카메라": "디지털",
-      "패션": "남성의류",
-      "문구": "도서/티켓/문구",
-      "기타": FALLBACK,
-    };
-
+    const FALLBACK = BUNJANG_CONFIG.categoryFallback;
+    const categoryMap = BUNJANG_CONFIG.categoryMap;
     const targetCategory = (category && categoryMap[category]) || FALLBACK;
 
     // 1단계: 카테고리 첫 번째 컬럼(대분류 스크롤 컨테이너) 찾기
@@ -204,7 +224,7 @@
 
   async function selectCondition() {
     // 상품상태 라디오 버튼 선택 (우선순위: 사용감 없음 > 사용감 적음)
-    const targets = ["사용감 없음", "사용감 적음"];
+    const targets = BUNJANG_CONFIG.conditionTargets;
     const labels = document.querySelectorAll("label");
     for (const target of targets) {
       for (const el of labels) {
@@ -258,7 +278,7 @@
           await sleep(2000);
           waitCount++;
           const imgs = document.querySelectorAll(
-            "img[src*='blob:'], img[src*='data:'], [class*='preview'] img, [class*='thumb'] img"
+            BUNJANG_CONFIG.selectors.imageDetect
           ).length;
           if (imgs > 0) {
             console.log(`[사구팔구] 이미지 ${imgs}개 감지`);
@@ -270,9 +290,7 @@
       await sleep(1500);
 
       // ② 이미지 모달 닫기 (번개장터는 이미지 업로드 후 모달이 뜰 수 있음)
-      const modalClose = document.querySelector(
-        "button[aria-label='close'], button[aria-label='닫기'], [class*='modal'] button[class*='close']"
-      );
+      const modalClose = document.querySelector(BUNJANG_CONFIG.selectors.modalClose);
       if (modalClose) {
         modalClose.click();
         await sleep(500);
@@ -280,9 +298,7 @@
 
       // ③ 상품명 (검색창이 아닌 폼 내부 입력란)
       steps.push("상품명 입력");
-      const titleInput = await waitFor(
-        "input[placeholder='상품명을 입력해 주세요.']"
-      );
+      const titleInput = await waitFor(BUNJANG_CONFIG.selectors.title);
       titleInput.scrollIntoView({ block: "center" });
       titleInput.focus();
       await sleep(300);
@@ -301,7 +317,7 @@
 
       // ⑥ 설명
       steps.push("설명 입력");
-      const textarea = document.querySelector("textarea");
+      const textarea = document.querySelector(BUNJANG_CONFIG.selectors.description);
       if (textarea) {
         // 번개장터는 textarea 클릭 후 focus 필요 (floating footer 버그 방지)
         textarea.scrollIntoView({ block: "center" });
@@ -314,9 +330,7 @@
       // ⑦ 태그
       steps.push("태그 입력");
       if (data.tags && data.tags.length > 0) {
-        const tagInput = document.querySelector(
-          "input[placeholder*='태그'], input[placeholder*='태그를 입력']"
-        );
+        const tagInput = document.querySelector(BUNJANG_CONFIG.selectors.tag);
         if (tagInput) {
           for (const tag of data.tags.slice(0, 5)) {
             fillInput(tagInput, tag);
@@ -334,9 +348,7 @@
 
       // ⑧ 가격
       steps.push("가격 입력");
-      const priceInput = await waitFor(
-        "input[placeholder*='가격'], input[placeholder*='가격을 입력']"
-      );
+      const priceInput = await waitFor(BUNJANG_CONFIG.selectors.price);
       fillInput(priceInput, String(data.price));
       await sleep(800);
 
@@ -353,7 +365,7 @@
       steps.push("등록하기 클릭");
       await sleep(1000);
       const submitBtn = Array.from(document.querySelectorAll("button")).find(
-        (b) => b.textContent.includes("등록하기") || b.textContent.includes("등록")
+        (b) => b.textContent.includes(BUNJANG_CONFIG.selectors.submitButton)
       );
 
       if (!submitBtn) {
@@ -370,9 +382,9 @@
       const currentUrl = window.location.href;
 
       // 성공 검증: /products/숫자 패턴
-      const match = currentUrl.match(/\/products\/(\d+)/);
+      const match = currentUrl.match(BUNJANG_CONFIG.successPattern);
 
-      if (currentUrl.includes("products/new")) {
+      if (currentUrl.includes(BUNJANG_CONFIG.stayPattern)) {
         throw new Error("등록 후에도 글쓰기 페이지에 머뭄 — 필수 항목 누락 가능");
       }
 

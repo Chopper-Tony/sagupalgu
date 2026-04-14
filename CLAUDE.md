@@ -29,8 +29,8 @@ cd frontend && npm install && npm run dev
 
 # 테스트
 pip install -r requirements-dev.txt
-python -m pytest tests/ -m unit     # unit (~581개, 10초)
-cd frontend && npm test             # FE 21개 (vitest)
+python -m pytest tests/ -m unit     # unit (~596개, 11초)
+cd frontend && npm test             # FE 60개 (vitest)
 
 # Docker
 docker compose up --build
@@ -63,7 +63,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build  #
 - **Settings**: `config.py`의 `settings`는 `_SettingsProxy` lazy 프록시
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
-- **인증**: `app/core/auth.py` JWT, dev 환경 `X-Dev-User-Id` bypass, prod에서는 차단 (403)
+- **인증**: `app/core/auth.py` JWT, dev 환경 `X-Dev-User-Id` bypass, prod `get_optional_user` 완화 (플랫폼 연동 등)
+- **이미지 저장**: Supabase Storage (`USE_CLOUD_STORAGE=true`) + 로컬 fallback
 - **게시 동시성**: `MAX_CONCURRENT_BROWSERS=2` 세마포어
 
 ## 아키텍처
@@ -96,7 +97,13 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build  #
 
 ## 미완성 항목
 
-- pgvector 활성화: `migrations/001_pgvector_setup.sql` 실행 후 `python scripts/setup_pgvector.py --seed`
 - 당근마켓 게시 (Android 에뮬레이터 필요, 보류)
-- Supabase Storage Public 버킷 생성 (코드는 완료)
-- 프로덕션 로그인 UI (Supabase Auth 프론트 연결 — dev bypass로 개발 중)
+- 프로덕션 로그인 UI (Supabase Auth 프론트 연결 — dev bypass + get_optional_user로 개발 중)
+- 중고나라 크롤링 (CloudFlare 봇 탐지로 서버 크롤링 차단 — 번개장터 데이터로 시세 산정)
+
+## 완료된 항목 (최근)
+
+- pgvector 활성화: 385건 시세 데이터 시딩 완료
+- Supabase Storage: Public 버킷 `product-images` 활성화
+- 번개장터 자동 게시: Content Script + React 이벤트 체인 방식
+- 중고나라 자동 게시: Content Script 방식
