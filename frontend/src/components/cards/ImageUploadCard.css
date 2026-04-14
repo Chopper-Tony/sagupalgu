@@ -66,3 +66,21 @@
   border: 1px solid var(--bg-hover);
   flex-shrink: 0;
 }
+
+@media (max-width: 768px) {
+  .image-upload-card__dropzone {
+    padding: 24px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .image-upload-card__dropzone {
+    padding: 16px 12px;
+  }
+  .image-upload-card__icon {
+    font-size: 28px;
+  }
+  .image-upload-card__title {
+    font-size: 14px;
+  }
+}

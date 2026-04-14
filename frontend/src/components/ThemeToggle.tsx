@@ -34,7 +34,9 @@ export function ThemeToggle() {
         color: "var(--text-primary)",
         cursor: "pointer",
         fontSize: 13,
+        lineHeight: 1,
         fontWeight: 500,
+        boxSizing: "border-box" as const,
       }}
       title={theme === "light" ? "다크 모드로 전환" : "라이트 모드로 전환"}
     >

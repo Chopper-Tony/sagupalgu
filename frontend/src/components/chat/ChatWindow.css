@@ -83,6 +83,22 @@
     max-width: 90%;
   }
   .chat-window__empty {
-    padding: 80px 16px 40px;
+    padding: 24px 16px 16px;
+  }
+  .chat-window__empty-title {
+    font-size: 20px;
+  }
+}
+
+/* 아주 작은 화면 (아이폰 SE 등) */
+@media (max-width: 480px) {
+  .chat-window__empty {
+    padding: 16px 12px 12px;
+  }
+  .chat-window__empty-title {
+    font-size: 18px;
+  }
+  .chat-window__empty-sub {
+    font-size: 13px;
   }
 }
