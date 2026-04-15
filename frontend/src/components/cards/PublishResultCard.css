@@ -112,3 +112,32 @@
 }
 
 .publish-result-card__inline-publish-btn:hover { opacity: 0.9; }
+
+.publish-result-card__copy-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.publish-result-card__copy-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--btn-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.publish-result-card__copy-btn:hover {
+  background: var(--accent-hover);
+}
+
+.publish-result-card__copy-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
