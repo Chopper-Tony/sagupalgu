@@ -1,11 +1,16 @@
 """
-게시 신뢰성 정책 — 타임아웃·재시도·에러 분류.
+게시 신뢰성 정책 — 타임아웃·재시도·에러 분류·플랫폼 능력.
 
-PublishService와 recovery_tools에서 참조하는 단일 진실 원천.
+PublishService, PublishOrchestrator, recovery_tools에서 참조하는 단일 진실 원천.
 """
 from __future__ import annotations
 
 from typing import Any, Dict
+
+# ── 플랫폼 능력 (capability) ─────────────────────────────────────
+
+EXTENSION_ONLY_PLATFORMS: frozenset[str] = frozenset({"joongna", "bunjang"})
+"""크롬 익스텐션 Content Script로만 게시 가능한 플랫폼. 서버 Playwright 게시 불가."""
 
 # ── 타임아웃 (초) ────────────────────────────────────────────────
 
