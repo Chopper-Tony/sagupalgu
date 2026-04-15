@@ -177,7 +177,7 @@
 .session-sidebar__nav-link {
   display: block;
   flex: 1;
-  padding: 9px 14px;
+  padding: 10px 14px;
   border-radius: var(--btn-radius);
   border: var(--btn-border-width) solid var(--border, #d1d5db);
   text-decoration: none;

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { ComposerMode } from "../../types";
 import "./ChatComposer.css";
 
@@ -15,10 +15,26 @@ const PLACEHOLDER: Record<ComposerMode, string> = {
   disabled: "사진을 올려 판매를 시작하세요",
 };
 
+const PLACEHOLDER_MOBILE: Record<ComposerMode, string> = {
+  upload: "메시지 입력",
+  confirmation: "브랜드, 모델명 입력",
+  rewrite: "수정 지시사항 입력",
+  disabled: "+ 눌러 사진 올리기",
+};
+
 export function ChatComposer({ mode, onSendText, onUploadImages }: ChatComposerProps) {
   const [text, setText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  const placeholder = isMobile ? PLACEHOLDER_MOBILE[mode] : PLACEHOLDER[mode];
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -78,7 +94,7 @@ export function ChatComposer({ mode, onSendText, onUploadImages }: ChatComposerP
         onChange={(e) => setText(e.target.value)}
         onInput={autoResize}
         onKeyDown={handleKeyDown}
-        placeholder={PLACEHOLDER[mode]}
+        placeholder={placeholder}
         rows={1}
         disabled={mode === "disabled"}
         style={{ maxHeight: 200, overflowY: "auto" }}
