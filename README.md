@@ -12,13 +12,15 @@
 ## 핵심 기능
 
 - **이미지 → 상품 식별**: Vision AI로 사진에서 브랜드·모델·카테고리 자동 인식
-- **시세 분석**: 번개장터·중고나라 크롤링 + pgvector RAG 검색으로 실시간 가격 산정
+- **시세 분석**: 번개장터 크롤링 + pgvector RAG (385건) 검색으로 실시간 가격 산정
 - **Goal-driven 전략**: 빠른 판매 / 균형 / 수익 극대화 목표에 따라 가격·문구·평가 기준이 달라짐
-- **AI 카피라이팅**: LLM이 매력적인 판매글 자동 생성 + Critic 자기 비평 루프
-- **멀티 플랫폼 게시**: 번개장터·중고나라 동시 게시 (Playwright 웹 자동화)
-- **웹 UI 플랫폼 로그인**: 브라우저에서 직접 로그인 → 쿠키 자동 저장 (스크립트 불필요)
+- **AI 카피라이팅**: LLM이 유사 매물 제목 패턴 학습 + 판매글 자동 생성 + Critic 비평 루프
+- **멀티 플랫폼 게시**: 크롬 익스텐션 Content Script로 번개장터·중고나라 자동 게시
+- **모바일 게시**: 판매글 전체 복사 + 플랫폼 글쓰기 페이지 직접 올리기
+- **AI 상품 챗봇**: 마켓 상세 페이지에서 구매자 질문에 AI 답변 (상품 정보 + LLM 지식)
+- **자체 마켓**: 상품 목록/상세/검색 + 판매자 대시보드 + 문의 관리 + 이메일·Discord 알림
 - **판매글 직접 수정**: AI 생성 초안을 사용자가 제목·설명·가격 인라인 편집 후 게시
-- **장애 진단**: 게시 실패 시 에러 분류(8종) → 자동 복구 가능 여부 판정 → 재시도
+- **장애 진단**: 게시 실패 시 에러 분류(11종) → 자동 복구 가능 여부 판정 → 재시도
 
 ---
 
@@ -77,9 +79,11 @@ START
 | **LLM** | OpenAI gpt-4.1-mini (기본) · Gemini 2.5 Flash · Solar (설정에 따라 전환, fallback 체인) |
 | **Vision** | OpenAI gpt-4.1-mini (기본) · Gemini 2.5 Flash (설정에 따라 전환) |
 | **DB** | Supabase (PostgreSQL + pgvector) |
-| **크롤러** | Playwright (웹 자동화) |
+| **게시** | Chrome Extension Content Script (CDP 이미지 업로드) |
+| **이미지** | Supabase Storage (Public 버킷) |
+| **알림** | Discord 웹훅 + Gmail SMTP |
 | **프론트엔드** | React 19 + TypeScript + Vite |
-| **배포** | Docker Compose (backend + frontend nginx) |
+| **배포** | Docker Compose + 서울 리전 EC2 (Elastic IP) + GitHub Actions CI/CD |
 
 ---
 
@@ -117,11 +121,14 @@ cd frontend && npm install && npm run dev
 ## 테스트
 
 ```bash
-# 전체 테스트 (596개)
+# 백엔드 테스트 (596개, 52파일)
 python -m pytest tests/
 
-# unit 테스트만 (0.5초)
+# unit 테스트만 (14초)
 python -m pytest tests/ -m unit
+
+# 프론트엔드 테스트 (60개)
+cd frontend && npm test
 
 # integration 테스트만
 python -m pytest tests/ -m integration
