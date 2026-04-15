@@ -264,3 +264,28 @@ GET /publish/{task_id}/status  ◄─────────────       
 - 게시 워커를 별도 컨테이너/프로세스로 분리
 - 워커 수평 확장 가능 (게시량에 비례)
 - API 서버는 브라우저 프로세스와 완전 격리
+
+---
+
+## 최근 추가 기능 (2026-04-15)
+
+### AI 상품 챗봇
+- `POST /market/{session_id}/chat` — 구매자가 상품에 대해 AI 질문
+- 컨텍스트: 판매글 + Vision AI 분석 + 시세 데이터 + LLM 일반 지식
+- 환각 방지: 확인된 정보 vs 일반 지식 구분, 추정 금지 항목 5개
+
+### 이메일 알림
+- 구매 문의 시 Discord 웹훅 + Gmail SMTP 동시 알림
+
+### 모바일 UX
+- 사이드바 없이 + 버튼으로 세션 자동 생성 + 업로드
+- 디바이스 분기: 데스크톱 = 자동 게시, 모바일 = 판매글 복사 + 직접 올리기
+- 모바일 placeholder 축약, iOS safe-area 대응
+
+### 게시 정책 단일화
+- `app/domain/publish_policy.py` — 타임아웃·재시도·에러 분류·플랫폼 capability
+- `EXTENSION_ONLY_PLATFORMS` 정책 포함
+
+### 서울 리전 이전
+- us-east-1 → ap-northeast-2 (서울), Elastic IP 43.201.188.57 고정
+- 중고나라 크롤링: CloudFlare 차단으로 번개장터 데이터 기반 시세 산정

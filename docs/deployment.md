@@ -1,4 +1,17 @@
-# 배포 가이드 — AWS EC2 + Caddy + Docker Compose
+# 배포 가이드 — AWS EC2 (서울 리전) + Docker Compose
+
+## 현재 배포 상태 (2026-04-15)
+
+| 항목 | 값 |
+|------|-----|
+| 리전 | ap-northeast-2 (서울) |
+| Elastic IP | 43.201.188.57 (고정) |
+| 인스턴스 | t3.medium (2vCPU, 4GB RAM, 20GB EBS) |
+| AMI | Amazon Linux 2023 |
+| SSH | `ssh -i sagupalgu-seoul-key.pem ec2-user@43.201.188.57` |
+| Docker Compose | `docker-compose up --build -d` |
+
+> 이전 us-east-1 인스턴스는 정리 완료. Elastic IP로 재시작해도 IP 변경 없음.
 
 ## 아키텍처
 
@@ -25,8 +38,8 @@ DB/Auth/Storage:        Supabase (외부)
 
 | 항목 | 기본 | 발표/알파 주간 |
 |------|------|--------------|
-| Instance type | t3.small (2vCPU, 2GB) | t3.medium (2vCPU, 4GB) |
-| AMI | Ubuntu 22.04 LTS | |
+| Instance type | t3.medium (2vCPU, 4GB) | — |
+| AMI | Amazon Linux 2023 | — |
 | Storage | 20GB gp3 | |
 | Security Group | SSH(22), HTTP(80), HTTPS(443) | |
 
