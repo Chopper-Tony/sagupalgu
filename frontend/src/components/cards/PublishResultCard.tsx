@@ -1,10 +1,12 @@
-import type { PlatformResult } from "../../types";
+import { useState } from "react";
+import type { PlatformResult, CanonicalListing } from "../../types";
 import { platformLabel } from "../../lib/sessionStatusUiMap";
 import "./PublishResultCard.css";
 
 interface PublishResultCardProps {
   results: PlatformResult[];
   sessionId?: string;
+  listing?: CanonicalListing | null;
   onUpdateSaleStatus: () => void;
 }
 
@@ -14,13 +16,19 @@ const PLATFORM_HOME: Record<string, string> = {
   daangn: "https://www.daangn.com",
 };
 
+const PLATFORM_WRITE: Record<string, string> = {
+  bunjang: "https://m.bunjang.co.kr/products/new",
+  joongna: "https://web.joongna.com/product/form?type=regist",
+};
+
 function isExtensionRequired(r: PlatformResult): boolean {
   return r.source === "extension_required";
 }
 
-export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: PublishResultCardProps) {
+export function PublishResultCard({ results, sessionId, listing, onUpdateSaleStatus }: PublishResultCardProps) {
   const serverResults = results.filter((r) => !isExtensionRequired(r));
   const extensionResults = results.filter((r) => isExtensionRequired(r));
+  const [copied, setCopied] = useState(false);
 
   const successCount = serverResults.filter((r) => r.success).length;
 
@@ -52,6 +60,37 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
       serverUrl: window.location.origin,
     }, "*");
   };
+
+  const handleCopyListing = () => {
+    if (!listing) return;
+    const text = [
+      listing.title,
+      `${listing.price?.toLocaleString()}원`,
+      "",
+      listing.description,
+      "",
+      (listing.tags || []).map((t) => `#${t}`).join(" "),
+    ].join("\n");
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  function fallbackCopy(text: string) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
 
   return (
     <div className="publish-result-card">
@@ -88,27 +127,53 @@ export function PublishResultCard({ results, sessionId, onUpdateSaleStatus }: Pu
           </div>
         ))}
 
-        {/* 익스텐션 전용 — 자동 게시 버튼을 플랫폼명 옆에 배치 */}
+        {/* 익스텐션 전용 — 자동 게시 버튼 + 수동 게시 링크 */}
         {extensionResults.map((r) => (
           <div key={r.platform} className="publish-result-card__result">
             <div className="publish-result-card__result-left">
               <span className="publish-result-card__result-dot publish-result-card__result-dot--extension" />
               <span className="publish-result-card__result-platform">{platformLabel(r.platform)}</span>
             </div>
-            {sessionId && (
-              <button
-                className="publish-result-card__inline-publish-btn"
-                style={{
-                  background: r.platform === "bunjang" ? "#dc2626" : "#059669",
-                }}
-                onClick={() => handleAutoPublish(r.platform)}
-              >
-                {platformLabel(r.platform)} 자동 게시
-              </button>
-            )}
+            <div style={{ display: "flex", gap: "4px" }}>
+              {sessionId && (
+                <button
+                  className="publish-result-card__inline-publish-btn"
+                  style={{ background: r.platform === "bunjang" ? "#dc2626" : "#059669" }}
+                  onClick={() => handleAutoPublish(r.platform)}
+                >
+                  자동 게시
+                </button>
+              )}
+              {PLATFORM_WRITE[r.platform] && (
+                <a
+                  href={PLATFORM_WRITE[r.platform]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="publish-result-card__inline-publish-btn"
+                  style={{ background: "var(--text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                >
+                  직접 올리기
+                </a>
+              )}
+            </div>
           </div>
         ))}
       </div>
+
+      {/* 판매글 복사 (모바일 + 데스크톱 공용) */}
+      {listing && (
+        <div className="publish-result-card__copy-section">
+          <button
+            className="publish-result-card__copy-btn"
+            onClick={handleCopyListing}
+          >
+            {copied ? "복사 완료!" : "판매글 전체 복사"}
+          </button>
+          <p className="publish-result-card__copy-hint">
+            복사 후 플랫폼에서 붙여넣기하세요
+          </p>
+        </div>
+      )}
 
       <button className="publish-result-card__status-btn" onClick={onUpdateSaleStatus}>
         판매 상태 업데이트
