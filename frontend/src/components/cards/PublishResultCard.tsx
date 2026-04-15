@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { PlatformResult, CanonicalListing } from "../../types";
 import { platformLabel } from "../../lib/sessionStatusUiMap";
 import "./PublishResultCard.css";
@@ -29,6 +29,13 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
   const serverResults = results.filter((r) => !isExtensionRequired(r));
   const extensionResults = results.filter((r) => isExtensionRequired(r));
   const [copied, setCopied] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const successCount = serverResults.filter((r) => r.success).length;
 
@@ -127,7 +134,7 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
           </div>
         ))}
 
-        {/* 익스텐션 전용 — 자동 게시 버튼 + 수동 게시 링크 */}
+        {/* 익스텐션 전용 */}
         {extensionResults.map((r) => (
           <div key={r.platform} className="publish-result-card__result">
             <div className="publish-result-card__result-left">
@@ -135,7 +142,8 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
               <span className="publish-result-card__result-platform">{platformLabel(r.platform)}</span>
             </div>
             <div style={{ display: "flex", gap: "4px" }}>
-              {sessionId && (
+              {/* 데스크톱: 자동 게시만 */}
+              {!isMobile && sessionId && (
                 <button
                   className="publish-result-card__inline-publish-btn"
                   style={{ background: r.platform === "bunjang" ? "#dc2626" : "#059669" }}
@@ -144,15 +152,16 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
                   자동 게시
                 </button>
               )}
-              {PLATFORM_WRITE[r.platform] && (
+              {/* 모바일: 직접 올리기만 */}
+              {isMobile && PLATFORM_WRITE[r.platform] && (
                 <a
                   href={PLATFORM_WRITE[r.platform]}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="publish-result-card__inline-publish-btn"
-                  style={{ background: "var(--text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                  style={{ background: r.platform === "bunjang" ? "#dc2626" : "#059669", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
                 >
-                  직접 올리기
+                  직접 올리기 →
                 </a>
               )}
             </div>
@@ -160,8 +169,8 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
         ))}
       </div>
 
-      {/* 판매글 복사 (모바일 + 데스크톱 공용) */}
-      {listing && (
+      {/* 판매글 복사 (모바일만) */}
+      {isMobile && listing && (
         <div className="publish-result-card__copy-section">
           <button
             className="publish-result-card__copy-btn"

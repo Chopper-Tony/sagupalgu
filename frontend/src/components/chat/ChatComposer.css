@@ -103,6 +103,7 @@
   .chat-composer__input {
     font-size: 12px;
     padding: 8px 10px;
+    min-height: 40px;
   }
   .chat-composer__upload-btn {
     width: 32px;
