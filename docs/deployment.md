@@ -154,9 +154,9 @@ python scripts/smoke_test.py --base-url https://<도메인>
 |------|----------|-----------|
 | 동시 게시 | 1건 (MAX_CONCURRENT_BROWSERS=1) | queue 대기 > 5건 |
 | 동시 사용자 | ~5~10명 | API 응답 > 3초 |
-| 메모리 | 2GB (t3.small) | worker OOM 발생 시 |
+| 메모리 | 4GB (t3.medium) | worker OOM 발생 시 |
 
-Scale 대응: worker 별도 EC2 분리 또는 t3.medium 업그레이드.
+Scale 대응: worker 별도 EC2 분리 또는 t3.large 이상 업그레이드.
 
 ---
 
@@ -209,9 +209,9 @@ docker stats
 
 | 항목 | 월 비용 |
 |------|--------|
-| EC2 t3.small (서울) | ~25,000원 |
+| EC2 t3.medium (서울) | ~50,000원 |
 | EBS 20GB gp3 | ~2,500원 |
 | 공인 IPv4 | ~5,400원 |
 | 데이터 전송 | ~0원 (월 100GB 무료) |
 | S3 보조 | ~200원 |
-| **합계** | **~34,000원** |
+| **합계** | **~58,000원** |
