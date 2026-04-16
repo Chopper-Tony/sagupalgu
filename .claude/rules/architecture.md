@@ -20,7 +20,7 @@
 | `lc_rag_price_tool` | 2 | pgvector→키워드→LLM 3단계 RAG |
 | `lc_generate_listing_tool` | 3 | 판매글 LLM 생성 |
 | `lc_rewrite_listing_tool` | 3 | 피드백 기반 재작성 |
-| `lc_diagnose_publish_failure_tool` | 4 | 8종 에러 분류 진단 |
+| `lc_diagnose_publish_failure_tool` | 4 | 12종 에러 분류 진단 (publish_policy.FAILURE_TAXONOMY) |
 | `lc_auto_patch_tool` | 4 | LLM 자동 패치 |
 | `lc_discord_alert_tool` | 4 | Discord 장애 알림 |
 | `rewrite_listing_tool` | 3 | lc_ 래퍼 내부 구현 공유 |
@@ -49,6 +49,39 @@ START → mission_planner → product_identity
 
 | | fast_sell | balanced | profit_max |
 |---|----------|---------|-----------|
-| 가격 배수 | ×0.90 | ×0.97 | ×1.05 |
+| 가격 배수 (high sample) | ×0.90 | ×0.97 | ×1.05 |
+| 가격 배수 (low sample) | ×0.88 | ×0.95 | ×1.02 |
 | 카피 톤 | 간결·긴급 | 실용·신뢰 | 프리미엄·가치 |
-| 비평 기준 | 관용적 (1회) | 표준 (2회) | 엄격 (3회) |
+| 비평 기준 (price_threshold) | 1.4 | 1.3 | 1.5 |
+| 비평 기준 (min_desc_len) | 30 | 50 | 80 |
+| 비평 기준 (trust_penalty) | 5 | 10 | 15 |
+| 네고 정책 | welcome, fast deal | small negotiation | firm price |
+| 문의 응대 템플릿 | 긴급 유도 | 합리적 톤 | 프리미엄 톤 |
+
+> 상세 상수: `app/domain/goal_strategy.py` 단일 원천 — PRICING_MULTIPLIER, COPYWRITING_TONE, CRITIC_CRITERIA, NEGOTIATION_POLICY, INQUIRY_REPLY_TEMPLATES 5개 딕셔너리.
+
+## 마켓 거래 루프 (판매글 생성 이후)
+
+판매글 생성 → 마켓 목록 노출 → 구매자 문의 → 판매자 응답 → 판매 상태 전이 → 재등록(옵션).
+
+### 컴포넌트
+- **마켓 목록/상세**: `market_router.py` 공개 엔드포인트 (검색·가격필터·정렬·페이지네이션)
+- **AI 상품 챗봇**: `POST /market/{id}/chat` — 구매자용, 상품 정보(판매글+Vision AI+시세) 기반 답변 + 환각 방지 가드레일
+- **문의 제출**: `POST /market/{id}/inquiry` — DB 저장 + Discord + Gmail SMTP 병렬 알림
+- **판매자 대시보드**: `GET /my-listings` + 인증 (문의 관리, 상태 변경, 재등록, 코파일럿)
+- **문의 코파일럿**: `POST /my-listings/{id}/inquiries/{inquiry_id}/suggest-reply` — LLM 초안 + goal별 fallback 템플릿 3종 (nego/condition/default)
+- **재등록**: `POST /my-listings/{id}/relist` — 기존 세션 복제 + sale_status 초기화
+
+### 판매 상태 머신
+- **상태**: `available` / `reserved` / `sold` (3종)
+- **전이 규칙** (`session_repository.py:SALE_STATUS_TRANSITIONS`):
+  - `available` → reserved, sold
+  - `reserved` → sold, available
+  - `sold` → [] (terminal, 되돌릴 수 없음)
+- **race condition 방어**: `eq("id", session_id).eq("user_id", user_id)` 조건부 업데이트 + `InvalidStateTransitionError` (409)
+
+## 판매 후 최적화 (Agent 5)
+
+- 입력: 경과 일수 + 판매 상태 + 문의 수
+- 출력: `price_drop` / `rewrite` / `platform_add` 제안
+- 트리거: `SaleTracker`가 completed → awaiting_sale_status_update → optimization_suggested 전이 관리

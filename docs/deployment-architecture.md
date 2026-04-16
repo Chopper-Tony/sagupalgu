@@ -2,6 +2,16 @@
 
 배포는 **단일 EC2 인스턴스에 Docker Compose로 4개 컨테이너를 올리는 방식**이다. 프론트엔드·백엔드가 따로 호스팅되지 않고, 동일 서버에서 Caddy가 경로 기반으로 라우팅한다.
 
+## 인프라 요약
+
+| 항목 | 값 |
+|---|---|
+| 리전 | `ap-northeast-2` (서울) |
+| 인스턴스 | `t3.medium` (2 vCPU, 4 GB RAM, 20 GB EBS) |
+| Elastic IP | `43.201.188.57` (고정 — 재시작해도 변경 없음) |
+| SSH | `ssh -i sagupalgu-seoul-key.pem ec2-user@43.201.188.57` |
+| DB | Supabase (외부 PostgreSQL + pgvector) |
+
 ## 전체 구조
 
 ```
@@ -18,7 +28,7 @@
 | `worker` | `backend`와 동일 이미지 재사용 | Playwright 게시 전담 | 8001 (내부) |
 | `frontend` | 자체 빌드 (nginx:alpine) | React SPA 정적 서빙 | 80 (내부) |
 
-> **핵심**: 프론트·백엔드가 같은 서버 같은 compose stack 안에 있어 단일 t3.small에서 운용 가능하다. 워커를 분리해서 게시 트래픽이 API 응답성을 방해하지 않는다.
+> **핵심**: 프론트·백엔드가 같은 서버 같은 compose stack 안에 있어 단일 t3.medium(2vCPU/4GB)에서 운용 가능하다. 워커를 분리해서 게시 트래픽이 API 응답성을 방해하지 않는다.
 
 ---
 
@@ -65,7 +75,7 @@ worker:
   environment:
     - RUN_PUBLISH_WORKER=true
     - PUBLISH_USE_QUEUE=true
-    - MAX_CONCURRENT_BROWSERS=1   # t3.small 2GB 기준 안전값
+    - MAX_CONCURRENT_BROWSERS=1   # t3.medium 4GB 기준 안전값 (워커 컨테이너 한정)
   deploy:
     resources:
       limits:
@@ -276,11 +286,12 @@ curl https://<domain>/health/ready | jq
 
 ### 핵심 설계 결정
 
-1. **Monorepo + 단일 compose stack**: 프론트·백엔드·워커가 같은 서버에서 돌아서 단일 t3.small로 운용 가능
-2. **워커 프로세스 분리**: 게시 부하가 API 응답성을 방해하지 않음 (M125)
-3. **Caddy 앞단**: HTTPS 종단과 경로 분배를 Caddy가 모두 담당 → nginx는 SPA 서빙에만 집중
-4. **동일 이미지 재사용**: backend와 worker가 같은 Dockerfile로 빌드되어 환경변수만 다름 → 일관성 확보
-5. **Rolling restart**: backend → health wait → frontend → caddy 순서로 무중단 배포
+1. **Monorepo + 단일 compose stack**: 프론트·백엔드·워커가 같은 서버에서 돌아서 단일 t3.medium으로 운용 가능
+2. **서울 리전 + Elastic IP 고정**: `ap-northeast-2` + `43.201.188.57` — 재시작/재배포해도 IP 불변, 익스텐션 URL 수동 갱신 불필요
+3. **워커 프로세스 분리**: 게시 부하가 API 응답성을 방해하지 않음 (M125)
+4. **Caddy 앞단**: HTTPS 종단과 경로 분배를 Caddy가 모두 담당 → nginx는 SPA 서빙에만 집중
+5. **동일 이미지 재사용**: backend와 worker가 같은 Dockerfile로 빌드되어 환경변수만 다름 → 일관성 확보
+6. **Rolling restart**: backend → health wait → frontend → caddy 순서로 무중단 배포
 
 ---
 
