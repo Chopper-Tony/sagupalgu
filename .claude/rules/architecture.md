@@ -73,11 +73,11 @@ START → mission_planner → product_identity
 - **재등록**: `POST /my-listings/{id}/relist` — 기존 세션 복제 + sale_status 초기화
 
 ### 판매 상태 머신
-- **상태**: `available` / `reserved` / `sold` / `unavailable`
+- **상태**: `available` / `reserved` / `sold` (3종)
 - **전이 규칙** (`session_repository.py:SALE_STATUS_TRANSITIONS`):
   - `available` → reserved, sold
   - `reserved` → sold, available
-  - `sold` → (terminal, 되돌릴 수 없음)
+  - `sold` → [] (terminal, 되돌릴 수 없음)
 - **race condition 방어**: `eq("id", session_id).eq("user_id", user_id)` 조건부 업데이트 + `InvalidStateTransitionError` (409)
 
 ## 판매 후 최적화 (Agent 5)

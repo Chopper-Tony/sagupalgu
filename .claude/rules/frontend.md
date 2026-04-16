@@ -29,9 +29,21 @@ paths:
 
 ## 액션 훅 (CTO P1)
 - **App.tsx에 비즈니스 로직 금지** → 모든 액션은 `useSessionActions.ts`의 `createActionHandler(ctx)` 훅 사용
-- 지원 액션 10종: `upload_images`, `confirm_product`, `prepare_publish`, `rewrite`, `publish`, `direct_edit`, `edit_draft`, `mark_sold/unsold`, `retry_publish`, `restart`
+- 지원 액션 (12 case, 11 unique):
+  1. `upload_images` — `handleUploadImages` 위임
+  2. `confirm_product` — provideProductInfo → generateListing → sellerTips 로드
+  3. `prepare_publish` — 게시 준비 (플랫폼 선택)
+  4. `rewrite` — rewriteListing 호출
+  5. `publish` — 게시 실행
+  6. `direct_edit` — updateListing (제목·설명·가격·태그 직접 수정)
+  7. `edit_draft` — DraftCard 재렌더링만 (상태 변경 없음)
+  8. `update_sale_status` / `mark_sold` — fall-through, `updateSaleStatus("sold")` 호출
+  9. `mark_unsold` — `updateSaleStatus("unsold")` 호출
+  10. `retry_publish` — publish 재호출
+  11. `restart` — `handleNewSession` 위임
+- `ActionContext` 타입: `activeId`, `currentStatus`, `pushItem`, `setSession`, `setLastRenderedStatus`, `handleNewSession`, `handleUploadImages` (7개 필드)
+- `friendlyError()` 헬퍼: HTTP status 코드 → 한국어 사용자 친화 메시지 변환 (409/422/429/timeout/Network/502/500/404 분기)
 - 액션별 API 호출 → 상태 업데이트 → 타임라인 push → 에러 처리 모두 훅 내부
-- `ActionContext`에 activeId, currentStatus, pushItem, setSession, setLastRenderedStatus 등 5~7개 의존성 주입
 
 ## 모바일 반응형
 - 감지: `window.innerWidth <= 768` (PublishResultCard, ChatComposer 동일 로직)

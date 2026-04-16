@@ -63,8 +63,9 @@
 ## 프론트엔드 액션 규칙
 - **`frontend/src/hooks/useSessionActions.ts`** 단일 파일에서 모든 세션 액션 관리 (CTO P1 반영)
 - App.tsx에 비즈니스 로직 직접 작성 금지 — `createActionHandler(ctx)` 훅만 사용
-- 지원 액션 10종: upload_images, confirm_product, prepare_publish, rewrite, publish, direct_edit, edit_draft, mark_sold/unsold, retry_publish, restart
+- 12 case / 11 unique 액션: upload_images, confirm_product, prepare_publish, rewrite, publish, direct_edit, edit_draft, update_sale_status (mark_sold와 fall-through), mark_sold, mark_unsold, retry_publish, restart
 - 액션별 상태 전이·카드 push·에러 처리 모두 훅 내부에서 처리
+- 에러 변환: `friendlyError()` 헬퍼가 HTTP 상태 코드(409/422/429/500/502/404/timeout/network)를 한국어 메시지로 매핑
 - 새 액션 추가 시 `useSessionActions.ts`에만 추가 + `ActionContext` 타입 업데이트
 
 ## 인증
