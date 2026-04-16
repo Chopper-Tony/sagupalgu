@@ -2,356 +2,285 @@
 
 ## 한 줄 요약
 
-중고 물품 사진 한 장으로 시세 분석 → 판매글 자동 생성 → 번개장터/중고나라 동시 게시까지 LangGraph 기반 워크플로우로 완전 자동화
+중고 물품 사진 한 장으로 상품 식별 → 시세 분석 → 판매글 자동 생성 → 번개장터/중고나라 자동 게시 → 마켓 거래(문의·응답·재등록)까지, LangGraph Agentic Workflow로 엔드투엔드 자동화한 중고거래 플랫폼.
 
 ---
 
 ## 에이전틱 워크플로우
 
-### 실제로 에이전틱한 부분
+### 구성 요소
 
-**Agent 2 — 도구 선택 자율성**
+- **7 에이전트** — 하이브리드 (ReAct + LLM+Fallback + Deterministic)
+- **10 툴** — `app.tools.agentic_tools` 단일 facade
+- **3 Agentic Loop** — Critic-Rewrite (max 2) / Replan (max 1) / Validation-Refinement (max 2)
 
-- `market_crawl_tool` 호출 후 sample_count < 3이면 `rag_price_tool` 추가 호출
-- 표본이 충분하면 RAG 스킵
-- 결과를 보고 다음 도구를 자율적으로 선택
-
-**Agent 4 — 결과 기반 재시도**
-
-- validation 실패 → `refinement_node`에서 자동 수정 → 재검증
-- 최대 2회 반복 후 강제 통과
-- 실패를 감지하고 스스로 고쳐서 재시도
-
-### 전체 실행 흐름
+### 그래프 플로우
 
 ```
-사용자 (사진 업로드 / 상품 정보 입력)
-        ↓
-[Agent 1] 상품 식별
-  confidence ≥ 0.6 → 자동 확정
-  confidence < 0.6 → 사용자 입력 요청 → 대기
-        ↓
-[Agent 2] 시세 수집
-  market_crawl_tool 호출
-  sample_count < 3 → rag_price_tool 추가 호출 (자율 판단)
-        ↓
-[Agent 2] 가격 전략 수립
-  시세 중앙값 × 97% → 추천 가격
-        ↓
-[Agent 3] 판매글 생성
-  rewrite_instruction 있음 → rewrite_listing_tool
-  없음 → LLM 생성 → 실패 시 템플릿 fallback
-        ↓
-[Agent 4] 검증
-  통과 → package_builder
-  실패 → refinement_node → 재검증 (최대 2회, 자율 반복)
-        ↓
-패키지 빌더
-  번개장터: 가격 +10,000원
-  중고나라: 가격 그대로
-        ↓
-게시 실행 (Playwright)
-  성공 → completed
-  실패 → [Agent 4] recovery_node
-            diagnose_publish_failure_tool → 원인 분석
-            discord_alert_tool → 알림 발송
-            자동 복구 가능 → 재시도 (최대 2회)
-            불가 → publishing_failed
-        ↓
-[Agent 5] 판매 후 최적화
-  sold → 종료
-  unsold → price_optimization_tool → 가격 재제안
+START → Mission Planner (Agent 0)
+      → Product Identity (Agent 1)
+          ├─ needs_user_input → clarification → END
+          └─ confirmed → Pre-listing Clarification
+                ├─ 정보 부족 → END (사용자 대기)
+                └─ 충분 → Market Intelligence (Agent 2, ReAct)
+                       → Pricing Strategy
+                       → Copywriting (Agent 3, ReAct)
+                       → Listing Critic (Agent 6)
+                            ├─ score ≥ 70 → Validation → Package Builder → END
+                            ├─ rewrite (retry<2) → Copywriting   ← REWRITE LOOP
+                            └─ replan (replan<1) → Mission Planner ← REPLAN LOOP
 ```
 
-### 상태머신 전이
+> 그래프 책임: 판매글 패키지 생성까지. 게시·복구·판매 후 최적화는 SessionService가 노드 함수 직접 호출.
+
+### 7 에이전트
+
+| # | 에이전트 | 유형 | 핵심 동작 |
+|---|---------|------|----------|
+| 0 | Mission Planner | LLM+Fallback | 세션 상태 해석 → 실행 계획 수립, replan 시 비평 반영 |
+| 1 | 상품 식별 | Deterministic | Vision AI(OpenAI gpt-4.1-mini/Gemini 2.5 Flash) 호출 → confidence ≥ 0.6 자동 확정 |
+| 2 | 시세·가격 전략 | ReAct | 크롤링·RAG 자율 선택, sample_count < 3이면 RAG 추가 호출 |
+| 3 | 판매글 생성 | ReAct | rewrite_instruction 유무로 generate/rewrite 자율 선택, LLM 실패 시 템플릿 fallback |
+| 4 | 검증·복구 | ReAct | 진단 → 패치 → Discord 알림 순서 자율 결정 |
+| 5 | 판매 후 최적화 | Deterministic | 경과 일수별 가격 인하·재게시 제안 |
+| 6 | Listing Critic | LLM+Fallback | 구매자 관점 비평, goal별 기준 (관용적/표준/엄격) |
+
+### 10 툴
+
+| 툴 | 에이전트 | 기능 |
+|----|---------|------|
+| `lc_market_crawl_tool` | 2 | 번개장터·중고나라 실시간 크롤링 |
+| `lc_rag_price_tool` | 2 | pgvector→키워드→LLM 3단계 RAG |
+| `lc_generate_listing_tool` | 3 | 판매글 LLM 생성 |
+| `lc_rewrite_listing_tool` | 3 | 피드백 기반 재작성 |
+| `lc_diagnose_publish_failure_tool` | 4 | 12종 에러 분류 진단 |
+| `lc_auto_patch_tool` | 4 | LLM 자동 패치 |
+| `lc_discord_alert_tool` | 4 | Discord 장애 알림 |
+| `rewrite_listing_tool` | 3 | lc_ 래퍼 내부 구현 공유 |
+| `diagnose_publish_failure_tool` | 4 | fallback용 |
+| `price_optimization_tool` | 5 | 규칙 기반 가격 최적화 |
+
+### Goal-driven 행동 변화
+
+| | fast_sell | balanced | profit_max |
+|---|----------|---------|-----------|
+| 가격 배수 (high sample) | ×0.90 | ×0.97 | ×1.05 |
+| 가격 배수 (low sample) | ×0.88 | ×0.95 | ×1.02 |
+| 카피 톤 | 간결·긴급 | 실용·신뢰 | 프리미엄·가치 |
+| Critic 기준 (price_threshold) | 1.4 | 1.3 | 1.5 |
+| Critic 기준 (min_desc_len) | 30 | 50 | 80 |
+| 네고 정책 | welcome, fast deal | small negotiation | firm price |
+| 문의 응대 템플릿 | 긴급 유도 | 합리적 톤 | 프리미엄 톤 |
+
+> 상세 상수: `app/domain/goal_strategy.py` 단일 원천.
+
+---
+
+## 상태 머신
+
+### 세션 상태 (13개)
 
 ```
 session_created
 → images_uploaded
 → awaiting_product_confirmation
 → product_confirmed
+→ market_analyzing
 → draft_generated
 → awaiting_publish_approval
 → publishing
-→ completed / publishing_failed
-→ awaiting_sale_status_update
-→ optimization_suggested
+→ completed
+  → awaiting_sale_status_update
+    → optimization_suggested (terminal)
+→ publishing_failed → awaiting_publish_approval (재시도)
+→ failed (terminal)
 ```
 
----
+- **전이 규칙**: `app/domain/session_status.py`의 `ALLOWED_TRANSITIONS` 기준
+- **원자성**: `_update_or_raise(session_id, payload, expected_status=...)` — 불일치 시 409
+- **next_action 해석**: `resolve_next_action()` 함수
 
-## 각 에이전트 역할과 툴
+### 판매 상태 (마켓 거래 루프)
 
-### Agent 1 — 상품 식별 에이전트
-
-**역할:** 사진을 보고 어떤 상품인지 판단. 확신이 없으면 사용자에게 직접 입력 요청
-
-| 판단 조건 | 결과 |
-| --- | --- |
-| 사용자가 직접 입력 | 바로 확정 |
-| Vision AI confidence ≥ 0.6 | 자동 확정 |
-| confidence < 0.6 또는 unknown | 사용자 입력 요청 |
-
-**툴:** 없음 (Vision API는 내부 capability로 직접 호출)
+- **상태**: `available` / `reserved` / `sold` / `unavailable`
+- **전이 규칙** (`session_repository.py:SALE_STATUS_TRANSITIONS`):
+  - `available` → reserved, sold
+  - `reserved` → sold, available
+  - `sold` → terminal (되돌릴 수 없음)
+- **race condition 방어**: `eq("id").eq("user_id")` 조건부 업데이트 + `InvalidStateTransitionError` (409)
 
 ---
 
-### Agent 2 — 시세·가격 전략 에이전트
+## 기술 스택
 
-**역할:** 번개장터/중고나라에서 시세를 수집하고 판매 가격 전략을 수립
-
-| 판단 조건 | 행동 |
-| --- | --- |
-| 항상 | market_crawl_tool 먼저 호출 |
-| sample_count < 3 | rag_price_tool 추가 호출 |
-| sample_count ≥ 3 | RAG 스킵 |
-
-| 툴 | 설명 |
-| --- | --- |
-| `market_crawl_tool` | 번개장터/중고나라 실시간 크롤링 |
-| `rag_price_tool` | 과거 거래 데이터 기반 가격 참고값 조회 |
-
----
-
-### Agent 3 — 판매글 생성 에이전트
-
-**역할:** 시세와 상품 정보를 바탕으로 판매글 초안 생성. 사용자 피드백 시 재작성
-
-| 판단 조건 | 행동 |
-| --- | --- |
-| rewrite_instruction 있음 | rewrite_listing_tool 호출 |
-| 없음 | LLM으로 신규 생성 |
-| LLM 실패 | 템플릿 기반 fallback |
-
-| 툴 | 설명 |
-| --- | --- |
-| `rewrite_listing_tool` | 사용자 피드백 반영해서 판매글 재작성 |
+| 레이어 | 기술 |
+|---|---|
+| 백엔드 | FastAPI + Pydantic v2 (12,400줄) |
+| 워크플로우 | LangGraph, `langchain.agents.create_agent` + bind_tools |
+| Vision AI | OpenAI gpt-4.1-mini (기본) / Gemini 2.5 Flash |
+| Listing LLM | OpenAI gpt-4.1-mini → Gemini → Solar (fallback 체인) + 규칙 기반 템플릿 |
+| DB | Supabase (PostgreSQL + pgvector, 385건 시세 데이터) |
+| 이미지 | Supabase Storage Public 버킷 `product-images` |
+| 게시 | 크롬 익스텐션 Content Script (CDP 이미지 업로드) + 모바일 복사/직접 올리기 |
+| 프론트엔드 | React 19 + TypeScript + Vite (7,080줄) |
+| 알림 | Discord 웹훅 + Gmail SMTP (병렬 실행) |
+| 배포 | Docker Compose + 서울 리전 EC2 (Elastic IP 43.201.188.57) + GitHub Actions CI/CD |
 
 ---
 
-### Agent 4 — 검증·복구 에이전트
+## 게시 아키텍처
 
-**역할:** 판매글 품질 검사 + 게시 실패 시 원인 진단 및 복구
+### 왜 크롬 익스텐션인가
 
-**검증 로직**
+초기에는 서버 Playwright로 게시했으나, 번개장터/중고나라가 서버 IP를 봇으로 탐지해 계정 정지 위험. 사용자 브라우저에서 실행되는 크롬 익스텐션 Content Script 방식으로 전환.
 
-| 조건 | 행동 |
-| --- | --- |
-| 제목 5자 미만 / 설명 20자 미만 / 가격 0 | 자동 수정 후 재검증 |
-| 재시도 2회 초과 | 강제 통과 |
+### 핵심 구현
 
-**복구 로직**
+- **React 폼 입력**: `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set` 네이티브 setter + `input`/`change` 이벤트 dispatch로 React 상태 업데이트
+- **이미지 업로드**: CDP(Chrome DevTools Protocol)로 file input 우회
+- **카테고리 매핑**: Vision AI 카테고리 → 번개장터 3-depth 카테고리 매핑 테이블 (미매핑 시 "기타" fallback)
+- **토큰 전달**: 익스텐션이 백엔드로 세션 쿠키를 StorageState 형식으로 전송 → DB 암호화 저장
 
-| 실패 원인 | 자동 복구 |
-| --- | --- |
-| 네트워크 오류 | 가능 (재시도) |
-| 로그인 만료 | 불가 (수동 처리) |
-| 콘텐츠 정책 위반 | 불가 (수동 처리) |
+### 모바일 분기
 
-| 툴 | 설명 |
-| --- | --- |
-| `diagnose_publish_failure_tool` | 실패 원인 분석 |
-| `discord_alert_tool` | Discord 웹훅으로 장애 알림 발송 |
+- 감지: `window.innerWidth <= 768`
+- 데스크톱 → 익스텐션 자동 게시
+- 모바일 → 판매글 전체 복사 버튼 + 플랫폼 `products/new` 직접 올리기 링크
+
+### 게시 정책 단일 원천
+
+`app/domain/publish_policy.py` — 타임아웃(180s), 재시도(MAX_PUBLISH_RETRIES=2, 지수 백오프 5×2^n), `FAILURE_TAXONOMY` 12종 에러 분류, `classify_error()` 메시지 기반 자동 분류.
 
 ---
 
-### Agent 5 — 판매 후 최적화 에이전트
+## 마켓 + 셀러 코파일럿
 
-**역할:** 판매 여부 확인 후 미판매 시 가격 재전략 제안
+### 마켓 (공개)
+- `#/market` — 상품 목록 (검색·가격 필터·상태 필터·정렬·페이지네이션)
+- `#/market/{id}` — 상품 상세 + **AI 상품 챗봇** (`POST /market/{id}/chat`)
+  - 환각 방지: "상품 설명에 따르면" / "일반적으로 이 모델은" 분기
+  - 추정 금지: 정품 여부·구성품·보증·배터리·하자 (5개)
 
-| 조건 | 행동 |
-| --- | --- |
-| sold | 종료 |
-| unsold + 7일 | -5% 인하 제안 (urgency: medium) |
-| unsold + 14일 이상 | -10% 인하 제안 (urgency: high) |
-
-| 툴 | 설명 |
-| --- | --- |
-| `price_optimization_tool` | 미판매 기간 기반 가격 인하 전략 계산 |
+### 셀러 대시보드 (`#/my-listings`, 인증)
+- 내 상품 목록 + 판매 상태 변경
+- **문의 관리**: `inquiries` 테이블 — DB 저장 + Discord 알림 + Gmail SMTP 알림 병렬
+- **문의 응답 시 자동 상태 전이**: status → replied, is_read → true, last_reply_at → now
+- **문의 코파일럿**: LLM 응답 초안 + goal별 fallback 템플릿 3종 (nego/condition/default)
+- **재등록**: `POST /my-listings/{id}/relist` — 기존 세션 복제 + sale_status 초기화
 
 ---
 
 ## 저장소 구조
 
-### 핵심 원칙
-
-> AI 중간 산출물은 `sell_sessions` JSONB에 저장
-> 운영 추적 데이터는 별도 테이블에서 관리
-
 ### sell_sessions 테이블
 
 | 컬럼 | 내용 |
-| --- | --- |
-| `status` | 세션 전체 상태 (상태머신) |
-| `product_data_jsonb` | 이미지 경로, Vision 후보, 확정 상품 정보 |
-| `listing_data_jsonb` | 시세, 가격 전략, 판매글 초안, 플랫폼 패키지, 최적화 제안 |
-| `workflow_meta_jsonb` | checkpoint, tool_calls, 게시 결과, 진단 결과, 재작성 이력 |
+|---|---|
+| `status` | 세션 전체 상태 (상태머신 13종) |
+| `product_data` (JSONB) | 이미지 경로, Vision 후보, 확정 상품 정보 |
+| `listing_data` (JSONB) | 시세, 가격 전략, 판매글, 플랫폼 패키지, sale_status |
+| `workflow_meta` (JSONB) | checkpoint, tool_calls, 게시 결과, 진단 이력, critic trace |
 
-### product_data_jsonb
+### inquiries 테이블 (마켓 거래 루프)
 
-```json
-{
-  "image_paths": ["..."],
-  "analysis_source": "vision | user_input",
-  "candidates": [...],
-  "confirmed_product": {
-    "brand": "애플",
-    "model": "아이폰 15 Pro",
-    "confidence": 0.92,
-    "source": "vision"
-  },
-  "needs_user_input": false
-}
-```
-
-### listing_data_jsonb
-
-```json
-{
-  "market_context": {
-    "median_price": 830000,
-    "price_band": [600000, 1150000],
-    "sample_count": 25,
-    "crawler_sources": ["번개장터", "중고나라"]
-  },
-  "strategy": {
-    "goal": "fast_sell",
-    "recommended_price": 805000
-  },
-  "canonical_listing": {
-    "title": "애플 아이폰 15 Pro 급처합니다",
-    "description": "...",
-    "price": 805000,
-    "tags": ["애플", "아이폰15Pro", "스마트폰"]
-  },
-  "platform_packages": {
-    "bunjang": {"price": 815000},
-    "joongna": {"price": 805000}
-  }
-}
-```
-
-### workflow_meta_jsonb
-
-```json
-{
-  "checkpoint": "C_complete",
-  "tool_calls": [
-    {"tool_name": "market_crawl_tool", "success": true},
-    {"tool_name": "diagnose_publish_failure_tool", "success": true}
-  ],
-  "publish_results": {
-    "bunjang": {"success": true, "external_url": "https://m.bunjang.co.kr/products/..."},
-    "joongna": {"success": true}
-  },
-  "rewrite_history": [...],
-  "publish_diagnostics": [...]
-}
-```
-
-### 파일 스토리지 구조
-
-```
-original-images/      ← 원본 업로드 이미지
-processed-images/     ← 전처리/리사이즈 이미지
-crawler-snapshots/    ← 크롤링 결과 스냅샷
-publish-artifacts/    ← 게시 payload
-publish-evidence/     ← 게시 성공/실패 스크린샷
-```
+| 컬럼 | 설명 |
+|---|---|
+| `id`, `listing_id` | 문의 ID, 상품(세션) FK |
+| `buyer_name`, `buyer_contact`, `message` | 구매자 정보 + 문의 내용 |
+| `reply`, `status` (open/replied), `is_read` | 응답 + 상태 |
+| `created_at`, `last_reply_at` | 시각 |
 
 ---
 
 ## 시스템 아키텍처
 
-### 전체 구조
-
-```
-[Frontend - Next.js]              ← 미구현
-        ↓
-[FastAPI API Layer]                ← app/main.py
-        ↓
-[Session Router]                   ← app/api/session_router.py
-  status / checkpoint / next_action 중심 응답
-        ↓
-[SessionService]                   ← app/services/session_service.py
-  실제 서비스 진입점 / 상태 전이 관리
-        ↓
-[SellerCopilotService]             ← app/services/seller_copilot_service.py
-  LangGraph 실행 래퍼
-        ↓
-[LangGraph Runner]                 ← app/graph/seller_copilot_runner.py
-  graph.invoke() 실행
-        ↓
-[LangGraph Workflow Nodes]         ← app/graph/seller_copilot_nodes.py
-  5개 에이전트 / 6개 도구 자율 선택
-        ↓
-[Supabase DB]                      ← sell_sessions JSONB
-        ↓
-[External Services]
-  Vision AI (Gemini / OpenAI)
-  시세 크롤러 (aiohttp)
-  Playwright Publisher
-  Discord Webhook
-```
-
-### 계층별 책임 분리
+### 계층별 책임
 
 | 계층 | 파일 | 책임 |
-| --- | --- | --- |
-| Router | `session_router.py` | HTTP 진입점, 응답 포맷 |
-| Service | `session_service.py` | 상태 전이, 비즈니스 로직 |
-| Copilot | `seller_copilot_service.py` | LangGraph 입력 구성 |
-| Graph | `seller_copilot_nodes.py` | 에이전트 판단·도구 선택 |
-| Tools | `agentic_tools.py` | 실제 외부 호출 |
-| Infra | `session_repository.py` | DB CRUD |
+|---|---|---|
+| Router | `app/api/session_router.py`, `market_router.py`, `platform_router.py`, `admin_router.py` | HTTP 진입점, 응답 포맷 |
+| Service | `session_service.py`, `seller_copilot_service.py`, `publish_orchestrator.py` | 상태 전이, 오케스트레이션 |
+| Graph | `app/graph/seller_copilot_graph.py` + `nodes/` | 에이전트 판단·도구 선택 |
+| Tools | `app/tools/agentic_tools.py` | 외부 호출 facade |
+| Domain | `app/domain/` (session_status, goal_strategy, publish_policy, exceptions) | 단일 진실 원천 |
+| Repository | `session_repository.py`, `inquiry_repository.py` | DB CRUD |
+| Storage | `app/storage/` | Supabase Storage 클라이언트 |
 
-### 런타임 실행 흐름
+### 의존성 주입
 
-```
-1. 사용자 API 호출
-2. SessionService → 현재 status 검사
-3. 허용된 상태면 SellerCopilotService 호출
-4. LangGraph graph.invoke() 실행
-5. 각 노드(에이전트)가 도구 선택·호출
-6. 결과를 sell_sessions JSONB에 저장
-7. tool_calls 이력 포함해서 UI 친화 구조로 반환
-8. 프론트가 status / next_action 기준으로 화면 갱신
-```
+`app/dependencies.py`에서 `@lru_cache(maxsize=1)` 싱글턴 + FastAPI `Depends()`로 wiring. 테스트에서 `app.dependency_overrides`로 mock 주입.
 
-### 핵심 API
+### 예외 처리
 
-| 엔드포인트 | 설명 |
-| --- | --- |
-| `POST /sessions` | 세션 생성 |
-| `POST /sessions/{id}/images` | 이미지 업로드 |
-| `POST /sessions/{id}/analyze` | Vision AI 상품 분석 |
-| `POST /sessions/{id}/confirm-product` | 상품 확정 |
-| `POST /sessions/{id}/provide-product-info` | 수동 상품 정보 입력 |
-| `POST /sessions/{id}/generate-listing` | 판매글 생성 (LangGraph 실행) |
-| `POST /sessions/{id}/rewrite-listing` | 판매글 재작성 |
-| `POST /sessions/{id}/prepare-publish` | 게시 준비 |
-| `POST /sessions/{id}/publish` | 실제 게시 (Playwright) |
-| `POST /sessions/{id}/sale-status` | 판매 상태 입력 → 최적화 트리거 |
+`app/main.py` 글로벌 핸들러 단일 (`_DOMAIN_STATUS_MAP`):
+- SessionNotFound→404, InvalidUserInput→400, InvalidStateTransition→409
+- ListingGeneration/Rewrite→500, PublishExecution→502
+
+### 인증
+
+`app/core/auth.py` JWT 기반:
+- local/dev: `X-Dev-User-Id` 헤더 bypass 허용
+- prod: JWT 필수 + `X-Dev-User-Id` 거부 (403)
+- 공개 엔드포인트: `get_optional_user` 완화 (마켓·챗봇·문의)
 
 ---
 
-## 현재 상태 요약
+## 프론트엔드
+
+- **해시 라우팅**: `#/` (셀러 코파일럿) / `#/market` / `#/market/{id}` / `#/my-listings`
+- **13개 상태별 카드**: `sessionStatusUiMap.ts` SSOT로 상태 → CardType·ComposerMode 매핑
+- **실시간**: SSE `EventSource` + 스마트 폴링 fallback (탭 비활성 시 폴링 간격 2.5s → 10s)
+- **액션 훅** (CTO P1): `useSessionActions.ts` 단일 파일 — 10종 액션 집중 관리, App.tsx에 비즈니스 로직 금지
+- **테마**: 라이트/다크 토글 + CSS 변수 기반 (`--btn-padding`, `--text-primary` 등)
+- **모바일 반응형**: 사이드바 숨김, `+` 버튼 세션 자동 생성, 짧은 placeholder, 게시 분기
+
+---
+
+## 현재 상태
 
 | 항목 | 상태 |
-| --- | --- |
-| 백엔드 E2E | ✅ 완료 |
-| LangGraph 조건 분기 | ✅ 완료 |
-| 번개장터 게시 | ✅ 실제 성공 확인 |
-| 중고나라 게시 | ✅ 실제 성공 확인 |
-| 테스트 코드 | ✅ 33개 통과 |
-| 프론트 UI | ❌ 미구현 |
-| RAG 실제 구현 | ❌ 더미 상태 |
-| 사용자 인증 | ❌ temp-user-id 하드코딩 |
+|---|---|
+| 백엔드 E2E | ✅ 완료 (12,400줄) |
+| 프론트엔드 UI | ✅ 완료 (7,080줄, React 19 + Vite) |
+| LangGraph 조건 분기 + 3 Agentic Loop | ✅ 완료 |
+| 번개장터 자동 게시 (Content Script) | ✅ 성공 확인 |
+| 중고나라 자동 게시 (Content Script) | ✅ 성공 확인 |
+| 모바일 게시 (복사 + 직접 올리기) | ✅ 완료 |
+| pgvector RAG (385건 시세) | ✅ 활성화 |
+| Supabase Storage | ✅ Public 버킷 `product-images` |
+| AI 상품 챗봇 (구매자용) | ✅ 완료, 환각 방지 |
+| 마켓 거래 루프 (문의·응답·재등록) | ✅ 완료 |
+| 이메일 알림 (Gmail SMTP) | ✅ Discord와 병렬 |
+| 라이트/다크 테마 토글 | ✅ 완료 |
+| 서울 리전 배포 + Elastic IP 고정 | ✅ 43.201.188.57 |
+| 테스트 | ✅ BE 596 unit / FE 60 |
+| CI/CD (GitHub Actions + EC2 SSH 배포) | ✅ Rolling restart + Discord 알림 |
+| JWT 인증 + dev bypass | ✅ 환경별 정책 |
+| 프로덕션 로그인 UI | ⚠️ Supabase Auth 프론트 연결 개발 중 (현재 dev bypass + `get_optional_user` 운용) |
+| 당근마켓 게시 | ❌ Android 에뮬레이터 필요 (보류) |
+| 중고나라 크롤링 | ❌ CloudFlare 차단 (번개장터 데이터로 대체) |
 
-## 남은 것
+---
 
-- 프론트 UI 구축 (Next.js)
-- `app/agents/` 죽은 코드 정리
-- RAG 실제 벡터 DB 연결
-- user_id 실제 인증 연동
-- LLM 기반 진짜 도구 선택 고도화 (현재는 규칙 기반)
+## 배포 정보
+
+| 항목 | 값 |
+|---|---|
+| 리전 | `ap-northeast-2` (서울) |
+| Elastic IP | `43.201.188.57` (고정) |
+| 인스턴스 | `t3.medium` (2 vCPU, 4 GB, 20 GB) |
+| 컨테이너 | Caddy(HTTPS) + backend(FastAPI) + worker(Playwright) + frontend(nginx) |
+| CI/CD | main push → test → type-sync → FE build → Docker build → SSH 배포 → Discord 알림 |
+
+---
+
+## 관련 문서
+
+- `CLAUDE.md` — 프로젝트 개요 + 레이어 구조 + 핵심 규칙
+- `docs/architecture.md` — 상세 아키텍처
+- `docs/api-contract.md` — API 엔드포인트 명세
+- `docs/deployment.md` / `deployment-architecture.md` — 배포 상세
+- `docs/demo-guide-2026-04-10.md` — 데모 시나리오
+- `.claude/rules/coding-rules.md` — 코딩 규칙
+- `.claude/rules/architecture.md` — 에이전트·툴·그래프
+- `.claude/rules/frontend.md` — 프론트엔드 규칙
