@@ -56,6 +56,7 @@
   - `MAX_PUBLISH_RETRIES=2`, `RETRY_BASE_DELAY_SECONDS=5.0` (지수 백오프)
   - `FAILURE_TAXONOMY`: 12종 에러 분류 (timeout, login_expired, content_policy, image_upload_failed 등)
   - `classify_error(error_code, error_message)` — 에러 코드/메시지 기반 자동 분류
+- **노출 위치**: `classify_error()`는 `publish_service.py`(동기 경로 3곳)·`publish_worker.py`(큐 경로 2곳)에서 호출되어 `auto_recoverable` 판정 + 재시도 여부 결정. recovery 에이전트는 `lc_diagnose_publish_failure_tool`을 통해 동일 taxonomy를 참조해 일관성 유지.
 - **`legacy_spikes/` 직접 수정 금지** → `app/publishers/`에서 패치
 - 게시/복구/최적화: SessionService에서 노드 함수 직접 호출
 - 번개장터 가격: 수수료 3.5% 보전 (`base_price × 1.035`)
