@@ -131,10 +131,14 @@ jobs:
       - name: Deploy to EC2
         if: steps.check.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY
           script: |
             set -e
             cd ~/sagupalgu
@@ -153,11 +157,19 @@ jobs:
 
             COMPOSE="$DC -f docker-compose.yml -f docker-compose.prod.yml"
 
-            # 1) frontend/.env 자동 생성/갱신 — Vite는 frontend/ 하위의 .env만 읽음
-            #    루트 .env의 VITE_* 를 항상 truth source로 덮어써 stale 파일 방지
-            if grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
+            # 1) frontend/.env 생성 — GitHub Secrets (CI 주입) 우선,
+            #    없으면 EC2 루트 .env 에서 VITE_* 추출로 fallback
+            if [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_ANON_KEY" ]; then
+              cat > frontend/.env << ENVEOF
+            VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+            VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+            ENVEOF
+              echo "✓ frontend/.env 갱신됨 (GitHub Secrets 주입)"
+            elif grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
               grep -E '^VITE_SUPABASE_(URL|ANON_KEY)=' .env > frontend/.env
-              echo "✓ frontend/.env 갱신됨 ($(wc -l < frontend/.env)줄)"
+              echo "✓ frontend/.env 갱신됨 (EC2 .env 추출)"
+            else
+              echo "⚠ VITE_SUPABASE_* 미설정 — 프론트엔드에서 Supabase Auth 비활성화됨"
             fi
 
             # 2) VISION_PROVIDER 기본값 정합화 — 코드 default=gemini 를 덮어쓰지 않도록
