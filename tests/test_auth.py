@@ -261,3 +261,147 @@ class TestDecodeJwtMultiAlg:
                     _decode_jwt(token)
 
         assert exc.value.status_code == 401
+
+
+# ── #250 CTO 리뷰 5건: 보안 강화 ─────────────────────────────────────
+
+
+class TestDecodeJwtSecurity:
+    """CTO #250 리뷰: alg whitelist / aud + iss / JWKS retry / 500 금지."""
+
+    def _b64(self, data: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=").decode()
+
+    def _make_token(self, alg: str, payload: dict) -> str:
+        header = self._b64({"alg": alg, "typ": "JWT"})
+        body = self._b64(payload)
+        return f"{header}.{body}.fake_sig"
+
+    def test_ALLOWED_ALGS_화이트리스트_상수_정의됨(self):
+        """CTO #1: 코드에 명시 상수로 알고리즘 고정."""
+        from app.core.auth import ALLOWED_ALGS
+        assert ALLOWED_ALGS == frozenset({"HS256", "ES256", "RS256"})
+
+    def test_화이트리스트_외_알고리즘_즉시_401(self):
+        """CTO #1: HS384, PS256, none 등 모두 사전 차단 (downgrade 공격)."""
+        from app.core.auth import _decode_jwt
+
+        for bad_alg in ("HS384", "PS256", "none", "", "HMAC"):
+            token = self._make_token(bad_alg, {"sub": "u"})
+            with patch("app.core.config.get_settings") as mock_settings:
+                mock_settings.return_value.supabase_url = "https://x.supabase.co"
+                with pytest.raises(HTTPException) as exc:
+                    _decode_jwt(token)
+            assert exc.value.status_code == 401, f"alg={bad_alg} 가 401 이 아님"
+
+    def test_HS256_경로_audience_issuer_검증_활성화(self):
+        """CTO #2: aud/iss 검증이 jwt.decode 호출에 포함됨."""
+        from app.core.auth import _decode_jwt
+
+        token = self._make_token("HS256", {"sub": "u"})
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_jwt_secret = "secret"
+            mock_settings.return_value.supabase_service_role_key = ""
+            mock_settings.return_value.supabase_url = "https://proj.supabase.co"
+            with patch("jwt.decode", return_value={"sub": "u"}) as mock_decode:
+                _decode_jwt(token)
+
+        _args, kwargs = mock_decode.call_args
+        assert kwargs["audience"] == "authenticated"
+        assert kwargs["issuer"] == "https://proj.supabase.co/auth/v1"
+        # verify_aud 를 끄지 않음 (옵션 비전달 = 기본 True)
+        assert "options" not in kwargs or kwargs["options"].get("verify_aud") is not False
+
+    def test_ES256_경로도_audience_issuer_검증(self):
+        """CTO #2: 비대칭 경로도 동일하게 aud/iss 검증."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _decode_jwt
+
+        auth_mod._jwks_clients.clear()
+        token = self._make_token("ES256", {"sub": "u"})
+        fake_key = MagicMock()
+        fake_key.key = "pub"
+        fake_jwks = MagicMock()
+        fake_jwks.get_signing_key_from_jwt.return_value = fake_key
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://proj.supabase.co"
+            with patch("jwt.PyJWKClient", return_value=fake_jwks):
+                with patch("jwt.decode", return_value={"sub": "u"}) as mock_decode:
+                    _decode_jwt(token)
+
+        _args, kwargs = mock_decode.call_args
+        assert kwargs["audience"] == "authenticated"
+        assert kwargs["issuer"] == "https://proj.supabase.co/auth/v1"
+
+    def test_PyJWKClient_lifespan_명시(self):
+        """CTO #3: TTL 명시 (5분) — key rotation 자동 반영."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _get_jwks_client
+
+        auth_mod._jwks_clients.clear()
+        with patch("jwt.PyJWKClient") as mock_client_class:
+            _get_jwks_client("https://x.supabase.co")
+
+        _args, kwargs = mock_client_class.call_args
+        assert kwargs.get("lifespan") == 300
+
+    def test_JWKS_fetch_1회_실패_2회_성공(self):
+        """CTO #5: 일시적 실패는 1회 retry 로 흡수."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _decode_jwt
+
+        auth_mod._jwks_clients.clear()
+        token = self._make_token("ES256", {"sub": "u"})
+        fake_key = MagicMock()
+        fake_key.key = "pub"
+        fake_jwks = MagicMock()
+        # 1번째 호출 예외, 2번째 호출 성공
+        fake_jwks.get_signing_key_from_jwt.side_effect = [
+            ConnectionError("temporary network blip"),
+            fake_key,
+        ]
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with patch("jwt.PyJWKClient", return_value=fake_jwks):
+                with patch("jwt.decode", return_value={"sub": "u"}):
+                    payload = _decode_jwt(token)
+
+        assert payload["sub"] == "u"
+        assert fake_jwks.get_signing_key_from_jwt.call_count == 2
+
+    def test_JWKS_fetch_연속_2회_실패_401(self):
+        """CTO #4 + #5: 재시도까지 실패하면 500 아닌 401."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _decode_jwt
+
+        auth_mod._jwks_clients.clear()
+        token = self._make_token("ES256", {"sub": "u"})
+        fake_jwks = MagicMock()
+        fake_jwks.get_signing_key_from_jwt.side_effect = ConnectionError("network down")
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with patch("jwt.PyJWKClient", return_value=fake_jwks):
+                with pytest.raises(HTTPException) as exc:
+                    _decode_jwt(token)
+
+        assert exc.value.status_code == 401
+        assert fake_jwks.get_signing_key_from_jwt.call_count == 2
+
+    def test_예상치_못한_예외도_500_금지(self):
+        """CTO #4: 어떤 예외든 auth 레이어는 401 으로만 응답."""
+        from app.core.auth import _decode_jwt
+
+        token = self._make_token("HS256", {"sub": "u"})
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_jwt_secret = "secret"
+            mock_settings.return_value.supabase_service_role_key = ""
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            # jwt.decode 가 예상 외 예외 (e.g. RuntimeError)
+            with patch("jwt.decode", side_effect=RuntimeError("unexpected")):
+                with pytest.raises(HTTPException) as exc:
+                    _decode_jwt(token)
+
+        assert exc.value.status_code == 401
