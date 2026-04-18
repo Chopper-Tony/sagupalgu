@@ -167,9 +167,22 @@ class Settings(BaseSettings):
 
     # PR4-1: 옵션 D-하이브리드 카탈로그 RAG (sessions + price_history) 활성화.
     # off로 toggle하면 hybrid_search_catalog 호출이 차단되고 기존 lc_rag_price_tool만 동작.
+    #
+    # CTO PR4-1 리뷰 #1: opt-in (default=False) 채택.
+    # - migration 005 적용 안 된 환경에서 RPC missing → 런타임 에러 위험 차단
+    # - 사용자가 dev에서 dry-run 검증 후 ENABLE_CATALOG_HYBRID=true로 활성화하는 단계적 rollout
+    # - 점진 rollout 안정화되면 default=True로 승격 (별도 PR)
     enable_catalog_hybrid: bool = Field(
-        default=True,
+        default=False,
         alias="ENABLE_CATALOG_HYBRID",
+    )
+
+    # PR4-2: product_identity_agent ReAct 활성화 (신규 툴 3개 bind).
+    # off면 즉시 deterministic fallback (PR4-cleanup의 product_gate 로직 100% 동일).
+    # opt-in으로 단계적 rollout — feature flag toggle만으로 즉시 회귀 가능.
+    enable_product_identity_agent: bool = Field(
+        default=False,
+        alias="ENABLE_PRODUCT_IDENTITY_AGENT",
     )
 
     # ------------------------------
