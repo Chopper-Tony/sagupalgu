@@ -6,6 +6,14 @@ Agent 0 — Mission Planner / Strategy Agent
                          LLM이 다음 4 정책 필드를 한 번에 결정 → 다운스트림 노드 동작
                          강도가 정책에 따라 동적으로 바뀐다.
 
+⚠️ 정책 필드는 metadata가 아니라 control signal이다 (CTO PR3 #1).
+   - state.plan_mode / market_depth / critic_policy / clarification_policy 는
+     실제로 routing 분기와 노드 동작 강도를 *제어*한다.
+   - 단순 관측·디버깅용 메타데이터로 다루면 안 된다.
+   - 다운스트림 노드(routing.py:route_after_planner, market_intelligence_node,
+     listing_critic_node, clarification_node)는 이를 *반드시* 참조해야 한다.
+   - 이 의미가 흐려지면 planner가 다시 "설명용 노드"로 퇴화한다.
+
 정책 출력:
   plan_mode:            "shallow" | "balanced" | "deep"
                         깊이/공격성. shallow는 빠르고 가볍게, deep은 충실하게.

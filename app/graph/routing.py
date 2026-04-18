@@ -98,7 +98,11 @@ def route_after_planner(state: SellerCopilotState) -> str:
     """
     depth = state.get("market_depth", "crawl_plus_rag")
     if depth != "skip":
+        # planner가 skip을 시도하지 않은 경우. skip_attempted=False (default 유지).
         return "market_intelligence_node"
+
+    # CTO PR3 #2: planner가 skip을 시도했음을 기록 (시도 안 함 vs 시도+거절 구분).
+    state["skip_attempted"] = True
 
     allowed, reason = _skip_allowed(state)
     if not allowed:

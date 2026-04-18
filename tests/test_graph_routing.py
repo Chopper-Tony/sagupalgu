@@ -228,3 +228,29 @@ class TestRouteAfterPlannerSkipGuard:
         state = {"market_depth": "skip", "user_product_input": {"price": 100000}}
         route_after_planner(state)
         assert any("skip_allowed" in log for log in state.get("debug_logs", []))
+
+    def test_skip_미시도시_skip_attempted_False(self):
+        """CTO PR3 #2: market_depth != 'skip'이면 skip_attempted는 default False 유지."""
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "crawl_plus_rag"}
+        route_after_planner(state)
+        assert not state.get("skip_attempted", False)
+
+    def test_skip_시도_허용시_skip_attempted_True(self):
+        """CTO PR3 #2: skip 시도하면 (허용/거절 무관) skip_attempted=True."""
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "skip", "user_product_input": {"price": 100000}}
+        route_after_planner(state)
+        assert state["skip_attempted"] is True
+
+    def test_skip_시도_거절시에도_skip_attempted_True(self):
+        """CTO PR3 #2: 시도 안 함 vs 시도+거절 구분."""
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "skip", "plan_mode": "deep",
+                 "confirmed_product": {"category": "electronics"}}
+        route_after_planner(state)
+        assert state["skip_attempted"] is True
+        assert state["skip_rejected_reason"]

@@ -24,12 +24,33 @@ clarification_policy 동작:
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 import logging
 
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _build_react_llm, _log, _record_error, _run_async
+
+
+# CTO PR3 #4: clarification 모드 명시 (state 기반 implicit 분기 → 명명된 mode).
+# PR4에서 Product Identity 승격 시 product_identification 모드 확장 충돌 방지용.
+ClarificationMode = Literal[
+    "product_identification",   # Vision confidence 낮음 → 모델명 직접 입력 대기 (LLM 안 씀)
+    "pre_listing_enrichment",   # confirmed_product 있음 + 정보 부족 → LLM 질문 생성
+    "noop",                     # 이미 done 상태 → 변경 없음
+]
+
+
+def _resolve_mode(state: SellerCopilotState) -> ClarificationMode:
+    """state로부터 명시 mode 결정. 모드 분기 의도를 명문화."""
+    product = state.get("confirmed_product") or {}
+    needs_input = state.get("needs_user_input", False)
+
+    if needs_input and (not product or float(product.get("confidence", 0) or 0) < 0.6):
+        return "product_identification"
+    if not state.get("pre_listing_done", False):
+        return "pre_listing_enrichment"
+    return "noop"
 
 
 # 판매글 품질에 영향을 주는 핵심 정보 항목
@@ -42,27 +63,16 @@ _LISTING_INFO_REQUIREMENTS = [
 
 
 def clarification_node(state: SellerCopilotState) -> SellerCopilotState:
-    """단일 통합 entry point. state로 모드 자동 분기.
+    """단일 통합 entry point. _resolve_mode()로 명시 mode 결정 후 dispatch."""
+    mode = _resolve_mode(state)
+    _log(state, f"clarification:mode={mode}")
 
-    모드 결정:
-      - confirmed_product 없음/약함 → product 모드 (모델명 직접 입력 대기, LLM 호출 없음)
-      - confirmed_product 있음 + pre_listing_done=False → pre_listing 모드 (LLM 질문 생성)
-      - 그 외 → no-op
-    """
-    product = state.get("confirmed_product") or {}
-    needs_input = state.get("needs_user_input", False)
-
-    # 모드 1: product 식별 단계 (LLM 안 씀, 단순 대기)
-    # needs_user_input=True 이면서 confirmed_product 없거나 confidence 낮음 → product 모드
-    if needs_input and (not product or float(product.get("confidence", 0) or 0) < 0.6):
+    if mode == "product_identification":
         return _wait_for_product_input(state)
-
-    # 모드 2: pre_listing 품질 향상용 추가 정보
-    if not state.get("pre_listing_done", False):
+    if mode == "pre_listing_enrichment":
         return _generate_pre_listing_questions(state)
-
-    # 모드 3: 이미 완료 상태 → no-op
-    _log(state, "clarification:already_done → noop")
+    # noop
+    _log(state, "clarification:noop (already done)")
     return state
 
 

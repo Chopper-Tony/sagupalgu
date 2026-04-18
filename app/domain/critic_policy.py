@@ -43,13 +43,33 @@ MAX_CRITIC_RETRIES: int = 2
 
 # ── plan_mode × critic_policy 조합 제약 ──────────────────────────────
 # planner가 정책을 결정할 때 모순 조합을 피하도록 프롬프트에 주입.
-# 예: shallow + strict = "빠르게 가자면서 엄격하게 평가" 라는 모순.
-# planner LLM이 위반 조합을 산출하면 fallback으로 보정.
+#
+# 정규화 기준 (CTO PR3 #3):
+#   - shallow는 strict critic과 함께 사용할 수 없다
+#     ("빠르게 가자면서 엄격하게 평가" → critic이 매번 reject → shallow 의도 무력화).
+#   - deep은 minimal critic과 함께 사용할 수 없다
+#     (심층 분석을 했는데 평가가 관대하면 분석 비용 낭비).
+#   - 위반 조합은 안정성을 위해 normal로 강등 (양쪽 plan_mode 모두에서 허용된 안전값).
 POLICY_COMBO_RULES: Dict[str, Dict[str, List[str]]] = {
     "shallow": {"critic_policy": ["minimal", "normal"]},
     "balanced": {"critic_policy": ["minimal", "normal", "strict"]},
     "deep": {"critic_policy": ["normal", "strict"]},
 }
+
+
+# ── market_depth 제어 범위 (CTO PR3 #5: 3단 유지 원칙) ───────────────
+# planner가 시세 조사 강도를 결정. market_intelligence_node는 이를 그대로 따른다.
+# 이 3단 구조를 확장하지 말 것 (예: "crawl_full", "rag_only" 등 추가 금지).
+# 추가 깊이가 필요하면 market_depth가 아니라 다른 정책 필드(예: rag_top_k)로 분리.
+#
+# 3단 의미:
+#   - skip:           시세 단계 건너뛰고 pricing으로 직진 (routing 가드 통과 시만)
+#   - crawl_only:     실시간 크롤링만, RAG 도구 bind 제외 (빠른 시세)
+#   - crawl_plus_rag: 기본. 크롤링 + sample_count<3 시 RAG 보완
+#
+# 통제력: planner가 깊이 결정 → market은 따른다. 다른 노드가 market_depth를
+# 임의로 override하면 planner의 통제력이 약화되므로 금지.
+VALID_MARKET_DEPTHS = ("skip", "crawl_only", "crawl_plus_rag")
 
 
 # ── market_depth=skip 허용 카테고리 ──────────────────────────────────
