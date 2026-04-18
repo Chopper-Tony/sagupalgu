@@ -62,13 +62,6 @@ export default function App() {
     return () => window.removeEventListener("hashchange", parseHash);
   }, []);
 
-  // 로그인 후 #/login 이면 기본 화면으로 복귀
-  useEffect(() => {
-    if (user && page === "login") {
-      window.location.hash = "#/";
-    }
-  }, [user, page]);
-
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
