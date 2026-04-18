@@ -42,11 +42,11 @@
 - `TYPE_CHECKING` 블록은 타입 힌트 전용
 
 ## 테스트
-- **unit**: 순수 함수, mock 불필요, CI 필수 (596개, 14초)
+- **전체**: 918개 (~40초). unit/integration/e2e 마커로 구분
 - **integration**: 노드 호출, 외부 LLM 반드시 mock
 - **e2e**: 실제 LLM, CI 필수 아님
 - LLM 응답 의존 assertion 금지 — fallback 경로만 검증
-- 프론트엔드 테스트: vitest 60개 (hooks, lib, 타입 계약)
+- 프론트엔드 테스트: vitest 67개 (hooks, lib, 컴포넌트, 타입 계약)
 - FE/BE 타입 동기화: `scripts/generate_api_types.py --check` CI 필수
 
 ## 게시 정책 (단일 원천)
@@ -73,6 +73,12 @@
 - `app/core/auth.py` JWT 기반 + 환경별 정책
 - dev/local: `X-Dev-User-Id` 헤더 bypass 허용 (로그인 UI 없이 개발)
 - prod: `get_optional_user` 완화 모드 + `X-Dev-User-Id` 거부 (403)
+- **알고리즘**: `ALLOWED_ALGS = frozenset({"HS256", "ES256", "RS256"})` 화이트리스트 — 그 외는 401 (downgrade 차단)
+  - HS256: legacy Supabase. `SUPABASE_JWT_SECRET` 으로 검증
+  - ES256/RS256: 모던 Supabase. `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` 의 공개키로 검증 (`PyJWKClient` lifespan=300, timeout=10, 1회 retry)
+- **claim 검증**: `audience="authenticated"` + `issuer="{SUPABASE_URL}/auth/v1"` 강제
+- **500 절대 금지**: 모든 실패 경로 (PyJWTError / JWKS HTTP / 예상 외 RuntimeError) → 401 + ERROR 로그
+- **익스텐션 호출**: `PublishResultCard` → `postMessage{accessToken}` → `publish_bridge.js` → `background.js` → `Authorization: Bearer` 헤더 (#251). 익스텐션 fetch 가 인증 필요 엔드포인트 호출 시 반드시 토큰 패스스루
 
 ## 이미지 저장
 - Supabase Storage Public 버킷 `product-images` (USE_CLOUD_STORAGE=true)

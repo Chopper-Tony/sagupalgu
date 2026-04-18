@@ -32,8 +32,8 @@ cd frontend && npm install && npm run dev
 
 # 테스트
 pip install -r requirements-dev.txt
-python -m pytest tests/ -m unit     # unit (596개, 14초)
-cd frontend && npm test             # FE 60개 (vitest)
+python -m pytest tests/             # 918개 (BE, ~40초)
+cd frontend && npm test             # FE 67개 (vitest)
 
 # Docker
 docker compose up --build
@@ -118,7 +118,10 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 
 ## 완료된 항목 (최근)
 
-- **에이전틱성 리팩터 PR4-3 (2026-04-19)**: 회귀 테스트 보강 + 문서 + observability. `app/middleware/metrics.py` 신규 — in-process 카운터 + cold_start>20% / fallback>10% 임계 alert. `_emit_observability_metrics` 가 logger.info → emit_product_identity_run 으로 교체. catalog tool ToolMessage 응답에서 cold_start 자동 추출 → state.product_identity_catalog_cold_start. architecture.md 4+2+5 → 5+2+4 갱신 + 카탈로그 sync flow 다이어그램. 894 BE + 65 FE green
+- **익스텐션 JWT 패스스루 v1.2.1 (2026-04-19)**: prod 로그인 사용자가 자동 게시 시 익스텐션 fetch 가 토큰 미전달 → `/publish-data` 404 였던 잠복 버그. `PublishResultCard` 가 AuthContext 의 access_token 을 postMessage 에 포함 → publish_bridge.js 가 background 로 전달 → background.js 가 `Authorization: Bearer` 헤더 추가. v1.2.0→1.2.1, 사용자는 `chrome://extensions` 재로드 1회 필요. (PR #252 / Issue #251)
+- **JWT 다중 알고리즘 + JWKS + 보안 강화 (2026-04-19)**: prod 로그인 후 모든 인증 엔드포인트가 500 으로 실패하던 잠복 버그. `app/core/auth.py` 가 HS256 만 허용해 모던 Supabase 의 ES256 토큰을 거부. 토큰 alg 헤더로 분기 (HS256 / ES256+RS256 JWKS) + `PyJWKClient` 5분 TTL + 1회 retry. CTO 보안 5건 반영: `ALLOWED_ALGS` 화이트리스트 (downgrade 차단), audience+issuer 검증, lifespan 명시, 모든 실패 401 (auth 레이어 500 금지), JWKS fetch retry. (PR #250 / Issue #249)
+- **Dockerfile scripts/ COPY (2026-04-19)**: PR4-1 의 `scripts/cron/sync_catalog.py` 가 컨테이너에 미포함이라 cron 실행 시 ModuleNotFoundError. Dockerfile 1줄 + smoke test (`tests/test_cron_scripts_importable.py`) 로 재발 방지. (PR #248 / Issue #247)
+- **에이전틱성 리팩터 PR4-3 (2026-04-19)**: 회귀 테스트 보강 + 문서 + observability. `app/middleware/metrics.py` 신규 — in-process 카운터 + cold_start>20% / fallback>10% 임계 alert. `_emit_observability_metrics` 가 logger.info → emit_product_identity_run 으로 교체. catalog tool ToolMessage 응답에서 cold_start 자동 추출 → state.product_identity_catalog_cold_start. architecture.md 4+2+5 → 5+2+4 갱신 + 카탈로그 sync flow 다이어그램 + 운영 runbook (threshold 튜닝 + rollout/rollback 기준). 918 BE + 67 FE green
 - **에이전틱성 리팩터 PR4-2 (2026-04-19)**: product_identity_node 를 결정론 노드 → Tool Agent (ReAct) 로 승격. 신규 툴 3개 (lc_image_reanalyze_tool / lc_rag_product_catalog_tool / lc_ask_user_clarification_tool). LLM 이 confidence·정보 보강을 위해 자율 선택. budget guard (reanalyze 2회 / clarify 1회 / 전체 4회) + SHA256 1h 캐시 + 5단계 fallback chain (PR4-cleanup deterministic 100% 보존). `enable_product_identity_agent` opt-in flag (default=False). 884 BE green
 - **에이전틱성 리팩터 PR4-1 (2026-04-19)**: Product Identity 카탈로그 RAG 인프라. migration 005 (vector_search_catalog_hybrid + keyword_search_catalog_hybrid RPC + price_history.source_type + catalog_sync_cursor). app/db/product_catalog_store.py (3-tier fallback: vector→keyword→Python ILIKE) + app/services/catalog_sync_service.py (sessions(sold) → price_history sync, cursor 기반 incremental). `enable_catalog_hybrid` opt-in flag (default=False, CTO #1)
 - **에이전틱성 리팩터 PR1~3 (2026-04-19)**: 명목상 7 에이전트 → 실제 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류. critic을 Routing Agent로 승격(repair_action 7값), planner를 Strategy Agent로 승격(plan_mode/market_depth/critic_policy/clarification_policy 4 정책 결정), copywriting을 단일 툴 노드로 강등, refinement를 validation에 흡수, clarification 통합. routing.py는 단순 dispatch + replan 가드 + skip 가드. 정책 단일 원천: `app/domain/critic_policy.py`. 839 BE + 65 FE green
@@ -128,6 +131,7 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 - **익스텐션 팝업 로그인 링크 (2026-04-18, v1.2.0)**: 번개장터·중고나라 row 에 플랫폼 로그인 페이지 바로가기 추가, 연동됨 상태에서는 숨김
 - **publish_worker 컨테이너 제거 (2026-04-18)**: 번장/중나는 익스텐션 전담, 당근은 보류 → 워커에 도달하는 작업 0 건이라 제거. `publish_jobs` 테이블과 코드 파일은 보존 (당근 에뮬레이터 경로 재개 가능성)
 - 서울 리전 이전: Elastic IP 43.201.188.57 (고정, 재시작해도 안 바뀜)
+- catalog sync cron 등록: EC2 `crontab` 에 `0 4 * * *` 매일 04:00 sync_catalog 자동 실행 (Amazon Linux 2023 cronie 설치 + `/var/log/sagupalgu/` 로그). sold=0 이면 no-op
 - AI 상품 챗봇: 마켓 상세 페이지에서 구매자 질문 AI 답변
 - 이메일 알림: 구매 문의 시 Gmail SMTP 알림 추가
 - pgvector 활성화: 385건 시세 데이터 시딩 완료
@@ -137,7 +141,7 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 - 모바일 반응형: + 버튼 업로드 + 판매글 복사 + 직접 올리기
 - 라이트/다크 테마 토글
 - CTO P1 반영: publish 정책 단일화 + App.tsx 액션 훅 분리
-- 프론트엔드 테스트 60개 (useWishlist, useRecentlyViewed, hashRouting, 타입 계약 등)
+- 프론트엔드 테스트 67개 (useWishlist, useRecentlyViewed, hashRouting, 타입 계약, PublishResultCard 등)
 
 ## EC2 서울 리전 배포 정보
 
@@ -147,3 +151,6 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 - **인스턴스**: t3.medium (2vCPU, 4GB RAM, 20GB EBS)
 - **리전**: ap-northeast-2 (서울)
 - **Docker Compose**: `docker-compose up --build -d`
+- **Cron**: `crontab -l` — 매일 04:00 catalog sync (Amazon Linux 2023 cronie 설치됨)
+- **로그**: `/var/log/sagupalgu/catalog_sync.log` (cron 실행 결과)
+- **운영 토글**: `.env` 의 `ENVIRONMENT=dev` 상태. 진짜 prod 인증 모드 (X-Dev-User-Id 차단 + JWT 강제) 활성화 시 `prod` 로 전환 필요. 단 사용자 모이고 baseline 잡힌 후 진행 권장
