@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── failure_mode taxonomy (CTO PR4-2 #5) ──────────────────────────────
 # string 분산 대신 Literal로 enum화. metric/alert/분석에서 명시 사용.
-from typing import Literal
+from typing import Literal, TypedDict
 
 ProductIdentityFailureMode = Literal[
     "react_exception",                       # ReAct 호출 자체 예외
@@ -36,6 +36,37 @@ ProductIdentityFailureMode = Literal[
     "reanalyze_budget_exceeded",             # tool 단위 budget 초과
     "max_clarify_calls_reached",             # tool 단위 budget 초과
 ]
+
+
+# ── lc_rag_product_catalog_tool 응답 contract (CTO PR4-3 #3) ──────────
+# observability 가 ToolMessage.content 에서 cold_start 를 자동 추출하므로
+# 이 필드들이 이름·타입 채로 항상 존재해야 한다. tool 응답 변경 시 본 schema 도 함께 갱신.
+
+class CatalogToolResponse(TypedDict, total=False):
+    matches: list                  # 매칭된 catalog 항목
+    top_match_confidence: float    # 0.0 ~ 1.0
+    source_count: int              # 검색된 항목 수
+    cold_start: bool               # 핵심: hits<3 OR top_conf<0.5 일 때 True
+    source_breakdown: dict         # {crawled: int, sell_session: int, manual: int}
+    disabled_by_flag: bool         # ENABLE_CATALOG_HYBRID=false 인 경우만
+    error: str                     # exception 발생 시만
+
+
+CATALOG_TOOL_REQUIRED_FIELDS = ("cold_start",)
+
+
+def validate_catalog_tool_response(payload: Dict[str, Any]) -> bool:
+    """ToolMessage 응답이 CatalogToolResponse contract 를 만족하는지 검증.
+    필수: cold_start 필드 존재 + bool 타입.
+    """
+    if not isinstance(payload, dict):
+        return False
+    for field in CATALOG_TOOL_REQUIRED_FIELDS:
+        if field not in payload:
+            return False
+    if not isinstance(payload.get("cold_start"), bool):
+        return False
+    return True
 
 
 # ── reanalyze 캐싱 (TTL 1h) ──────────────────────────────────────────

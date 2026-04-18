@@ -314,10 +314,14 @@ def _log_quality_comparison(state: SellerCopilotState, agent_result: SellerCopil
 def _extract_catalog_cold_start(react_result: Dict[str, Any]) -> bool:
     """react_result.messages 에서 lc_rag_product_catalog_tool 의 ToolMessage 응답을 찾아
     cold_start=true 였는지 판정. PR4-3 observability 용.
+
     catalog tool 호출이 없었으면 False (cold_start 라는 신호 자체가 없음).
+    contract 위반 응답 (cold_start 필드 누락 등) 도 False — 다만 logger.warning 으로
+    drift 감지 가능하게 남김 (CTO PR4-3 #3: tool response schema 명시 필드 강제).
     """
+    from app.tools.product_identity_tools import validate_catalog_tool_response
+
     for msg in react_result.get("messages", []):
-        # ToolMessage: name 속성 + content (str)
         name = getattr(msg, "name", "") or ""
         if name != "lc_rag_product_catalog_tool":
             continue
@@ -326,10 +330,15 @@ def _extract_catalog_cold_start(react_result: Dict[str, Any]) -> bool:
             continue
         try:
             payload = json.loads(content)
-            if isinstance(payload, dict) and payload.get("cold_start") is True:
-                return True
         except (json.JSONDecodeError, ValueError, TypeError):
+            logger.warning("[catalog_contract] non-json ToolMessage content")
             continue
+        if not validate_catalog_tool_response(payload):
+            keys = list(payload.keys()) if isinstance(payload, dict) else type(payload).__name__
+            logger.warning(f"[catalog_contract] response missing cold_start field: keys={keys}")
+            continue
+        if payload.get("cold_start") is True:
+            return True
     return False
 
 

@@ -209,3 +209,43 @@ market_depth='skip'은 아래 조건 중 1개 이상 충족 시만 실제 적용
 ```
 
 > Feature flag 2개로 단계적 rollout: `ENABLE_CATALOG_HYBRID` (PR4-1) → `ENABLE_PRODUCT_IDENTITY_AGENT` (PR4-2). 둘 다 default=False (opt-in).
+
+## Product Identity 운영 runbook (PR4-3)
+
+### Threshold 튜닝 (CTO PR4-3 #2)
+
+`COLD_START_ALERT_THRESHOLD=0.20` / `FALLBACK_ALERT_THRESHOLD=0.10` 은 **임시 static 값**이다.
+실제 분포 모르는 상태에서 도입한 reasonable default — 운영 진입 후 baseline 으로 재조정.
+
+절차:
+1. **Day 0~3**: `ENABLE_CATALOG_HYBRID=true` + `ENABLE_PRODUCT_IDENTITY_AGENT=true` 활성화 후 표본 ≥ 100 누적까지 alert 무시
+2. **Day 4**: `compute_diagnostic_breakdown()` snapshot 으로 baseline 측정
+   - cold_start_rate baseline → 그 +50% 를 신규 threshold (예: baseline 12% → 18%)
+   - fallback_rate baseline → 그 +100% 를 신규 threshold (fallback 은 더 민감하게)
+3. **Day 7~**: trend 기반 alert 추가 — 전일 대비 cold_start +5%p OR fallback +3%p 급증 시 알림 (baseline 절대치보다 변화량이 더 의미)
+
+코드 변경 위치: `app/middleware/metrics.py` 의 `COLD_START_ALERT_THRESHOLD` / `FALLBACK_ALERT_THRESHOLD` 상수.
+trend 비교는 별도 store (Redis 또는 SQL) 도입 시 추가.
+
+### Rollout / Rollback 기준 (CTO PR4-3 #5)
+
+**Rollout (off → on)**
+- PR4-1 (`ENABLE_CATALOG_HYBRID`):
+  - 전제: migration 005 dev/prod 적용 완료 + `scripts/cron/sync_catalog.py --dry-run` 정상
+  - on 후 24h 표본 ≥ 30 + RPC 에러율 < 5%
+- PR4-2 (`ENABLE_PRODUCT_IDENTITY_AGENT`):
+  - 전제: PR4-1 7일 안정 (cold_start_rate baseline 확정)
+  - on 후 48h 표본 ≥ 50 + fallback_rate < 15% + agent vs deterministic delta 평균 ≥ -0.05 (quality regression 방지)
+
+**Rollback (on → off)**
+즉시 `.env` 토글 + `docker compose restart`. 기준:
+- fallback_rate > 25% (1h window)
+- cold_start_rate > 40% (1h window) — 카탈로그 데이터 또는 RPC 자체 문제
+- agent vs deterministic delta 평균 < -0.15 — quality 명백히 하락
+- LLM 비용 일일 예산 1.5배 초과
+
+**Diagnostic 우선순위** (compute_diagnostic_breakdown 의 failure_modes 분포로 판정)
+- `react_exception` 우세 → LLM provider 장애 의심 → fallback chain 점검
+- `parse_error` 우세 → system_prompt 응답 형식 drift → prompt 재정렬
+- `react_total_budget_exceeded` 우세 → 무한 루프 케이스 발생 → max_iterations / tool budget 재검토
+- `clarify_forced_by_heuristic` 우세 → vision 품질 하락 → identify_product fallback 점검
