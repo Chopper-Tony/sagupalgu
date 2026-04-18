@@ -294,8 +294,12 @@ class TestProductIdentityAgentReAct:
         assert result["checkpoint"] == "A_needs_user_input"
 
     def test_observability_metric_log_emit(self):
-        """CTO PR4-2 #2: agent 실행 후 metric hook이 logger.info 호출."""
+        """CTO PR4-2 #2 + PR4-3: agent 실행 후 metric hook 이 in-process registry 누적."""
         from app.graph.nodes.product_agent import product_identity_agent
+        from app.middleware.metrics import get_registry, PRODUCT_IDENTITY_RUN
+
+        registry = get_registry()
+        registry.reset()
 
         state = {
             "user_product_input": {},
@@ -311,11 +315,10 @@ class TestProductIdentityAgentReAct:
         }
         with self._enable_flag():
             with patch("app.graph.nodes.product_agent._run_react", return_value=ok_result):
-                with patch("app.graph.nodes.product_agent.logger") as mock_logger:
-                    product_identity_agent(state)
+                product_identity_agent(state)
 
-        info_calls = [c for c in mock_logger.info.call_args_list if "[metric]" in str(c)]
-        assert info_calls, "expected [metric] log to be emitted"
+        snap = registry.snapshot()
+        assert snap["counters"].get(f"{PRODUCT_IDENTITY_RUN}.total", 0) == 1
 
 
 # ─────────────────────────────────────────────────────────────────

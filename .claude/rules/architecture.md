@@ -1,13 +1,15 @@
-# 에이전트 · 툴 · 그래프 아키텍처 (4 + 2 + 5)
+# 에이전트 · 툴 · 그래프 아키텍처 (5 + 2 + 4)
 
-> PR1~3 리팩터 결과. 명목상 7 에이전트 → 실제 selection을 수행하는 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류.
+> PR1~4 리팩터 결과. 명목상 7 에이전트 → 실제 selection을 수행하는 5 에이전트 + 2 단일툴 + 4 결정론으로 재분류.
+> PR4 에서 `product_identity_node` 가 결정론 노드 → Tool Agent (ReAct) 로 승격되며 4+2+5 → 5+2+4 로 변동.
 > 정책 단일 원천: `app/domain/critic_policy.py`.
 
-## 4 에이전트 (selection 수행)
+## 5 에이전트 (selection 수행)
 
 | 분류 | 노드 | 결정 책임 |
 |---|---|---|
 | **Strategy Agent** | `mission_planner_node` | 4 정책 필드 결정: plan_mode / market_depth / critic_policy / clarification_policy. POLICY_COMBO_RULES 위반 정규화. replan 시 strict 강화 |
+| **Tool Agent (ReAct)** | `product_identity_node` | **PR4-2 승격**. lc_image_reanalyze_tool / lc_rag_product_catalog_tool / lc_ask_user_clarification_tool 자율 선택. confidence·정보 보강. `enable_product_identity_agent=False` 또는 LLM 실패 시 PR4-cleanup 의 deterministic 로직 100% 보존 (5단계 fallback chain) |
 | **Tool Agent (ReAct)** | `market_intelligence_node` | lc_market_crawl_tool + lc_rag_price_tool 자율 선택. market_depth='crawl_only'면 RAG 제외 |
 | **Routing Agent** | `listing_critic_node` | LLM이 score + repair_action(7값) + failure_mode + rewrite_plan 결정. critic_policy로 엄격도 동적 |
 | **Tool Agent (ReAct)** | `recovery_node` | lc_diagnose / lc_auto_patch / lc_discord_alert 자율 선택 |
@@ -19,20 +21,24 @@
 | `copywriting_node` | critic이 정해준 rewrite_plan(target/instruction)을 실행. rewrite_plan 없으면 신규 generate. ListingService → rule-based → template fallback 체인 (결정론 안전망) | "Single Tool Node with deterministic fallback chain" |
 | `clarification_node` | state로 모드 자동 분기 (product 식별 대기 / pre_listing 질문 생성). clarification_policy로 적극성 조절 | PR3 통합 (구 `pre_listing_clarification_node` + `product_agent.clarification_node`) |
 
-## 5 결정론 노드 (LLM 없음)
+## 4 결정론 노드 (LLM 없음)
 
 | 노드 (PR1 알리아스) | 동작 |
 |---|---|
-| `product_identity_node` (= `product_gate_node`) | Vision 결과·사용자 입력으로 상품 확정 |
 | `pricing_strategy_node` (= `pricing_rule_node`) | goal_strategy 모듈 기반 규칙 산정 |
 | `validation_node` (= `validation_rules_node`) | 필수 필드·길이·가격 검사 + **자동 보강 흡수** (description 짧음 / price 0원) + repair_action_hint |
 | `post_sale_optimization_node` (= `post_sale_policy_node`) | sale_status 기반 price_optimization_tool 결정론적 호출 |
 | `package_builder_node` | canonical → 플랫폼별 패키지 (번개장터 수수료 3.5% 보전 등) |
 
-## 10 툴
+> `product_identity_node` 는 PR4-2 에서 Tool Agent 로 승격. 5 결정론 → 4 결정론.
+
+## 13 툴
 
 | 툴 | 에이전트 | 기능 |
 |----|---------|------|
+| `lc_image_reanalyze_tool` | 1 (Product Identity) | **PR4-2 신규**. focus(ocr/spec/category_hint) 다른 prompt 로 Vision 재분석. 한 세션 최대 2회 + SHA256 1h TTL 캐시 |
+| `lc_rag_product_catalog_tool` | 1 (Product Identity) | **PR4-2 신규**. PR4-1 hybrid_search_catalog (sessions sold + price_history) 호출. cold_start flag 포함 |
+| `lc_ask_user_clarification_tool` | 1 (Product Identity) | **PR4-2 신규**. 사용자 식별 질문 발행. 한 세션 최대 1회 |
 | `lc_market_crawl_tool` | 2 | 번개장터·중고나라 실시간 크롤링 |
 | `lc_rag_price_tool` | 2 | pgvector→키워드→LLM 3단계 RAG |
 | `lc_generate_listing_tool` | 3 | 판매글 LLM 생성 |
@@ -157,3 +163,49 @@ market_depth='skip'은 아래 조건 중 1개 이상 충족 시만 실제 적용
 - 입력: 경과 일수 + 판매 상태 + 문의 수
 - 출력: `price_drop` / `rewrite` / `platform_add` 제안
 - 트리거: `SaleTracker`가 completed → awaiting_sale_status_update → optimization_suggested 전이 관리
+
+## Product Identity 카탈로그 sync flow (PR4-1·4-2·4-3)
+
+```
+[sell_sessions: status=completed AND sale_status=sold]
+        │  (cron 일 1회 또는 수동 trigger)
+        ▼
+[scripts/cron/sync_catalog.py]
+        │
+        ▼
+[app/services/catalog_sync_service.py
+  · cursor 읽기 (catalog_sync_cursor)
+  · 신규/갱신된 sold session 만 batch 추출
+  · 정규화 (브랜드 alias, 모델, 카테고리)
+  · OpenAI text-embedding-3-small 임베딩
+  · price_history INSERT (source_type='sell_session')
+  · cursor write]
+        │
+        ▼
+[Supabase price_history (pgvector)] ← ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+                                                              │
+[product_identity_agent ReAct]                                 │
+        │                                                      │
+        ▼ (LLM 자율 호출)                                        │
+[lc_rag_product_catalog_tool]                                  │
+        │                                                      │
+        ▼                                                      │
+[app/db/product_catalog_store.hybrid_search_catalog]            │
+  · vector RPC (vector_search_catalog_hybrid) ─────────────────┘
+  · 실패 시 keyword RPC (keyword_search_catalog_hybrid)
+  · 그래도 실패 시 Python ILIKE fallback (CTO PR4-1 #2)
+  · cold_start 판정 (hits<3 OR top_conf<0.5)
+        │
+        ▼
+[ToolMessage(cold_start=bool, matches=[...])]
+        │
+        ▼
+[product_agent._extract_catalog_cold_start → state.product_identity_catalog_cold_start]
+        │
+        ▼
+[app/middleware/metrics.emit_product_identity_run]
+        · cold_start_rate / fallback_rate 누적
+        · compute_alert_status: cold_start>20% OR fallback>10% (표본>=20) → alert
+```
+
+> Feature flag 2개로 단계적 rollout: `ENABLE_CATALOG_HYBRID` (PR4-1) → `ENABLE_PRODUCT_IDENTITY_AGENT` (PR4-2). 둘 다 default=False (opt-in).

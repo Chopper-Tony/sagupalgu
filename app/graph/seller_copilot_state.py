@@ -205,6 +205,7 @@ class SellerCopilotState(TypedDict, total=False):
     # 한 세션 내 reanalyze/clarify 호출 카운트 추적용 budget guard.
     product_identity_tool_calls: List[str]
     product_identity_failure_mode: Optional[str]   # parse_error / contract_violation / budget_exceeded 등
+    product_identity_catalog_cold_start: bool      # PR4-3: catalog tool cold_start 여부 (observability)
 
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
@@ -296,4 +297,5 @@ def create_initial_state(
         skip_attempted=False,
         product_identity_tool_calls=[],
         product_identity_failure_mode=None,
+        product_identity_catalog_cold_start=False,
     )

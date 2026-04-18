@@ -131,6 +131,9 @@ def _run_react(state: SellerCopilotState) -> Optional[Dict[str, Any]]:
                     })
     state["product_identity_tool_calls"] = tool_calls_seq
 
+    # PR4-3: catalog tool 응답에서 cold_start 신호 추출 → metric 용
+    state["product_identity_catalog_cold_start"] = _extract_catalog_cold_start(react_result)
+
     # 마지막 message → 최종 JSON 응답
     final_content = ""
     if react_result.get("messages"):
@@ -308,28 +311,49 @@ def _log_quality_comparison(state: SellerCopilotState, agent_result: SellerCopil
     )
 
 
+def _extract_catalog_cold_start(react_result: Dict[str, Any]) -> bool:
+    """react_result.messages 에서 lc_rag_product_catalog_tool 의 ToolMessage 응답을 찾아
+    cold_start=true 였는지 판정. PR4-3 observability 용.
+    catalog tool 호출이 없었으면 False (cold_start 라는 신호 자체가 없음).
+    """
+    for msg in react_result.get("messages", []):
+        # ToolMessage: name 속성 + content (str)
+        name = getattr(msg, "name", "") or ""
+        if name != "lc_rag_product_catalog_tool":
+            continue
+        content = getattr(msg, "content", "") or ""
+        if not isinstance(content, str):
+            continue
+        try:
+            payload = json.loads(content)
+            if isinstance(payload, dict) and payload.get("cold_start") is True:
+                return True
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+    return False
+
+
 def _emit_observability_metrics(state: SellerCopilotState, result: SellerCopilotState) -> None:
     """CTO PR4-2 #2: tool usage / fallback / clarify 비율 metric hook.
-
-    PR4-3에서 본격 metric exporter 연결 예정. 지금은 logger.info로 구조화 카운트만 남김.
-    이 hook 위치만 잡혀 있으면 PR4-3에서는 logger 호출을 metric backend로 교체.
+    PR4-3: app.middleware.metrics 의 in-process 카운터로 누적 + 구조화 로그.
     """
+    from app.middleware.metrics import emit_product_identity_run
+
     tool_calls_seq = result.get("product_identity_tool_calls") or []
     failure_mode = result.get("product_identity_failure_mode")
     needs_input = bool(result.get("needs_user_input"))
     confirmed_source = (result.get("confirmed_product") or {}).get("source", "")
 
-    metrics = {
-        "agent": "product_identity",
-        "tool_calls_total": len(tool_calls_seq),
-        "reanalyze_count": tool_calls_seq.count("lc_image_reanalyze_tool"),
-        "catalog_count": tool_calls_seq.count("lc_rag_product_catalog_tool"),
-        "clarify_count": tool_calls_seq.count("lc_ask_user_clarification_tool"),
-        "failure_mode": failure_mode,
-        "needs_user_input": needs_input,
-        "confirmed_source": confirmed_source,
-    }
-    logger.info(f"[metric] product_identity {metrics}")
+    emit_product_identity_run(
+        tool_calls_total=len(tool_calls_seq),
+        reanalyze_count=tool_calls_seq.count("lc_image_reanalyze_tool"),
+        catalog_count=tool_calls_seq.count("lc_rag_product_catalog_tool"),
+        clarify_count=tool_calls_seq.count("lc_ask_user_clarification_tool"),
+        failure_mode=failure_mode,
+        needs_user_input=needs_input,
+        confirmed_source=confirmed_source,
+        cold_start=bool(result.get("product_identity_catalog_cold_start", False)),
+    )
 
 
 # ── Deterministic Fallback (PR4-cleanup의 product_gate 로직 100% 복원) ─
