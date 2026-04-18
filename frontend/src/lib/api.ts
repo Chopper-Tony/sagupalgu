@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { SessionResponse } from "../types";
+import { getSupabase, isSupabaseConfigured } from "./supabase";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
 
@@ -8,13 +9,43 @@ const client = axios.create({
   timeout: 120000,
 });
 
-// Dev 환경 자동 인증 (X-Dev-User-Id 헤더 주입)
-client.interceptors.request.use((config) => {
+// 인증 헤더 주입
+// - dev 환경: X-Dev-User-Id bypass 유지 (기존 개발 플로우 보존)
+// - prod + Supabase 설정 시: Authorization: Bearer <JWT>
+client.interceptors.request.use(async (config) => {
   if (import.meta.env.DEV) {
     config.headers["X-Dev-User-Id"] = "seller-1";
+    return config;
+  }
+  if (isSupabaseConfigured()) {
+    try {
+      const { data } = await getSupabase().auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // 세션 조회 실패는 무시 — 서버가 401로 응답하면 인터셉터가 처리
+    }
   }
   return config;
 });
+
+// 401 응답 시 로그인 페이지로 리다이렉트 (prod 환경만)
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      !import.meta.env.DEV
+      && error?.response?.status === 401
+      && typeof window !== "undefined"
+      && !window.location.hash.startsWith("#/login")
+    ) {
+      window.location.hash = "#/login";
+    }
+    return Promise.reject(error);
+  },
+);
 
 export const api = {
   /** SSE 스트림 URL을 반환한다. EventSource에서 사용. */

@@ -73,7 +73,7 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 - **Settings**: `config.py`의 `settings`는 `_SettingsProxy` lazy 프록시
 - **테스트**: LLM 응답 의존 assertion 금지, fallback 경로만 검증
 - **legacy**: `legacy_spikes/` 수정 금지 → `app/publishers/`에서 패치
-- **인증**: `app/core/auth.py` JWT, dev 환경 `X-Dev-User-Id` bypass, prod `get_optional_user` 완화
+- **인증**: `app/core/auth.py` JWT (Supabase Auth) — 프론트 `AuthContext` → axios `Authorization: Bearer`, dev 환경 `X-Dev-User-Id` bypass 공존
 - **이미지 저장**: Supabase Storage (`USE_CLOUD_STORAGE=true`) + 로컬 fallback
 - **게시 정책**: `app/domain/publish_policy.py` 단일 원천 (타임아웃·재시도·에러 분류·플랫폼 capability)
 - **게시 동시성**: `MAX_CONCURRENT_BROWSERS=2` 세마포어
@@ -96,7 +96,7 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 - ChatGPT 스타일 대화형 UI, 라이트/다크 테마 토글, 13개 상태별 카드
 - SSE 실시간 + 폴링 fallback
 - 해시 라우팅: `#/` (셀러 코파일럿), `#/market` (마켓), `#/market/{id}` (상세), `#/my-listings` (대시보드)
-- `api.ts`: dev 환경 `X-Dev-User-Id` 자동 주입 interceptor
+- `api.ts`: prod Supabase JWT 주입 + 401 → `#/login` 리다이렉트, dev 환경은 `X-Dev-User-Id` bypass
 - 모바일 반응형: 사이드바 숨김, + 버튼으로 세션 자동 생성 + 업로드, 짧은 placeholder
 - 디바이스 분기: 데스크톱 = 자동 게시, 모바일 = 판매글 복사 + 직접 올리기
 - CSS 변수 기반 테마 시스템 (`--btn-padding` 등 공통 토큰)
@@ -114,11 +114,12 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 ## 미완성 항목
 
 - 당근마켓 게시 (Android 에뮬레이터 필요, 보류)
-- 프로덕션 로그인 UI (Supabase Auth 프론트 연결 — dev bypass + get_optional_user로 개발 중)
 - 중고나라 크롤링 (CloudFlare 봇 탐지로 서버 크롤링 차단 — 번개장터 데이터로 시세 산정)
 
 ## 완료된 항목 (최근)
 
+- 프로덕션 로그인 UI: Supabase Auth (이메일 + Google OAuth) + AuthContext + 보호 라우트, dev bypass 공존
+- Vision AI fallback 체인: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini fallback
 - 서울 리전 이전: Elastic IP 43.201.188.57 (고정, 재시작해도 안 바뀜)
 - AI 상품 챗봇: 마켓 상세 페이지에서 구매자 질문 AI 답변
 - 이메일 알림: 구매 문의 시 Gmail SMTP 알림 추가
