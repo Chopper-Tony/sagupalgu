@@ -27,8 +27,8 @@ class OptimizationService:
                 "tool_calls": [...],
             }
         """
-        # TODO(PR4-cleanup): post_sale_policy_node로 import 전환 (현재 mock 타깃 호환 위해 구 이름 유지).
-        from app.graph.nodes.optimization_agent import post_sale_optimization_node
+        # PR4-cleanup: 신 이름 (post_sale_policy_node) 직접 import.
+        from app.graph.nodes.optimization_agent import post_sale_policy_node
         from app.graph.seller_copilot_state import create_initial_state
 
         state = create_initial_state(
@@ -40,7 +40,7 @@ class OptimizationService:
         state["confirmed_product"] = product_data.get("confirmed_product")
         state["followup_due_at"] = followup_due_at
 
-        final_state = post_sale_optimization_node(state)
+        final_state = post_sale_policy_node(state)
         return {
             "optimization_suggestion": final_state.get("optimization_suggestion"),
             "status": final_state.get("status"),

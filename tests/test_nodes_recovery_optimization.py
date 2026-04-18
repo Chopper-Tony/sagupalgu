@@ -146,14 +146,14 @@ class TestPostSaleOptimizationAgent:
         assert result["output"].get("suggestion") is None or result["output"].get("type") is None
 
     def test_판매완료_노드_상태전환(self, base_state):
-        from app.graph.seller_copilot_nodes import post_sale_optimization_node
+        from app.graph.seller_copilot_nodes import post_sale_policy_node
 
         state = {**base_state, "sale_status": "sold"}
-        result = post_sale_optimization_node(state)
+        result = post_sale_policy_node(state)
         assert result["status"] == "completed"
 
     def test_미판매_최적화노드_실행(self, base_state, canonical_listing):
-        from app.graph.seller_copilot_nodes import post_sale_optimization_node
+        from app.graph.seller_copilot_nodes import post_sale_policy_node
 
         state = {**base_state, "sale_status": "unsold", "canonical_listing": canonical_listing}
         opt_output = {
@@ -163,7 +163,7 @@ class TestPostSaleOptimizationAgent:
         mock_result = {"tool_name": "price_optimization_tool", "output": opt_output, "success": True}
 
         with patch("app.graph.nodes.optimization_agent._run_async", return_value=mock_result):
-            result = post_sale_optimization_node(state)
+            result = post_sale_policy_node(state)
 
         assert result["optimization_suggestion"]["type"] == "price_drop"
         assert result["status"] == "optimization_suggested"

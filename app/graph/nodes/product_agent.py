@@ -1,13 +1,11 @@
 """
-Agent 1 — 상품 식별 (PR4에서 Tool Agent로 승격 예정)
+Agent 1 — 상품 식별 (Tool Agent로 승격 예정, 별도 트랙)
 
 분류 (Target Architecture, 4+2+5):
-  product_identity_node  → Deterministic Node (PR1 알리아스: product_gate_node)
-                           Vision 결과·사용자 입력으로 상품 확정. LLM 호출 없음.
-                           PR4에서 lc_image_reanalyze_tool 등 신규 툴 도입해
-                           ReAct Tool Agent로 승격 예정.
-  clarification_node     → Single Tool Node (PR3에서 pre_listing_clarification_node와 통합)
-                           LLM 한 번 호출로 질문 생성 (현재는 단순 대기, PR3에서 실제 LLM 통합).
+  product_gate_node  → Deterministic Node
+                       Vision 결과·사용자 입력으로 상품 확정. LLM 호출 없음.
+                       Product Identity 승격 (lc_image_reanalyze_tool 도입 + ReAct 전환)은
+                       별도 PR 트랙 (entry criteria 충족 후 진행).
 """
 from __future__ import annotations
 
@@ -15,8 +13,9 @@ from app.graph.seller_copilot_state import ConfirmedProduct, SellerCopilotState
 from app.graph.nodes.helpers import _log
 
 
-def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
-    _log(state, "agent1:product_identity:start")
+def product_gate_node(state: SellerCopilotState) -> SellerCopilotState:
+    """Vision 결과·사용자 입력으로 상품을 확정하는 deterministic gate."""
+    _log(state, "agent1:product_gate:start")
 
     user_input = state.get("user_product_input") or {}
     candidates = state.get("product_candidates") or []
@@ -36,7 +35,7 @@ def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
         state["clarification_prompt"] = None
         state["checkpoint"] = "A_complete"
         state["status"] = "product_confirmed"
-        _log(state, "agent1:product_identity:user_input_confirmed")
+        _log(state, "agent1:product_gate:user_input_confirmed")
         return state
 
     # 경로 B: Vision 결과(candidates)가 이미 있는 경우
@@ -54,7 +53,7 @@ def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
             )
             state["checkpoint"] = "A_needs_user_input"
             state["status"] = "awaiting_product_confirmation"
-            _log(state, f"agent1:product_identity:low_confidence={confidence:.2f}")
+            _log(state, f"agent1:product_gate:low_confidence={confidence:.2f}")
             return state
 
         # confidence 충분 → 확정
@@ -71,7 +70,7 @@ def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
         state["clarification_prompt"] = None
         state["checkpoint"] = "A_complete"
         state["status"] = "product_confirmed"
-        _log(state, f"agent1:product_identity:vision_confirmed confidence={confidence:.2f}")
+        _log(state, f"agent1:product_gate:vision_confirmed confidence={confidence:.2f}")
         return state
 
     # 경로 C: candidates도 없음 → 사용자 입력 요청
@@ -82,24 +81,15 @@ def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
     )
     state["checkpoint"] = "A_needs_user_input"
     state["status"] = "awaiting_product_confirmation"
-    _log(state, "agent1:product_identity:no_candidates")
+    _log(state, "agent1:product_gate:no_candidates")
     return state
 
 
-def clarification_node(state: SellerCopilotState) -> SellerCopilotState:
-    """Deprecated (PR3): clarification_node.py 통합 entry point로 위임.
-
-    PR3 이전: product 식별 단계의 단순 대기 노드.
-    PR3 이후: 통합 entry point가 state로 모드 자동 분기 (product / pre_listing).
-
-    제거 시점: PR4 (graph builder가 신 노드로 전환된 뒤).
-    """
-    from app.graph.nodes.clarification_node import clarification_node as _unified
-    return _unified(state)
-
-
-# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
-# 동작 변화 0. PR2/3에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
-# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
-#                    임시 호환 layer지 영구 유지 layer 아님.
-product_gate_node = product_identity_node
+# ─────────────────────────────────────────────────────────────────────
+# PR4-cleanup REMOVED (호출 시 ImportError 발생 — 의도된 동작):
+#   - product_identity_node (alias) → use product_gate_node
+#   - clarification_node (deprecated wrapper) →
+#       use app.graph.nodes.clarification_node.clarification_node
+# 이유: 알리아스/wrapper가 영구 호환 layer로 굳지 않게 PR4-cleanup에서 완전 제거.
+# 다시 alias를 추가하지 말 것 (architecture.md "노드 이름 일관성 원칙" 참조).
+# ─────────────────────────────────────────────────────────────────────

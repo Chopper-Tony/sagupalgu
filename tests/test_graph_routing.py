@@ -26,6 +26,7 @@ class TestRouteAfterProductIdentity:
         assert route_after_product_identity(state) == "clarification_node"
 
     def test_confirmed_product_pre_listing으로_분기(self):
+        """routing은 'pre_listing_clarification_node' 반환. graph builder가 통합 clarification_node로 매핑."""
         from app.graph.routing import route_after_product_identity
 
         state = {"needs_user_input": False}
@@ -69,7 +70,7 @@ class TestRouteAfterCriticDispatch:
     def test_pass_validation으로(self):
         from app.graph.routing import route_after_critic
 
-        assert route_after_critic({"repair_action": "pass"}) == "validation_node"
+        assert route_after_critic({"repair_action": "pass"}) == "validation_rules_node"
 
     def test_rewrite_title_copywriting으로(self):
         from app.graph.routing import route_after_critic
@@ -89,7 +90,7 @@ class TestRouteAfterCriticDispatch:
     def test_reprice_pricing으로(self):
         from app.graph.routing import route_after_critic
 
-        assert route_after_critic({"repair_action": "reprice"}) == "pricing_strategy_node"
+        assert route_after_critic({"repair_action": "reprice"}) == "pricing_rule_node"
 
     def test_clarify_clarification으로(self):
         from app.graph.routing import route_after_critic
@@ -105,13 +106,13 @@ class TestRouteAfterCriticDispatch:
     def test_unknown_action도_validation_safety_net(self):
         from app.graph.routing import route_after_critic
 
-        assert route_after_critic({"repair_action": "weird_action"}) == "validation_node"
+        assert route_after_critic({"repair_action": "weird_action"}) == "validation_rules_node"
 
     def test_repair_action_없으면_pass_default(self):
         """critic이 한 번도 안 돌았으면 repair_action 기본값 'pass' 덕에 validation으로."""
         from app.graph.routing import route_after_critic
 
-        assert route_after_critic({}) == "validation_node"
+        assert route_after_critic({}) == "validation_rules_node"
 
 
 class TestReplanLimitGuard:
@@ -121,7 +122,7 @@ class TestReplanLimitGuard:
         from app.graph.routing import route_after_critic
 
         state = {"repair_action": "replan", "plan_revision_count": MAX_PLAN_REVISIONS}
-        assert route_after_critic(state) == "validation_node"
+        assert route_after_critic(state) == "validation_rules_node"
 
     def test_replan_상한_도달시_failure_mode_기록(self):
         from app.graph.routing import route_after_critic
@@ -167,7 +168,7 @@ class TestRouteAfterPreListingClarification:
             "market_depth": "skip",
             "user_product_input": {"price": 500000},
         }
-        assert route_after_pre_listing_clarification(state) == "pricing_strategy_node"
+        assert route_after_pre_listing_clarification(state) == "pricing_rule_node"
 
 
 # ── PR3 신규: route_after_planner + _skip_allowed 가드 ───────────────
@@ -187,14 +188,14 @@ class TestRouteAfterPlannerSkipGuard:
         from app.graph.routing import route_after_planner
 
         state = {"market_depth": "skip", "user_product_input": {"price": 500000}}
-        assert route_after_planner(state) == "pricing_strategy_node"
+        assert route_after_planner(state) == "pricing_rule_node"
 
     def test_skip_이전_market_context_있으면_pricing(self):
         """조건 2: replan 케이스 — market_context 잔존."""
         from app.graph.routing import route_after_planner
 
         state = {"market_depth": "skip", "market_context": {"sample_count": 5, "median_price": 500000}}
-        assert route_after_planner(state) == "pricing_strategy_node"
+        assert route_after_planner(state) == "pricing_rule_node"
 
     def test_skip_shallow_저위험_카테고리_pricing(self):
         """조건 3: plan_mode=shallow + LOW_RISK_SKIP_CATEGORIES."""
@@ -205,7 +206,7 @@ class TestRouteAfterPlannerSkipGuard:
             "plan_mode": "shallow",
             "confirmed_product": {"category": "clothing"},
         }
-        assert route_after_planner(state) == "pricing_strategy_node"
+        assert route_after_planner(state) == "pricing_rule_node"
 
     def test_skip_미충족_silent_crawl_only_fallback(self):
         """모든 조건 미충족 → silent crawl_only 강등 + skip_rejected_reason 기록."""

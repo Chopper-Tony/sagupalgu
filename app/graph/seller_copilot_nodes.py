@@ -1,15 +1,9 @@
 """
-하위 호환 re-export shim.
+하위 호환 re-export shim (PR4-cleanup 후).
 
-모든 노드는 app.graph.nodes 패키지로 이동:
-  nodes/product_agent.py      — Agent 1 (상품 식별)
-  nodes/market_agent.py       — Agent 2 (시세·가격 전략)
-  nodes/copywriting_agent.py  — Agent 3 (판매글 생성)
-  nodes/validation_agent.py   — Agent 4 검증
-  nodes/recovery_agent.py     — Agent 4 복구
-  nodes/packaging_agent.py    — 패키지 빌더 + 게시
-  nodes/optimization_agent.py — Agent 5 (판매 후 최적화)
-  nodes/helpers.py            — 공통 헬퍼
+모든 노드는 app.graph.nodes 패키지로 이동.
+PR1 알리아스/deprecated stub은 PR4-cleanup에서 제거됨.
+이 shim은 정식 이름만 forward한다.
 """
 from app.graph.nodes import (  # noqa: F401
     _build_react_llm,
@@ -22,13 +16,14 @@ from app.graph.nodes import (  # noqa: F401
     _safe_int,
     clarification_node,
     copywriting_node,
+    listing_critic_node,
     market_intelligence_node,
+    mission_planner_node,
     package_builder_node,
-    post_sale_optimization_node,
-    pricing_strategy_node,
-    product_identity_node,
+    post_sale_policy_node,
+    pricing_rule_node,
+    product_gate_node,
     publish_node,
     recovery_node,
-    refinement_node,
-    validation_node,
+    validation_rules_node,
 )

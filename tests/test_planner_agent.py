@@ -87,7 +87,7 @@ class TestReplanRouting:
         from app.domain.critic_policy import MAX_PLAN_REVISIONS
 
         state = {"repair_action": "replan", "plan_revision_count": MAX_PLAN_REVISIONS}
-        assert route_after_critic(state) == "validation_node"
+        assert route_after_critic(state) == "validation_rules_node"
 
     @pytest.mark.unit
     def test_critic이_rewrite_결정시_copywriting으로(self):
@@ -233,11 +233,11 @@ class TestPolicyMatrix:
         }
         # route_after_planner는 market 또는 pricing 둘 중 하나
         result1 = route_after_planner(state)
-        assert result1 in {"market_intelligence_node", "pricing_strategy_node"}
+        assert result1 in {"market_intelligence_node", "pricing_rule_node"}
 
         # route_after_critic은 6갈래 중 하나
         result2 = route_after_critic(state)
         assert result2 in {
-            "validation_node", "copywriting_node", "pricing_strategy_node",
+            "validation_rules_node", "copywriting_node", "pricing_rule_node",
             "clarification_node", "mission_planner_node",
         }

@@ -17,14 +17,14 @@ class TestProductIdentityAgent:
 
     def test_user_input_확정(self):
         """사용자 입력이 있으면 도구 없이 바로 confirmed_product 설정"""
-        from app.graph.seller_copilot_nodes import product_identity_node
+        from app.graph.seller_copilot_nodes import product_gate_node
 
         state = {
             "user_product_input": {"brand": "Samsung", "model": "Galaxy S24", "category": "smartphone"},
             "product_candidates": [],
             "tool_calls": [], "debug_logs": [], "error_history": [],
         }
-        result = product_identity_node(state)
+        result = product_gate_node(state)
 
         assert result["confirmed_product"]["model"] == "Galaxy S24"
         assert result["confirmed_product"]["source"] == "user_input"
@@ -33,7 +33,7 @@ class TestProductIdentityAgent:
 
     def test_high_confidence_vision_확정(self):
         """Vision confidence >= 0.6이면 자동 확정"""
-        from app.graph.seller_copilot_nodes import product_identity_node
+        from app.graph.seller_copilot_nodes import product_gate_node
 
         state = {
             "user_product_input": {},
@@ -42,14 +42,14 @@ class TestProductIdentityAgent:
             ],
             "tool_calls": [], "debug_logs": [], "error_history": [],
         }
-        result = product_identity_node(state)
+        result = product_gate_node(state)
 
         assert result["confirmed_product"]["model"] == "iPhone 15"
         assert result["needs_user_input"] is False
 
     def test_low_confidence_사용자입력요청(self):
         """confidence < 0.6이면 사용자 입력 요청으로 분기"""
-        from app.graph.seller_copilot_nodes import product_identity_node
+        from app.graph.seller_copilot_nodes import product_gate_node
 
         state = {
             "user_product_input": {},
@@ -58,7 +58,7 @@ class TestProductIdentityAgent:
             ],
             "tool_calls": [], "debug_logs": [], "error_history": [],
         }
-        result = product_identity_node(state)
+        result = product_gate_node(state)
 
         assert result["needs_user_input"] is True
         assert result["clarification_prompt"] is not None
@@ -66,14 +66,14 @@ class TestProductIdentityAgent:
 
     def test_empty_candidates_사용자입력요청(self):
         """candidates 없으면 사용자 입력 요청"""
-        from app.graph.seller_copilot_nodes import product_identity_node
+        from app.graph.seller_copilot_nodes import product_gate_node
 
         state = {
             "user_product_input": {},
             "product_candidates": [],
             "tool_calls": [], "debug_logs": [], "error_history": [],
         }
-        result = product_identity_node(state)
+        result = product_gate_node(state)
         assert result["needs_user_input"] is True
 
 
