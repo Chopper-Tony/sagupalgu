@@ -63,13 +63,20 @@ def product_identity_agent(state: SellerCopilotState) -> SellerCopilotState:
         if result is None:
             _log(state, "agent1:react returned None → deterministic_fallback")
             return _deterministic_fallback(state)
-        return _apply_react_result(state, result)
+        applied = _apply_react_result(state, result)
+        # CTO PR4-2 #6: A/B 비교 로그 (agent vs deterministic confidence delta)
+        _log_quality_comparison(state, applied)
+        # CTO PR4-2 #2: observability hook
+        _emit_observability_metrics(state, applied)
+        return applied
     except Exception as e:
         logger.error("agent1 ReAct failed", exc_info=True)
         _record_error(state, "product_identity_agent", f"ReAct failed: {e}")
         _log(state, f"agent1:react_exception → deterministic_fallback error={e}")
         state["product_identity_failure_mode"] = "react_exception"
-        return _deterministic_fallback(state)
+        result = _deterministic_fallback(state)
+        _emit_observability_metrics(state, result)
+        return result
 
 
 # ── ReAct 실행 ─────────────────────────────────────────────────────────
@@ -142,16 +149,44 @@ def _run_react(state: SellerCopilotState) -> Optional[Dict[str, Any]]:
 
 
 def _apply_react_result(state: SellerCopilotState, result: Dict[str, Any]) -> SellerCopilotState:
-    """파싱된 ReAct 응답을 state에 반영."""
+    """파싱된 ReAct 응답을 state에 반영. 추가 deterministic 가드 적용."""
+    from app.tools.product_identity_tools import total_budget_exceeded
+
     confirmed = result.get("confirmed_product") or {}
     needs_input = bool(result.get("needs_user_input", False))
     rationale = result.get("rationale", "")
+
+    tool_calls_seq = state.get("product_identity_tool_calls") or []
+    confidence = float(confirmed.get("confidence", 0.0) or 0.0)
+
+    # CTO PR4-2 #1: total tool calls soft budget 초과 시 강제 종료
+    if total_budget_exceeded(tool_calls_seq):
+        _log(state, f"agent1:total_budget_exceeded count={len(tool_calls_seq)} → fallback")
+        state["product_identity_failure_mode"] = "react_total_budget_exceeded"
+        return _deterministic_fallback(state)
 
     # 필수 필드 검증
     if not needs_input and not confirmed.get("model"):
         _log(state, "agent1:contract_violation: needs_user_input=False but model missing")
         state["product_identity_failure_mode"] = "product_identity_contract_violation"
         return _deterministic_fallback(state)
+
+    # CTO PR4-2 #4: clarify explicit heuristic
+    # LLM이 confirmed로 응답했더라도 deterministic 안전망:
+    #   confidence < 0.5 AND reanalyze 2회 모두 소진 → 강제 clarify
+    #   (LLM에 맡기면 흔들리는 영역이라 결정론적 가드)
+    reanalyze_done = tool_calls_seq.count("lc_image_reanalyze_tool")
+    if not needs_input and confidence < 0.5 and reanalyze_done >= 2:
+        _log(state, f"agent1:clarify_forced confidence={confidence:.2f} reanalyze={reanalyze_done}")
+        state["product_identity_failure_mode"] = "clarify_forced_by_heuristic"
+        state["needs_user_input"] = True
+        state["clarification_prompt"] = (
+            "여러 번 시도했지만 사진만으로 정확히 식별하지 못했습니다. "
+            "모델명을 직접 입력해 주세요."
+        )
+        state["checkpoint"] = "A_needs_user_input"
+        state["status"] = "awaiting_product_confirmation"
+        return state
 
     if needs_input:
         # clarify 요청
@@ -249,6 +284,52 @@ def _build_user_prompt(candidates: List[Dict], image_paths: List[str], category_
 - 이미지 경로 JSON (도구 입력용): {json.dumps(image_paths, ensure_ascii=False)}
 
 위 정보를 기반으로 의사결정해서 최종 JSON을 반환하라."""
+
+
+# ── Quality 비교 + Observability (CTO PR4-2 #2, #6) ──────────────────
+
+
+def _log_quality_comparison(state: SellerCopilotState, agent_result: SellerCopilotState) -> None:
+    """CTO PR4-2 #6: agent vs deterministic 결과 confidence delta 로깅.
+
+    full A/B 비교 (양쪽 동시 실행)는 비용 2배라 회피.
+    대신 agent 결과의 confidence를 deterministic이 산출했을 confidence와 비교 가능하게
+    상위 candidate confidence를 함께 기록한다. 후속 분석으로 quality regression 감지.
+    """
+    candidates = state.get("product_candidates") or []
+    deterministic_top = float(candidates[0].get("confidence", 0.0) or 0.0) if candidates else 0.0
+    agent_confirmed = (agent_result.get("confirmed_product") or {})
+    agent_conf = float(agent_confirmed.get("confidence", 0.0) or 0.0)
+    delta = agent_conf - deterministic_top
+    _log(
+        state,
+        f"agent1:quality_compare deterministic_top={deterministic_top:.2f} "
+        f"agent={agent_conf:.2f} delta={delta:+.2f} source={agent_confirmed.get('source')}"
+    )
+
+
+def _emit_observability_metrics(state: SellerCopilotState, result: SellerCopilotState) -> None:
+    """CTO PR4-2 #2: tool usage / fallback / clarify 비율 metric hook.
+
+    PR4-3에서 본격 metric exporter 연결 예정. 지금은 logger.info로 구조화 카운트만 남김.
+    이 hook 위치만 잡혀 있으면 PR4-3에서는 logger 호출을 metric backend로 교체.
+    """
+    tool_calls_seq = result.get("product_identity_tool_calls") or []
+    failure_mode = result.get("product_identity_failure_mode")
+    needs_input = bool(result.get("needs_user_input"))
+    confirmed_source = (result.get("confirmed_product") or {}).get("source", "")
+
+    metrics = {
+        "agent": "product_identity",
+        "tool_calls_total": len(tool_calls_seq),
+        "reanalyze_count": tool_calls_seq.count("lc_image_reanalyze_tool"),
+        "catalog_count": tool_calls_seq.count("lc_rag_product_catalog_tool"),
+        "clarify_count": tool_calls_seq.count("lc_ask_user_clarification_tool"),
+        "failure_mode": failure_mode,
+        "needs_user_input": needs_input,
+        "confirmed_source": confirmed_source,
+    }
+    logger.info(f"[metric] product_identity {metrics}")
 
 
 # ── Deterministic Fallback (PR4-cleanup의 product_gate 로직 100% 복원) ─

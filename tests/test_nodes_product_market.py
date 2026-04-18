@@ -241,6 +241,82 @@ class TestProductIdentityAgentReAct:
         # deterministic fallback로 vision_confirmed
         assert result["confirmed_product"]["model"] == "iPhone 15"
 
+    def test_total_budget_초과시_fallback(self):
+        """CTO PR4-2 #1: tool calls 4건 누적 + ReAct가 confirmed로 응답 → 강제 fallback."""
+        from app.graph.nodes.product_agent import product_identity_agent
+
+        state = {
+            "user_product_input": {},
+            "product_candidates": [
+                {"brand": "Apple", "model": "iPhone 15", "category": "smartphone", "confidence": 0.85}
+            ],
+            "product_identity_tool_calls": ["lc_image_reanalyze_tool"] * 4,
+            "tool_calls": [], "debug_logs": [], "error_history": [],
+        }
+        ok_result = {
+            "confirmed_product": {"brand": "Apple", "model": "iPhone 15 Pro",
+                                  "category": "smartphone", "confidence": 0.8, "source": "react"},
+            "needs_user_input": False,
+        }
+        with self._enable_flag():
+            with patch("app.graph.nodes.product_agent._run_react", return_value=ok_result):
+                result = product_identity_agent(state)
+
+        assert result.get("product_identity_failure_mode") == "react_total_budget_exceeded"
+        # deterministic fallback로 candidates의 iPhone 15 (Pro 아님)
+        assert result["confirmed_product"]["model"] == "iPhone 15"
+
+    def test_clarify_heuristic_강제발동(self):
+        """CTO PR4-2 #4: confidence<0.5 + reanalyze 2회 소진 → 강제 clarify."""
+        from app.graph.nodes.product_agent import product_identity_agent
+
+        state = {
+            "user_product_input": {},
+            "product_candidates": [
+                {"brand": "?", "model": "?", "category": "etc", "confidence": 0.3}
+            ],
+            "product_identity_tool_calls": ["lc_image_reanalyze_tool", "lc_image_reanalyze_tool"],
+            "tool_calls": [], "debug_logs": [], "error_history": [],
+        }
+        low_conf_result = {
+            "confirmed_product": {
+                "brand": "추정", "model": "Unknown", "category": "etc",
+                "confidence": 0.4, "source": "react",
+            },
+            "needs_user_input": False,
+        }
+        with self._enable_flag():
+            with patch("app.graph.nodes.product_agent._run_react", return_value=low_conf_result):
+                result = product_identity_agent(state)
+
+        assert result.get("product_identity_failure_mode") == "clarify_forced_by_heuristic"
+        assert result["needs_user_input"] is True
+        assert result["checkpoint"] == "A_needs_user_input"
+
+    def test_observability_metric_log_emit(self):
+        """CTO PR4-2 #2: agent 실행 후 metric hook이 logger.info 호출."""
+        from app.graph.nodes.product_agent import product_identity_agent
+
+        state = {
+            "user_product_input": {},
+            "product_candidates": [
+                {"brand": "Apple", "model": "iPhone 15", "category": "smartphone", "confidence": 0.91}
+            ],
+            "tool_calls": [], "debug_logs": [], "error_history": [],
+        }
+        ok_result = {
+            "confirmed_product": {"brand": "Apple", "model": "iPhone 15",
+                                  "category": "smartphone", "confidence": 0.91, "source": "react"},
+            "needs_user_input": False,
+        }
+        with self._enable_flag():
+            with patch("app.graph.nodes.product_agent._run_react", return_value=ok_result):
+                with patch("app.graph.nodes.product_agent.logger") as mock_logger:
+                    product_identity_agent(state)
+
+        info_calls = [c for c in mock_logger.info.call_args_list if "[metric]" in str(c)]
+        assert info_calls, "expected [metric] log to be emitted"
+
 
 # ─────────────────────────────────────────────────────────────────
 # 에이전트 2: 시세 분석 — 도구 선택 자율성

@@ -242,3 +242,36 @@ class TestBudgetGuard:
         )
         assert clarification_budget_exceeded([]) is False
         assert clarification_budget_exceeded(["lc_ask_user_clarification_tool"] * MAX_CLARIFICATION_CALLS) is True
+
+    @pytest.mark.unit
+    def test_total_budget(self):
+        """CTO PR4-2 #1: 전체 tool 호출 수 soft budget."""
+        from app.tools.product_identity_tools import (
+            MAX_TOTAL_TOOL_CALLS, total_budget_exceeded,
+        )
+        assert total_budget_exceeded([]) is False
+        assert total_budget_exceeded(["a", "b", "c"]) is False  # < 4
+        assert total_budget_exceeded(["a"] * MAX_TOTAL_TOOL_CALLS) is True
+        assert total_budget_exceeded(["a"] * (MAX_TOTAL_TOOL_CALLS + 1)) is True
+
+
+class TestFailureModeTaxonomy:
+    """CTO PR4-2 #5: failure_mode enum (Literal) 검증."""
+
+    @pytest.mark.unit
+    def test_모든_failure_mode_literal에_정의됨(self):
+        from typing import get_args
+        from app.tools.product_identity_tools import ProductIdentityFailureMode
+
+        modes = set(get_args(ProductIdentityFailureMode))
+        # PR4-2에서 사용하는 모든 failure_mode는 enum에 들어있어야 함
+        expected = {
+            "react_exception",
+            "product_identity_parse_error",
+            "product_identity_contract_violation",
+            "react_total_budget_exceeded",
+            "clarify_forced_by_heuristic",
+            "reanalyze_budget_exceeded",
+            "max_clarify_calls_reached",
+        }
+        assert expected == modes, f"missing: {expected - modes}, extra: {modes - expected}"

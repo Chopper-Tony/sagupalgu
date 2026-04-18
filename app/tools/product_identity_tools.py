@@ -23,6 +23,21 @@ except ImportError:  # langchain-core 미설치 환경 대비 (테스트 등)
 logger = logging.getLogger(__name__)
 
 
+# ── failure_mode taxonomy (CTO PR4-2 #5) ──────────────────────────────
+# string 분산 대신 Literal로 enum화. metric/alert/분석에서 명시 사용.
+from typing import Literal
+
+ProductIdentityFailureMode = Literal[
+    "react_exception",                       # ReAct 호출 자체 예외
+    "product_identity_parse_error",          # 최종 응답 JSON 파싱 실패
+    "product_identity_contract_violation",   # 필수 필드 누락
+    "react_total_budget_exceeded",           # PR4-2 #1: total tool calls cap 초과
+    "clarify_forced_by_heuristic",           # PR4-2 #4: explicit heuristic 발동 (정상 동작)
+    "reanalyze_budget_exceeded",             # tool 단위 budget 초과
+    "max_clarify_calls_reached",             # tool 단위 budget 초과
+]
+
+
 # ── reanalyze 캐싱 (TTL 1h) ──────────────────────────────────────────
 # 같은 세션 내에서 replan/재시도 시 동일 image+focus는 재호출 안 함.
 # key: SHA256(image_paths_concat + focus + category_hint), value: (timestamp, result_json)
@@ -35,7 +50,7 @@ def _cache_key(image_paths_json: str, focus: str, category_hint: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _cache_get(key: str) -> Optional[str]:
+def _cache_get(key: str, focus: str = "?") -> Optional[str]:
     entry = _reanalyze_cache.get(key)
     if not entry:
         return None
@@ -43,6 +58,8 @@ def _cache_get(key: str) -> Optional[str]:
     if time.time() - ts > _REANALYZE_CACHE_TTL_SECONDS:
         _reanalyze_cache.pop(key, None)
         return None
+    # CTO PR4-2 #3: cache hit 시 debug log (input drift 추적용)
+    logger.info(f"[reanalyze] cache hit focus={focus} key_prefix={key[:8]} age_sec={int(time.time() - ts)}")
     return value
 
 
@@ -96,11 +113,10 @@ async def lc_image_reanalyze_tool(
         return json.dumps({"error": f"invalid focus: {focus}", "valid": list(_FOCUS_PROMPTS.keys())},
                           ensure_ascii=False)
 
-    # 캐시 확인
+    # 캐시 확인 (CTO PR4-2 #3: cache hit 시 _cache_get 내부에서 log)
     key = _cache_key(image_paths_json, focus, category_hint)
-    cached = _cache_get(key)
+    cached = _cache_get(key, focus=focus)
     if cached:
-        logger.info(f"[reanalyze] cache hit focus={focus}")
         return cached
 
     try:
@@ -276,6 +292,12 @@ def lc_ask_user_clarification_tool(questions_json: str, reason: str) -> str:
 MAX_REANALYZE_CALLS = 2
 MAX_CLARIFICATION_CALLS = 1
 
+# CTO PR4-2 #1: total tool calls soft budget.
+# 개별 tool guard (2 + 1) 외에 *전체* 호출 수도 cap. heavy flow (reanalyze x2 + rag + clarify = 4)
+# 정도까지는 정상이지만 그 이상은 의미 없는 반복일 가능성 높음 → 강제 종료.
+# elapsed time 기반 guard는 LLM·네트워크 의존성으로 측정 어려움 → 호출 수가 더 단순·결정론적.
+MAX_TOTAL_TOOL_CALLS = 4
+
 
 def reanalyze_budget_exceeded(prior_calls: List[str]) -> bool:
     return prior_calls.count("lc_image_reanalyze_tool") >= MAX_REANALYZE_CALLS
@@ -283,3 +305,8 @@ def reanalyze_budget_exceeded(prior_calls: List[str]) -> bool:
 
 def clarification_budget_exceeded(prior_calls: List[str]) -> bool:
     return prior_calls.count("lc_ask_user_clarification_tool") >= MAX_CLARIFICATION_CALLS
+
+
+def total_budget_exceeded(prior_calls: List[str]) -> bool:
+    """전체 tool 호출 수가 soft budget 초과한 경우 True (CTO PR4-2 #1)."""
+    return len(prior_calls) >= MAX_TOTAL_TOOL_CALLS

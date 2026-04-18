@@ -42,9 +42,12 @@ from app.tools.optimization_tools import price_optimization_tool  # noqa: F401
 from app.tools.product_identity_tools import (  # noqa: F401
     MAX_CLARIFICATION_CALLS,
     MAX_REANALYZE_CALLS,
+    MAX_TOTAL_TOOL_CALLS,
+    ProductIdentityFailureMode,
     clarification_budget_exceeded,
     lc_ask_user_clarification_tool,
     lc_image_reanalyze_tool,
     lc_rag_product_catalog_tool,
     reanalyze_budget_exceeded,
+    total_budget_exceeded,
 )
