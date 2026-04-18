@@ -21,6 +21,7 @@ function updateStatus(platform, status) {
   const el = document.getElementById(`status-${platform}`);
   const connectBtn = document.getElementById(`btn-${platform}`);
   const disconnectBtn = document.getElementById(`btn-disconnect-${platform}`);
+  const loginLink = document.getElementById(`login-link-${platform}`);
   if (!el) return;
 
   if (status === "connected") {
@@ -28,11 +29,13 @@ function updateStatus(platform, status) {
     el.className = "platform-status status-connected";
     if (connectBtn) connectBtn.style.display = "none";
     if (disconnectBtn) disconnectBtn.style.display = "inline-block";
+    if (loginLink) loginLink.style.display = "none";
   } else {
     el.textContent = status === "expired" ? "재연결 필요" : "미연동";
     el.className = status === "expired" ? "platform-status status-expired" : "platform-status status-disconnected";
     if (connectBtn) connectBtn.style.display = "inline-block";
     if (disconnectBtn) disconnectBtn.style.display = "none";
+    if (loginLink) loginLink.style.display = "inline";
   }
 }
 
