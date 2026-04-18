@@ -1,14 +1,24 @@
 """
-Agent 0 — Mission Planner 에이전트
+Agent 0 — Mission Planner (PR3에서 Strategy Agent로 승격 예정)
 
-세션 상태를 해석하고 실행 계획을 생성한다.
-Critic이 replan을 요청하면 계획을 수정한다.
+분류 (Target Architecture, 4+2+5):
+  mission_planner_node → Strategy Agent (PR3 승격 후)
+                         현재는 LLM 1회 + JSON 파싱 (replan 여부만 결정).
+                         PR3에서 정책 4필드 (plan_mode, market_depth, critic_policy,
+                         clarification_policy) 결정 → 다운스트림 노드 동작 강도 조절.
 
-출력:
+출력 (PR1 시점):
   mission_goal: fast_sell | balanced | profit_max
   plan: {steps: [...], focus: str}
   decision_rationale: [str]
   missing_information: [str]
+
+출력 (PR3 이후 예정):
+  + plan_mode: "shallow" | "balanced" | "deep"
+  + market_depth: "skip" | "crawl_only" | "crawl_plus_rag"
+  + critic_policy: "minimal" | "normal" | "strict"
+  + clarification_policy: "ask_early" | "ask_late"
+  → POLICY_COMBO_RULES 제약 (app/domain/critic_policy.py) 위반 조합 금지
 """
 from __future__ import annotations
 

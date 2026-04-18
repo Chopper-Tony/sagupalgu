@@ -1,9 +1,13 @@
 """
-Agent 1 — 상품 식별 에이전트
+Agent 1 — 상품 식별 (PR4에서 Tool Agent로 승격 예정)
 
-노드:
-  product_identity_node  — Vision 결과 또는 사용자 입력으로 상품 확정
-  clarification_node     — 사용자 입력 대기 (graph END 후 재진입 시)
+분류 (Target Architecture, 4+2+5):
+  product_identity_node  → Deterministic Node (PR1 알리아스: product_gate_node)
+                           Vision 결과·사용자 입력으로 상품 확정. LLM 호출 없음.
+                           PR4에서 lc_image_reanalyze_tool 등 신규 툴 도입해
+                           ReAct Tool Agent로 승격 예정.
+  clarification_node     → Single Tool Node (PR3에서 pre_listing_clarification_node와 통합)
+                           LLM 한 번 호출로 질문 생성 (현재는 단순 대기, PR3에서 실제 LLM 통합).
 """
 from __future__ import annotations
 
@@ -88,3 +92,10 @@ def clarification_node(state: SellerCopilotState) -> SellerCopilotState:
     state["checkpoint"] = "A_needs_user_input"
     state["status"] = "awaiting_product_confirmation"
     return state
+
+
+# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
+# 동작 변화 0. PR2/3에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
+# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
+#                    임시 호환 layer지 영구 유지 layer 아님.
+product_gate_node = product_identity_node

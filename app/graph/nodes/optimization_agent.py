@@ -1,8 +1,10 @@
 """
-Agent 5 — 판매 후 최적화 에이전트
+Agent 5 — 판매 후 최적화
 
-노드:
-  post_sale_optimization_node  — sale_status 기반 가격 인하 제안
+분류 (Target Architecture, 4+2+5):
+  post_sale_optimization_node → Deterministic Node (PR1 알리아스: post_sale_policy_node)
+                                price_optimization_tool 결정론적 호출. LLM 호출 없음.
+                                (도구를 호출하지만 selection 없음 — sale_status 분기뿐).
 """
 from __future__ import annotations
 
@@ -60,3 +62,9 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
         _log(state, "agent5:no_suggestion_generated")
 
     return state
+
+
+# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
+# 동작 변화 0. PR2/3에서 신 이름이 service layer·graph builder에서 사용되기 시작.
+# TODO(PR3-cleanup): graph builder·service가 신 이름으로 완전 전환되면 이 알리아스 제거.
+post_sale_policy_node = post_sale_optimization_node

@@ -1,9 +1,13 @@
 """
-Agent 2 — 시세·가격 전략 에이전트 (ReAct)
+Agent 2 — 시세·가격 (Tool Agent + Deterministic)
 
-노드:
-  market_intelligence_node  — lc_market_crawl_tool + lc_rag_price_tool 자율 선택
-  pricing_strategy_node     — 시장 데이터 기반 가격 전략 수립
+분류 (Target Architecture, 4+2+5):
+  market_intelligence_node  → Tool Agent (ReAct)
+                              lc_market_crawl_tool + lc_rag_price_tool 자율 선택.
+                              PR3에서 state.market_depth 정책 반영
+                              ("crawl_only"이면 RAG tool bind 제외).
+  pricing_strategy_node     → Deterministic Node (PR1 알리아스: pricing_rule_node)
+                              goal_strategy 모듈 기반 규칙 산정. LLM 호출 없음.
 """
 from __future__ import annotations
 
@@ -160,3 +164,9 @@ def pricing_strategy_node(state: SellerCopilotState) -> SellerCopilotState:
     )
     state["checkpoint"] = "B_strategy_complete"
     return state
+
+
+# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
+# 동작 변화 0. PR2/3에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
+# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
+pricing_rule_node = pricing_strategy_node

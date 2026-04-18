@@ -1,9 +1,12 @@
 """
-패키지 빌더 + 게시 노드
+패키지 빌더 + 게시
 
-노드:
-  package_builder_node  — canonical listing → 플랫폼별 패키지 변환
-  publish_node          — 플랫폼 게시 실행 (SessionService 직접 호출 경로에서는 미사용)
+분류 (Target Architecture, 4+2+5):
+  package_builder_node → Deterministic Node
+                         canonical listing → 플랫폼별 패키지 변환. LLM 호출 없음.
+                         번개장터 수수료 3.5% 보전 같은 결정론적 변환만 수행.
+  publish_node         → 외부 I/O 노드 (SessionService 직접 호출 경로에서는 미사용)
+                         PublishService 호출. selection 없음.
 """
 from __future__ import annotations
 

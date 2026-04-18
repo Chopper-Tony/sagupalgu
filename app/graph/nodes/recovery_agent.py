@@ -1,8 +1,10 @@
 """
-Agent 4 (복구) — 게시 실패 복구 에이전트 (ReAct)
+Agent 4 (복구) — 게시 실패 복구
 
-노드:
-  recovery_node  — 진단 → 패치 → Discord 알림 순서 자율 결정
+분류 (Target Architecture, 4+2+5):
+  recovery_node  → Tool Agent (ReAct)
+                   lc_diagnose_publish_failure_tool · lc_auto_patch_tool · lc_discord_alert_tool
+                   세 도구 자율 선택. PR1~3 동안 변경 없음.
 """
 from __future__ import annotations
 

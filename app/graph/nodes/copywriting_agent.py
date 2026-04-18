@@ -1,12 +1,17 @@
 """
-Agent 3 — 판매글 생성 에이전트 (ReAct)
+Agent 3 — 판매글 생성
 
-노드:
-  copywriting_node   — lc_generate_listing_tool / lc_rewrite_listing_tool 자율 선택
-  refinement_node    — validation 실패 시 자동 보완 (Agent 4 루프)
+분류 (Target Architecture, 4+2+5):
+  copywriting_node  → Single Tool Node with deterministic fallback chain
+                      현재 PR1 시점에는 ReAct 패턴 유지 (LLM이 generate vs rewrite 자율 선택).
+                      PR2에서 단일 LLM 호출로 강등: state.rewrite_plan 유무로 분기,
+                      LLM 1회 호출 + 실패 시 ListingService → template fallback 체인.
+                      "Single Tool Node" 분류 유지 (selection은 critic이 담당, copywriting은 실행만).
+  refinement_node   → Deterministic Node (PR2에서 validation_rules_node에 흡수 후 삭제 예정)
+                      title/desc 길이·가격 0원 보강. LLM 호출 없음.
 
 내부 함수 분리:
-  _run_copywriting_agent()    — ReAct 에이전트 실행
+  _run_copywriting_agent()    — ReAct 에이전트 실행 (PR2에서 단일 LLM 호출로 단순화)
   _extract_listing_payload()  — 에이전트 결과에서 listing dict 추출
   _normalize_listing()        — 추출 결과를 CanonicalListingSchema 계약에 맞게 정규화
 """

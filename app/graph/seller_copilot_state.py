@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 
+from app.domain.critic_policy import (
+    DEFAULT_CLARIFICATION_POLICY,
+    DEFAULT_CRITIC_POLICY,
+    DEFAULT_MARKET_DEPTH,
+    DEFAULT_PLAN_MODE,
+    DEFAULT_REPAIR_ACTION,
+)
+
 
 CheckpointLiteral = Literal[
     "A_before_confirm",
@@ -174,11 +182,23 @@ class SellerCopilotState(TypedDict, total=False):
     pre_listing_done: bool                          # 질문 완료 여부
 
     # ── Critic / Rewrite 루프 ────────────────────────────────────────
-    critic_score: int                           # 0~100
+    critic_score: int                           # 0~100 (PR2 이후: 관측용. 라우팅은 repair_action이 담당)
     critic_feedback: List[Dict[str, Any]]       # [{type, impact, reason}]
     critic_rewrite_instructions: List[str]      # critic이 발행한 수정 지시
     critic_retry_count: int                     # rewrite 재시도 횟수
     max_critic_retries: int                     # rewrite 최대 횟수 (기본 2)
+
+    # ── PR1 신규: Routing Agent / Strategy Agent 결정 출력 ──────────
+    # PR1에서는 필드 자리만 잡아둔다 (어디서도 아직 채우지 않음 — dead field 아님, PR2/3 진입로).
+    # 기본값은 app/domain/critic_policy.py의 DEFAULT_* 상수에서 단일 원천으로 가져온다.
+    repair_action: str                          # PR2 critic output. "pass" | "rewrite_title" | "rewrite_description" | "rewrite_full" | "reprice" | "clarify" | "replan"
+    failure_mode: Optional[str]                 # PR2 critic output. "title_weak" | "price_off" | "info_missing" | "critic_parse_error" | "replan_limit_reached"
+    rewrite_plan: Dict[str, Any]                # PR2 critic output. {target: "title|description|full", instruction: str}
+    plan_mode: str                              # PR3 planner output. "shallow" | "balanced" | "deep"
+    market_depth: str                           # PR3 planner output. "skip" | "crawl_only" | "crawl_plus_rag"
+    critic_policy: str                          # PR3 planner output. "minimal" | "normal" | "strict" — critic 프롬프트 엄격도
+    clarification_policy: str                   # PR3 planner output. "ask_early" | "ask_late"
+    skip_rejected_reason: Optional[str]         # PR3 _skip_allowed() 미충족 시 사유 기록
 
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
@@ -257,4 +277,14 @@ def create_initial_state(
         error_history=[],
         last_error=None,
         debug_logs=[],
+        # PR1 신규 필드 baseline — app/domain/critic_policy.py의 DEFAULT_* 단일 원천
+        # repair_action="pass" 는 PR2 route_after_critic의 fallback과 의미 정렬
+        repair_action=DEFAULT_REPAIR_ACTION,
+        failure_mode=None,
+        rewrite_plan={},
+        plan_mode=DEFAULT_PLAN_MODE,
+        market_depth=DEFAULT_MARKET_DEPTH,
+        critic_policy=DEFAULT_CRITIC_POLICY,
+        clarification_policy=DEFAULT_CLARIFICATION_POLICY,
+        skip_rejected_reason=None,
     )

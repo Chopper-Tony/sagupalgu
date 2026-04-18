@@ -1,8 +1,15 @@
 """
-Pre-listing Clarification 노드 — 판매글 품질 향상을 위한 추가 정보 수집.
+Pre-listing Clarification — 판매글 품질 향상용 추가 정보 수집.
+
+분류 (Target Architecture, 4+2+5):
+  pre_listing_clarification_node → Single Tool Node
+                                   LLM 1회 호출로 질문 생성 (selection 없음).
+                                   PR3에서 product_agent.clarification_node와 통합 →
+                                   app/graph/nodes/clarification_node.py 신규 단일 파일.
+                                   clarification_policy ("ask_early" | "ask_late")로 시점·개수 조절.
 
 상품 확정 후, 판매글 생성 전에 실행.
-상품 상태, 구성품, 거래 조건 등 판매글 품질에 필요한 정보가 부족하면
+상품 상태·구성품·거래 조건 등 판매글 품질에 필요한 정보가 부족하면
 질문을 생성하고 needs_user_input 상태로 전환.
 이미 답이 충분하면 바로 통과.
 """
