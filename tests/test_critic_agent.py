@@ -96,7 +96,7 @@ class TestRouteAfterCritic:
     @pytest.mark.unit
     def test_pass_validation으로(self):
         state = {"repair_action": "pass"}
-        assert route_after_critic(state) == "validation_node"
+        assert route_after_critic(state) == "validation_rules_node"
 
     @pytest.mark.unit
     def test_rewrite_full_copywriting으로(self):
@@ -116,7 +116,7 @@ class TestRouteAfterCritic:
     @pytest.mark.unit
     def test_reprice_pricing으로(self):
         state = {"repair_action": "reprice"}
-        assert route_after_critic(state) == "pricing_strategy_node"
+        assert route_after_critic(state) == "pricing_rule_node"
 
     @pytest.mark.unit
     def test_clarify_clarification으로(self):
@@ -131,7 +131,7 @@ class TestRouteAfterCritic:
     @pytest.mark.unit
     def test_repair_action_없으면_pass_default(self):
         """critic이 한 번도 안 돌았으면 repair_action 기본값 'pass' 덕에 validation으로."""
-        assert route_after_critic({}) == "validation_node"
+        assert route_after_critic({}) == "validation_rules_node"
 
 
 # ── Critic 노드 통합 테스트 ──────────────────────────────────────

@@ -222,7 +222,7 @@ class TestOptimizationService:
         from app.services.optimization_service import OptimizationService
         svc = OptimizationService()
 
-        with patch("app.graph.nodes.optimization_agent.post_sale_optimization_node") as mock_node:
+        with patch("app.graph.nodes.optimization_agent.post_sale_policy_node") as mock_node:
             mock_node.return_value = {
                 "optimization_suggestion": {"new_price": 80000},
                 "status": "optimization_suggested",
@@ -244,7 +244,7 @@ class TestOptimizationService:
         from app.services.optimization_service import OptimizationService
         svc = OptimizationService()
 
-        with patch("app.graph.nodes.optimization_agent.post_sale_optimization_node") as mock_node:
+        with patch("app.graph.nodes.optimization_agent.post_sale_policy_node") as mock_node:
             mock_node.return_value = {
                 "optimization_suggestion": None,
                 "status": None,
@@ -263,7 +263,7 @@ class TestOptimizationService:
         from app.services.optimization_service import OptimizationService
         svc = OptimizationService()
 
-        with patch("app.graph.nodes.optimization_agent.post_sale_optimization_node") as mock_node:
+        with patch("app.graph.nodes.optimization_agent.post_sale_policy_node") as mock_node:
             mock_node.return_value = {}
             result = svc.run_post_sale_optimization(
                 session_id="s1",

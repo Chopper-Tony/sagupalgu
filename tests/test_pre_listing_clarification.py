@@ -4,10 +4,10 @@ Pre-listing Clarification 노드 + 라우팅 테스트.
 import pytest
 from unittest.mock import patch
 
-from app.graph.nodes.clarification_listing_agent import (
+from app.graph.nodes.clarification_node import (
     _detect_missing_info,
     _generate_questions_rule,
-    pre_listing_clarification_node,
+    clarification_node,
 )
 from app.graph.routing import route_after_pre_listing_clarification
 
@@ -104,7 +104,7 @@ class TestPreListingClarificationNode:
                  "pre_listing_answers": {}, "missing_information": []}
         # base_state의 confirmed_product에 brand/model이 있지만 상태/구성품 정보는 없음
         # → 일부 질문이 생성될 수 있음
-        result = pre_listing_clarification_node(state)
+        result = clarification_node(state)
         assert isinstance(result.get("pre_listing_questions"), list)
 
     @pytest.mark.integration
@@ -112,7 +112,7 @@ class TestPreListingClarificationNode:
         state = {**base_state,
                  "pre_listing_done": True, "pre_listing_questions": [],
                  "pre_listing_answers": {}, "missing_information": []}
-        result = pre_listing_clarification_node(state)
+        result = clarification_node(state)
         assert result["pre_listing_done"] is True
 
     @pytest.mark.integration
@@ -121,7 +121,7 @@ class TestPreListingClarificationNode:
                  "pre_listing_done": False, "pre_listing_questions": [],
                  "pre_listing_answers": {}, "missing_information": [],
                  "confirmed_product": {"brand": "Apple", "model": "iPhone 15 Pro"}}
-        result = pre_listing_clarification_node(state)
+        result = clarification_node(state)
         if result.get("pre_listing_questions"):
             assert result["needs_user_input"] is True
             assert len(result["pre_listing_questions"]) > 0
@@ -137,7 +137,7 @@ class TestPreListingClarificationNode:
                      "delivery_method": "직거래",
                  },
                  "missing_information": []}
-        result = pre_listing_clarification_node(state)
+        result = clarification_node(state)
         assert result["pre_listing_done"] is True
         assert len(result.get("pre_listing_questions", [])) == 0
 
@@ -210,22 +210,12 @@ class TestUnifiedClarificationNode:
         assert result["pre_listing_done"] is True
 
     def test_legacy_pre_listing_alias_위임(self, base_state):
-        """clarification_listing_agent.pre_listing_clarification_node가 통합 entry point로 위임."""
-        from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
+        """clarification_node.clarification_node가 통합 entry point로 위임."""
+        from app.graph.nodes.clarification_node import clarification_node
 
         state = {**base_state, "pre_listing_done": True, "needs_user_input": False}
-        result = pre_listing_clarification_node(state)
+        result = clarification_node(state)
         assert result["pre_listing_done"] is True
 
-    def test_legacy_product_alias_위임(self, base_state):
-        """product_agent.clarification_node가 통합 entry point로 위임."""
-        from app.graph.nodes.product_agent import clarification_node as product_clarification
-
-        state = {
-            **base_state,
-            "needs_user_input": True,
-            "confirmed_product": {"confidence": 0.3},
-            "pre_listing_done": False,
-        }
-        result = product_clarification(state)
-        assert result["checkpoint"] == "A_needs_user_input"
+    # PR4-cleanup: legacy product_agent.clarification_node alias 제거됨.
+    # 통합 clarification_node가 product 모드 자체를 처리하므로 위임 alias 불필요.

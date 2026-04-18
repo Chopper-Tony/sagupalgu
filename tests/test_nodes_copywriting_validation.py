@@ -154,18 +154,10 @@ class TestCopywritingFallbackChain:
         assert "300,000원" in result["description"]
 
 
-class TestRefinementDeprecated:
-    """PR2: refinement_node는 validation_node에 흡수되어 no-op이 됨."""
-
-    def test_refinement_node_noop(self, base_state):
-        from app.graph.seller_copilot_nodes import refinement_node
-
-        before = dict(base_state.get("canonical_listing") or {})
-        state = {**base_state}
-        result = refinement_node(state)
-
-        # 어떤 필드도 변경하지 않음 (validation_node가 보강을 담당)
-        assert dict(result.get("canonical_listing") or {}) == before
+# PR4-cleanup: TestRefinementDeprecated 제거.
+#   refinement_node는 PR2에서 validation_rules_node에 흡수되었고,
+#   PR4-cleanup에서 deprecated wrapper가 완전히 제거됨.
+#   validation 자동 보강 동작은 TestValidationAgent에서 검증함.
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -175,19 +167,19 @@ class TestRefinementDeprecated:
 class TestValidationAgent:
 
     def test_정상_listing_통과(self, base_state):
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
-        result = validation_node(base_state)
+        result = validation_rules_node(base_state)
         assert result["validation_passed"] is True
         assert result["checkpoint"] == "B_complete"
 
     def test_짧은제목_실패_보강불가(self, base_state):
         """title은 자동 보강 불가 → repair_action_hint='rewrite_title' 남김."""
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
         state = {**base_state}
         state["canonical_listing"] = {**base_state["canonical_listing"], "title": "짧"}
-        result = validation_node(state)
+        result = validation_rules_node(state)
 
         assert result["validation_passed"] is False
         error_codes = [i["code"] for i in result["validation_result"]["issues"]]
@@ -196,11 +188,11 @@ class TestValidationAgent:
 
     def test_짧은설명_자동_보강_후_pass(self, base_state):
         """description 짧음은 자동 보강 가능 → 보강 후 재검증 → pass."""
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
         state = {**base_state}
         state["canonical_listing"] = {**base_state["canonical_listing"], "description": "짧음"}
-        result = validation_node(state)
+        result = validation_rules_node(state)
 
         assert result["validation_passed"] is True
         # 보강 후 description 길이 충족
@@ -209,35 +201,35 @@ class TestValidationAgent:
 
     def test_가격_0원_자동_보강(self, base_state):
         """price 0원은 market_context.median_price 기반 자동 산정 → pass."""
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
         state = {**base_state}
         state["canonical_listing"] = {**base_state["canonical_listing"], "price": 0}
         state["market_context"] = {**(state.get("market_context") or {}), "median_price": 800000, "sample_count": 5}
         state["strategy"] = {**(state.get("strategy") or {}), "recommended_price": 800000}
-        result = validation_node(state)
+        result = validation_rules_node(state)
 
         assert result["validation_passed"] is True
         assert result["canonical_listing"]["price"] > 0
 
     def test_보강불가_repair_action_hint_기록(self, base_state):
         """missing_model 같은 보강 불가 항목 → repair_action_hint='clarify'."""
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
         state = {**base_state}
         state["confirmed_product"] = {}  # model 누락
-        result = validation_node(state)
+        result = validation_rules_node(state)
 
         assert result["validation_passed"] is False
         assert result["repair_action_hint"] == "clarify"
 
     def test_logs_누적(self, base_state):
         """validation 실행 흔적이 debug_logs에 남는지."""
-        from app.graph.seller_copilot_nodes import validation_node
+        from app.graph.seller_copilot_nodes import validation_rules_node
 
         state = {**base_state}
         state["canonical_listing"] = {**base_state["canonical_listing"], "description": "짧음"}
-        result = validation_node(state)
+        result = validation_rules_node(state)
 
         all_logs = " ".join(result.get("debug_logs") or [])
         assert "agent4:validation" in all_logs

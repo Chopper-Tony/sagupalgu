@@ -15,6 +15,13 @@ PR3 변경:
   - planner Strategy Agent가 결정한 market_depth를 보고 시세 단계를 skip할지 결정.
   - skip은 _skip_allowed() 가드를 통과해야만 실제 적용 (남용 차단).
   - 미통과 시 silent crawl_only fallback + skip_rejected_reason 기록.
+
+PR4-cleanup:
+  - 노드 이름을 Target Architecture(4+2+5) 정식 이름으로 일괄 전환.
+  - PR1 알리아스 제거: validation_node→validation_rules_node,
+    pricing_strategy_node→pricing_rule_node,
+    post_sale_optimization_node→post_sale_policy_node,
+    product_identity_node→product_gate_node.
 """
 from __future__ import annotations
 
@@ -67,21 +74,21 @@ def route_after_critic(state: SellerCopilotState) -> str:
     if action == "replan" and int(state.get("plan_revision_count") or 0) >= MAX_PLAN_REVISIONS:
         state["failure_mode"] = "replan_limit_reached"
         state.setdefault("debug_logs", []).append("routing:replan_limit_reached → validation_rules")
-        return "validation_node"
+        return "validation_rules_node"
 
     if action == "pass":
-        return "validation_node"
+        return "validation_rules_node"
     if action.startswith("rewrite"):
         return "copywriting_node"
     if action == "reprice":
-        return "pricing_strategy_node"
+        return "pricing_rule_node"
     if action == "clarify":
         return "clarification_node"
     if action == "replan":
         return "mission_planner_node"
 
     # 알 수 없는 repair_action — critic_parse_error 같은 fallback과 동일 안전망
-    return "validation_node"
+    return "validation_rules_node"
 
 
 def route_after_planner(state: SellerCopilotState) -> str:
@@ -113,8 +120,8 @@ def route_after_planner(state: SellerCopilotState) -> str:
         return "market_intelligence_node"
 
     # skip 허용 — 시세 단계 건너뛰고 pricing으로 직진
-    state.setdefault("debug_logs", []).append("routing:skip_allowed → pricing_strategy_node")
-    return "pricing_strategy_node"
+    state.setdefault("debug_logs", []).append("routing:skip_allowed → pricing_rule_node")
+    return "pricing_rule_node"
 
 
 def _skip_allowed(state: SellerCopilotState) -> Tuple[bool, Optional[str]]:

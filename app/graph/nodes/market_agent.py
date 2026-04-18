@@ -6,7 +6,7 @@ Agent 2 — 시세·가격 (Tool Agent + Deterministic)
                               lc_market_crawl_tool + lc_rag_price_tool 자율 선택.
                               PR3에서 state.market_depth 정책 반영
                               ("crawl_only"이면 RAG tool bind 제외).
-  pricing_strategy_node     → Deterministic Node (PR1 알리아스: pricing_rule_node)
+  pricing_rule_node         → Deterministic Node
                               goal_strategy 모듈 기반 규칙 산정. LLM 호출 없음.
 """
 from __future__ import annotations
@@ -151,8 +151,9 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
     return state
 
 
-def pricing_strategy_node(state: SellerCopilotState) -> SellerCopilotState:
-    _log(state, "agent2:pricing_strategy:start")
+def pricing_rule_node(state: SellerCopilotState) -> SellerCopilotState:
+    """goal_strategy 기반 규칙 가격 산정 (deterministic)."""
+    _log(state, "agent2:pricing_rule:start")
 
     from app.domain.goal_strategy import get_negotiation_policy, get_pricing_multiplier
 
@@ -178,7 +179,4 @@ def pricing_strategy_node(state: SellerCopilotState) -> SellerCopilotState:
     return state
 
 
-# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
-# 동작 변화 0. PR2/3에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
-# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
-pricing_rule_node = pricing_strategy_node
+# PR4-cleanup: pricing_strategy_node alias 제거. def 자체가 pricing_rule_node로 rename됨.

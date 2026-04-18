@@ -16,7 +16,7 @@ Agent 3 — 판매글 생성
     2. _apply_rewrite_instruction_rule_based — rewrite 지시가 있는데 LLM 다 실패
     3. _build_template_listing — 최후의 결정론적 템플릿
 
-  refinement_node는 PR2에서 validation_agent.py에 흡수 후 삭제됨.
+  refinement_node는 PR2에서 validation_rules_node에 흡수 → PR4-cleanup에서 wrapper 완전 제거.
 """
 from __future__ import annotations
 
@@ -301,10 +301,5 @@ def _build_template_listing(
     )
 
 
-# refinement_node는 PR2에서 validation_agent.py로 흡수 후 삭제됨.
-# 호환을 위해 import 시점에 ImportError가 나지 않도록 alias만 남겨두고,
-# 호출되면 단순히 state를 그대로 반환 (validation_node가 이미 보강함).
-def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
-    """Deprecated: validation_node가 흡수. 호출되면 no-op."""
-    _log(state, "agent3:refinement:deprecated_noop (validation_node가 보강 처리)")
-    return state
+# PR4-cleanup: refinement_node deprecated wrapper 제거.
+#   validation_rules_node가 보강을 흡수했으니 더 이상 별도 호출 경로 불필요.

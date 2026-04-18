@@ -2,9 +2,9 @@
 Agent 5 — 판매 후 최적화
 
 분류 (Target Architecture, 4+2+5):
-  post_sale_optimization_node → Deterministic Node (PR1 알리아스: post_sale_policy_node)
-                                price_optimization_tool 결정론적 호출. LLM 호출 없음.
-                                (도구를 호출하지만 selection 없음 — sale_status 분기뿐).
+  post_sale_policy_node → Deterministic Node
+                          price_optimization_tool 결정론적 호출. LLM 호출 없음.
+                          (도구를 호출하지만 selection 없음 — sale_status 분기뿐).
 """
 from __future__ import annotations
 
@@ -14,8 +14,9 @@ from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import _log, _record_tool_call, _run_async
 
 
-def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState:
-    _log(state, "agent5:post_sale_optimization:start")
+def post_sale_policy_node(state: SellerCopilotState) -> SellerCopilotState:
+    """sale_status 기반 가격 최적화 제안 (deterministic)."""
+    _log(state, "agent5:post_sale_policy:start")
 
     sale_status = state.get("sale_status")
     canonical = state.get("canonical_listing") or {}
@@ -31,8 +32,8 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
         state["status"] = "awaiting_sale_status_update"
         return state
 
-    # ── 도구 선택: 가격 최적화 ────────────────────────────────────
-    _log(state, "agent5:selecting_tool:price_optimization_tool")
+    # ── 도구 호출: 가격 최적화 (selection 없음) ──────────────────
+    _log(state, "agent5:invoking_tool:price_optimization_tool")
     from app.tools.agentic_tools import price_optimization_tool
 
     days_listed = 7
@@ -64,7 +65,4 @@ def post_sale_optimization_node(state: SellerCopilotState) -> SellerCopilotState
     return state
 
 
-# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
-# 동작 변화 0. PR2/3에서 신 이름이 service layer·graph builder에서 사용되기 시작.
-# TODO(PR3-cleanup): graph builder·service가 신 이름으로 완전 전환되면 이 알리아스 제거.
-post_sale_policy_node = post_sale_optimization_node
+# PR4-cleanup: post_sale_optimization_node alias 제거. def 자체가 post_sale_policy_node로 rename됨.

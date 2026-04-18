@@ -18,17 +18,18 @@ NODE_OUTPUT_CONTRACTS: Dict[str, NodeContract] = {
     "mission_planner_node": {
         "required": ["mission_goal", "plan", "decision_rationale", "missing_information"],
     },
-    "product_identity_node": {
+    "product_gate_node": {
         "required": ["checkpoint", "status"],
         "one_of": [["confirmed_product"], ["needs_user_input"]],
     },
-    "pre_listing_clarification_node": {
+    "clarification_node": {
+        # PR3 통합: pre_listing 모드 기준 필드. product 모드일 때는 needs_user_input/checkpoint만 보장.
         "required": ["pre_listing_done", "pre_listing_questions", "missing_information"],
     },
     "market_intelligence_node": {
         "required": ["market_context", "checkpoint"],
     },
-    "pricing_strategy_node": {
+    "pricing_rule_node": {
         "required": ["strategy", "checkpoint"],
     },
     "copywriting_node": {
@@ -37,7 +38,7 @@ NODE_OUTPUT_CONTRACTS: Dict[str, NodeContract] = {
     "listing_critic_node": {
         "required": ["critic_score", "critic_feedback", "critic_rewrite_instructions"],
     },
-    "validation_node": {
+    "validation_rules_node": {
         "required": ["validation_passed", "validation_result", "checkpoint"],
     },
     "package_builder_node": {

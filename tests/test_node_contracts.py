@@ -79,25 +79,25 @@ class TestCheckContract:
 
     @pytest.mark.unit
     def test_missing_required_key(self):
-        violations = check_contract("pricing_strategy_node", {})
+        violations = check_contract("pricing_rule_node", {})
         assert len(violations) >= 2
 
     @pytest.mark.unit
     def test_passing_contract(self):
         state = {"strategy": {"goal": "balanced"}, "checkpoint": "B_strategy_complete"}
-        violations = check_contract("pricing_strategy_node", state)
+        violations = check_contract("pricing_rule_node", state)
         assert violations == []
 
     @pytest.mark.unit
     def test_one_of_satisfied(self):
         state = {"checkpoint": "A_complete", "status": "product_confirmed", "confirmed_product": {"model": "x"}}
-        violations = check_contract("product_identity_node", state)
+        violations = check_contract("product_gate_node", state)
         assert violations == []
 
     @pytest.mark.unit
     def test_one_of_not_satisfied(self):
         state = {"checkpoint": "A_complete", "status": "product_confirmed"}
-        violations = check_contract("product_identity_node", state)
+        violations = check_contract("product_gate_node", state)
         assert any("one_of" in v for v in violations)
 
 
@@ -121,24 +121,24 @@ class TestMissionPlannerContract:
 class TestProductIdentityContract:
     @pytest.mark.integration
     def test_user_input_path_satisfies_contract(self):
-        from app.graph.nodes.product_agent import product_identity_node
+        from app.graph.nodes.product_agent import product_gate_node
 
         state = _make_minimal_state(
             user_product_input={"brand": "Samsung", "model": "Galaxy S24", "category": "smartphone"},
         )
-        result = product_identity_node(state)
-        violations = check_contract("product_identity_node", result)
+        result = product_gate_node(state)
+        violations = check_contract("product_gate_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
     @pytest.mark.integration
     def test_low_confidence_path_satisfies_contract(self):
-        from app.graph.nodes.product_agent import product_identity_node
+        from app.graph.nodes.product_agent import product_gate_node
 
         state = _make_minimal_state(
             product_candidates=[{"brand": "Unknown", "model": "unknown", "confidence": 0.3, "category": "etc"}],
         )
-        result = product_identity_node(state)
-        violations = check_contract("product_identity_node", result)
+        result = product_gate_node(state)
+        violations = check_contract("product_gate_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
 
@@ -146,15 +146,15 @@ class TestPreListingClarificationContract:
     @pytest.mark.integration
     @patch("app.graph.nodes.clarification_node._build_react_llm", return_value=None)
     def test_rule_based_fallback_satisfies_contract(self, _mock_llm):
-        """PR3: pre_listing_clarification_node는 통합된 clarification_node로 위임.
+        """PR3: clarification_node는 통합된 clarification_node로 위임.
         mock 타깃은 새 통합 모듈."""
-        from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
+        from app.graph.nodes.clarification_node import clarification_node
 
         state = _make_minimal_state(
             confirmed_product={"brand": "Apple", "model": "iPhone 15", "category": "smartphone"},
         )
-        result = pre_listing_clarification_node(state)
-        violations = check_contract("pre_listing_clarification_node", result)
+        result = clarification_node(state)
+        violations = check_contract("clarification_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
 
@@ -175,27 +175,27 @@ class TestMarketIntelligenceContract:
 class TestPricingStrategyContract:
     @pytest.mark.integration
     def test_satisfies_contract(self):
-        from app.graph.nodes.market_agent import pricing_strategy_node
+        from app.graph.nodes.market_agent import pricing_rule_node
 
         state = _make_minimal_state(
             market_context={"median_price": 500000, "sample_count": 5},
             mission_goal="balanced",
         )
-        result = pricing_strategy_node(state)
-        violations = check_contract("pricing_strategy_node", result)
+        result = pricing_rule_node(state)
+        violations = check_contract("pricing_rule_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
     @pytest.mark.integration
     def test_goal_propagates_to_strategy(self):
         """mission_goal이 strategy.goal로 전파되는지 검증 (M40 연계)."""
-        from app.graph.nodes.market_agent import pricing_strategy_node
+        from app.graph.nodes.market_agent import pricing_rule_node
 
         for goal in ("fast_sell", "balanced", "profit_max"):
             state = _make_minimal_state(
                 market_context={"median_price": 500000, "sample_count": 5},
                 mission_goal=goal,
             )
-            result = pricing_strategy_node(state)
+            result = pricing_rule_node(state)
             assert result["strategy"]["goal"] == goal
 
 
@@ -247,7 +247,7 @@ class TestListingCriticContract:
 class TestValidationContract:
     @pytest.mark.integration
     def test_satisfies_contract(self):
-        from app.graph.nodes.validation_agent import validation_node
+        from app.graph.nodes.validation_agent import validation_rules_node
 
         state = _make_minimal_state(
             canonical_listing={
@@ -258,8 +258,8 @@ class TestValidationContract:
             confirmed_product={"brand": "Apple", "model": "iPhone 15 Pro", "category": "smartphone"},
             market_context={"median_price": 980000, "sample_count": 12},
         )
-        result = validation_node(state)
-        violations = check_contract("validation_contract" if False else "validation_node", result)
+        result = validation_rules_node(state)
+        violations = check_contract("validation_contract" if False else "validation_rules_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
 
@@ -291,13 +291,13 @@ class TestContractCoverage:
         """NODE_OUTPUT_CONTRACTS에 정의된 모든 노드가 이 파일에서 테스트되는지."""
         tested_nodes = {
             "mission_planner_node",
-            "product_identity_node",
-            "pre_listing_clarification_node",
+            "product_gate_node",
+            "clarification_node",
             "market_intelligence_node",
-            "pricing_strategy_node",
+            "pricing_rule_node",
             "copywriting_node",
             "listing_critic_node",
-            "validation_node",
+            "validation_rules_node",
             "package_builder_node",
         }
         assert tested_nodes == set(NODE_OUTPUT_CONTRACTS.keys())

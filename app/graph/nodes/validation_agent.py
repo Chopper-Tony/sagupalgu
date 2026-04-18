@@ -2,13 +2,13 @@
 Agent 4 (검증) — 판매글 품질 검사
 
 분류 (Target Architecture, 4+2+5):
-  validation_node  → Deterministic Node (PR1 알리아스: validation_rules_node)
-                     listing 필수 필드·가격·길이 검사. LLM 호출 없음.
-                     PR2에서 copywriting_agent.refinement_node의 보강 로직 흡수:
-                       - description 짧음 → 자동 텍스트 보강
-                       - price 0원 → market_context·strategy 기반 자동 산정
-                     보강 가능 시 보강 후 재검증 → pass 처리.
-                     보강 불가 시 repair_action_hint 남김 (다음 critic이 참조).
+  validation_rules_node  → Deterministic Node
+                           listing 필수 필드·가격·길이 검사. LLM 호출 없음.
+                           PR2에서 copywriting_agent.refinement_node의 보강 로직 흡수:
+                             - description 짧음 → 자동 텍스트 보강
+                             - price 0원 → market_context·strategy 기반 자동 산정
+                           보강 가능 시 보강 후 재검증 → pass 처리.
+                           보강 불가 시 repair_action_hint 남김 (다음 critic이 참조).
 """
 from __future__ import annotations
 
@@ -21,8 +21,9 @@ from app.graph.nodes.helpers import _log, _safe_int
 MAX_AUTO_PATCH_ATTEMPTS = 1  # 보강은 한 번만 시도 (무한 루프 차단)
 
 
-def validation_node(state: SellerCopilotState) -> SellerCopilotState:
-    _log(state, "agent4:validation:start")
+def validation_rules_node(state: SellerCopilotState) -> SellerCopilotState:
+    """필드·가격·길이 검사 + 자동 보강 + 재검증 (deterministic)."""
+    _log(state, "agent4:validation_rules:start")
 
     canonical = dict(state.get("canonical_listing") or {})
     product = state.get("confirmed_product") or {}
@@ -34,18 +35,18 @@ def validation_node(state: SellerCopilotState) -> SellerCopilotState:
 
     if passed:
         _finalize(state, canonical, issues, passed=True)
-        _log(state, f"agent4:validation:passed=True issues={len(issues)}")
+        _log(state, f"agent4:validation_rules:passed=True issues={len(issues)}")
         return state
 
     # ── PR2 흡수: 자동 보강 (구 refinement_node 로직) ──────────────
     if _is_auto_patchable(issues) and int(state.get("validation_retry_count") or 0) < MAX_AUTO_PATCH_ATTEMPTS:
-        _log(state, "agent4:validation:auto_patch:attempt")
+        _log(state, "agent4:validation_rules:auto_patch:attempt")
         canonical = _auto_patch(canonical, market_context, strategy)
         # 재검증
         issues = _check(canonical, product, market_context)
         passed = _no_errors(issues)
         state["validation_retry_count"] = int(state.get("validation_retry_count") or 0) + 1
-        _log(state, f"agent4:validation:auto_patch:done passed={passed} issues={len(issues)}")
+        _log(state, f"agent4:validation_rules:auto_patch:done passed={passed} issues={len(issues)}")
 
     if passed:
         _finalize(state, canonical, issues, passed=True)
@@ -57,7 +58,7 @@ def validation_node(state: SellerCopilotState) -> SellerCopilotState:
     state.setdefault("debug_logs", []).append(
         f"validation:fail_after_patch repair_action_hint={state['repair_action_hint']}"
     )
-    _log(state, f"agent4:validation:passed=False issues={len(issues)} hint={state['repair_action_hint']}")
+    _log(state, f"agent4:validation_rules:passed=False issues={len(issues)} hint={state['repair_action_hint']}")
     return state
 
 
@@ -140,7 +141,4 @@ def _finalize(state: SellerCopilotState, canonical: Dict, issues: List[Validatio
     state["checkpoint"] = "B_complete" if passed else "B_validation_failed"
 
 
-# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
-# 동작 변화 0. PR2에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
-# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
-validation_rules_node = validation_node
+# PR4-cleanup: validation_node alias 제거. def 자체가 validation_rules_node로 rename됨.
