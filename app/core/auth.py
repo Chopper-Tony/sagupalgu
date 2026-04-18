@@ -3,6 +3,10 @@ JWT 인증 모듈.
 
 Supabase Auth JWT를 검증하고 user_id를 추출한다.
 dev/local 환경에서는 X-Dev-User-Id 헤더로 bypass 가능.
+
+알고리즘 지원 (#249):
+  - HS256: legacy Supabase 프로젝트 (shared secret = SUPABASE_JWT_SECRET)
+  - ES256 / RS256: 모던 Supabase 프로젝트 (asymmetric, JWKS 엔드포인트에서 공개키 fetch)
 """
 from __future__ import annotations
 
@@ -31,26 +35,30 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     return None
 
 
+# JWKS client 캐시 — Supabase URL 당 1개. PyJWKClient 가 내부적으로 키 캐싱.
+_jwks_clients: dict = {}
+
+
+def _get_jwks_client(supabase_url: str):
+    """Supabase JWKS 엔드포인트용 PyJWKClient (URL 당 싱글턴)."""
+    import jwt as _jwt
+
+    if supabase_url not in _jwks_clients:
+        jwks_uri = f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        _jwks_clients[supabase_url] = _jwt.PyJWKClient(jwks_uri)
+    return _jwks_clients[supabase_url]
+
+
 def _decode_jwt(token: str) -> dict:
     """Supabase JWT를 디코딩·검증한다.
 
-    PyJWT 설치 여부에 따라:
-    - 설치됨: 서명 검증 (HS256, SUPABASE_JWT_SECRET)
-    - 미설치: payload만 디코딩 (개발용)
+    PyJWT 설치 여부 + 토큰 alg 헤더에 따라:
+    - PyJWT 미설치: payload 만 base64 디코딩 (개발용)
+    - HS256: SUPABASE_JWT_SECRET 또는 service_role_key 로 검증
+    - ES256 / RS256: SUPABASE_URL 의 JWKS 에서 공개키 fetch 후 검증
     """
     try:
         import jwt
-        from app.core.config import get_settings
-        settings = get_settings()
-        secret = getattr(settings, "supabase_jwt_secret", None) or settings.supabase_service_role_key
-        payload = jwt.decode(
-            token,
-            secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-            options={"verify_aud": False},
-        )
-        return payload
     except ImportError:
         # PyJWT 미설치 시 base64 디코딩만 (개발 환경)
         import base64
@@ -59,11 +67,53 @@ def _decode_jwt(token: str) -> dict:
         if len(parts) != 3:
             raise HTTPException(status_code=401, detail="잘못된 토큰 형식입니다")
         payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return json.loads(base64.urlsafe_b64decode(payload_b64))
+
+    from app.core.config import get_settings
+    settings = get_settings()
+
+    # 1) 토큰 header 에서 alg 추출 — 잘못된 토큰이면 여기서 401
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.exceptions.DecodeError as e:
+        logger.warning("jwt_header_decode_failed: %s", e)
+        raise HTTPException(status_code=401, detail="잘못된 토큰 형식입니다")
+
+    alg = header.get("alg", "")
+
+    try:
+        if alg == "HS256":
+            secret = getattr(settings, "supabase_jwt_secret", None) or settings.supabase_service_role_key
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+                options={"verify_aud": False},
+            )
+        elif alg in ("ES256", "RS256"):
+            jwks_client = _get_jwks_client(settings.supabase_url)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[alg],
+                audience="authenticated",
+                options={"verify_aud": False},
+            )
+        else:
+            logger.warning("jwt_unsupported_alg: %s", alg)
+            raise HTTPException(status_code=401, detail=f"지원하지 않는 토큰 알고리즘입니다: {alg}")
+
         return payload
-    except (ValueError, KeyError) as e:
-        logger.warning("jwt_decode_failed: %s", e)
+    except jwt.exceptions.PyJWTError as e:
+        # InvalidSignatureError / ExpiredSignatureError / InvalidAlgorithmError 등 모두 포함
+        logger.warning("jwt_verify_failed alg=%s err=%s", alg, e)
         raise HTTPException(status_code=401, detail="토큰 검증에 실패했습니다")
+    except Exception as e:
+        # JWKS fetch 네트워크 실패 등
+        logger.error("jwt_jwks_error alg=%s err=%s", alg, e)
+        raise HTTPException(status_code=401, detail="토큰 검증 중 오류가 발생했습니다")
 
 
 async def get_current_user(request: Request) -> AuthenticatedUser:
@@ -105,7 +155,7 @@ async def get_current_user(request: Request) -> AuthenticatedUser:
 
 
 async def get_optional_user(request: Request) -> AuthenticatedUser:
-    """인증이 선택적인 엔드포인트용. ���상 사용자를 반환한다."""
+    """인증이 선택적인 엔드포인트용. 익명 사용자를 반환한다."""
     try:
         return await get_current_user(request)
     except HTTPException:

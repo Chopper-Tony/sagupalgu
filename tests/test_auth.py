@@ -142,3 +142,122 @@ class TestRouterIntegration:
         source = inspect.getsource(create_session)
         assert "temp-user-id" not in source
         assert "user.user_id" in source or "user_id" in source
+
+
+# ── #249: 다중 알고리즘 (HS256 + ES256/RS256) 지원 ──────────────────
+
+
+class TestDecodeJwtMultiAlg:
+    """Bug #249: HS256-only → HS256 + ES256/RS256 (Supabase JWKS)."""
+
+    def _b64(self, data: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=").decode()
+
+    def _make_token(self, alg: str, payload: dict) -> str:
+        header = self._b64({"alg": alg, "typ": "JWT"})
+        body = self._b64(payload)
+        return f"{header}.{body}.fake_sig"
+
+    def test_HS256_경로_기존_secret_사용(self):
+        """alg=HS256 은 SUPABASE_JWT_SECRET 으로 검증 (legacy 호환)."""
+        from app.core.auth import _decode_jwt
+
+        token = self._make_token("HS256", {"sub": "u-1"})
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_jwt_secret = "test-secret"
+            mock_settings.return_value.supabase_service_role_key = "fallback"
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with patch("jwt.decode", return_value={"sub": "u-1"}) as mock_decode:
+                payload = _decode_jwt(token)
+
+        assert payload["sub"] == "u-1"
+        # HS256 + 'test-secret' 으로 호출됐는지 검증
+        args, kwargs = mock_decode.call_args
+        assert kwargs["algorithms"] == ["HS256"]
+        assert args[1] == "test-secret"
+
+    def test_ES256_경로_JWKS_공개키_사용(self):
+        """alg=ES256 은 SUPABASE_URL JWKS 에서 공개키 fetch 후 검증 (모던 Supabase)."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _decode_jwt
+
+        # JWKS client 캐시 클리어 (테스트 격리)
+        auth_mod._jwks_clients.clear()
+
+        token = self._make_token("ES256", {"sub": "u-2"})
+        fake_signing_key = MagicMock()
+        fake_signing_key.key = "fake-public-key"
+        fake_jwks_client = MagicMock()
+        fake_jwks_client.get_signing_key_from_jwt.return_value = fake_signing_key
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://proj.supabase.co"
+            with patch("jwt.PyJWKClient", return_value=fake_jwks_client):
+                with patch("jwt.decode", return_value={"sub": "u-2"}) as mock_decode:
+                    payload = _decode_jwt(token)
+
+        assert payload["sub"] == "u-2"
+        args, kwargs = mock_decode.call_args
+        assert kwargs["algorithms"] == ["ES256"]
+        assert args[1] == "fake-public-key"
+
+    def test_RS256_경로(self):
+        """RS256 도 ES256 과 동일 경로 (JWKS)."""
+        from app.core import auth as auth_mod
+        from app.core.auth import _decode_jwt
+
+        auth_mod._jwks_clients.clear()
+
+        token = self._make_token("RS256", {"sub": "u-3"})
+        fake_signing_key = MagicMock()
+        fake_signing_key.key = "rsa-pub"
+        fake_jwks_client = MagicMock()
+        fake_jwks_client.get_signing_key_from_jwt.return_value = fake_signing_key
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with patch("jwt.PyJWKClient", return_value=fake_jwks_client):
+                with patch("jwt.decode", return_value={"sub": "u-3"}) as mock_decode:
+                    _decode_jwt(token)
+
+        args, kwargs = mock_decode.call_args
+        assert kwargs["algorithms"] == ["RS256"]
+
+    def test_지원하지_않는_알고리즘_401(self):
+        """alg=NONE 등 지원 외 알고리즘은 401."""
+        from app.core.auth import _decode_jwt
+
+        token = self._make_token("none", {"sub": "u-4"})
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with pytest.raises(HTTPException) as exc:
+                _decode_jwt(token)
+
+        assert exc.value.status_code == 401
+
+    def test_손상된_header_401(self):
+        """header 가 base64 디코딩 실패 → 401."""
+        from app.core.auth import _decode_jwt
+
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with pytest.raises(HTTPException) as exc:
+                _decode_jwt("not-a-jwt-format")
+
+        assert exc.value.status_code == 401
+
+    def test_signature_검증_실패_401(self):
+        """jwt.decode 가 InvalidSignatureError 던지면 401."""
+        import jwt as _jwt
+        from app.core.auth import _decode_jwt
+
+        token = self._make_token("HS256", {"sub": "u-5"})
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.supabase_jwt_secret = "wrong-secret"
+            mock_settings.return_value.supabase_service_role_key = ""
+            mock_settings.return_value.supabase_url = "https://x.supabase.co"
+            with patch("jwt.decode", side_effect=_jwt.exceptions.InvalidSignatureError("bad sig")):
+                with pytest.raises(HTTPException) as exc:
+                    _decode_jwt(token)
+
+        assert exc.value.status_code == 401
