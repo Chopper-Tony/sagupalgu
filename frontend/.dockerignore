@@ -1,5 +1,9 @@
 node_modules
 dist
-.env
-.env.*
+# 로컬 override 파일만 제외. 프로덕션 빌드는 .env (VITE_* 공개값) 를 읽어야 함.
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
 *.log
