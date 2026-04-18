@@ -141,6 +141,50 @@ class TestProductIdentityContract:
         violations = check_contract("product_gate_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
+    # PR4-3: ReAct (LLM 사용) 경로도 동일 contract 준수해야 함.
+    # _run_react 자체를 mock해 LLM 호출 없이 결과만 주입한다.
+    @pytest.mark.integration
+    def test_react_confirmed_path_satisfies_contract(self):
+        from app.graph.nodes.product_agent import product_identity_agent
+
+        ok_result = {
+            "confirmed_product": {
+                "brand": "Apple", "model": "iPhone 15", "category": "smartphone",
+                "confidence": 0.85, "source": "react",
+            },
+            "needs_user_input": False,
+        }
+        state = _make_minimal_state(
+            product_candidates=[{"brand": "Apple", "model": "iPhone 15",
+                                 "confidence": 0.5, "category": "smartphone"}],
+        )
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.enable_product_identity_agent = True
+            with patch("app.graph.nodes.product_agent._run_react", return_value=ok_result):
+                result = product_identity_agent(state)
+        violations = check_contract("product_gate_node", result)
+        assert violations == [], f"Contract violations: {violations}"
+
+    @pytest.mark.integration
+    def test_react_clarify_path_satisfies_contract(self):
+        from app.graph.nodes.product_agent import product_identity_agent
+
+        clarify_result = {
+            "confirmed_product": {},
+            "needs_user_input": True,
+            "clarification_prompt": "모델명을 알려주세요",
+        }
+        state = _make_minimal_state(
+            product_candidates=[{"brand": "Unknown", "model": "unknown",
+                                 "confidence": 0.2, "category": "etc"}],
+        )
+        with patch("app.core.config.get_settings") as mock_settings:
+            mock_settings.return_value.enable_product_identity_agent = True
+            with patch("app.graph.nodes.product_agent._run_react", return_value=clarify_result):
+                result = product_identity_agent(state)
+        violations = check_contract("product_gate_node", result)
+        assert violations == [], f"Contract violations: {violations}"
+
 
 class TestPreListingClarificationContract:
     @pytest.mark.integration

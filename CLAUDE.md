@@ -4,7 +4,7 @@
 
 중고거래(번개장터, 중고나라) 자동 게시 + 자체 마켓 플랫폼.
 이미지 → AI 분석 → 가격 산정 → 카피라이팅 → 게시 → 복구의 파이프라인을
-LangGraph 결정 그래프로 구현. **4 에이전트 + 2 단일툴 + 5 결정론 노드** (PR1~3 리팩터 결과).
+LangGraph 결정 그래프로 구현. **5 에이전트 + 2 단일툴 + 4 결정론 노드** (PR1~4 리팩터 결과).
 
 게시는 크롬 익스텐션 Content Script 방식 (서버 Playwright → 계정 정지로 전환).
 자체 마켓(`#/market`, `#/my-listings`)에서 판매 상태 관리 + 문의 응답 + 셀러 코파일럿 제공.
@@ -118,7 +118,10 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 
 ## 완료된 항목 (최근)
 
-- **에이전틱성 리팩터 PR1~3 (2026-04-19)**: 명목상 7 에이전트 → 실제 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류. critic을 Routing Agent로 승격(repair_action 7값), planner를 Strategy Agent로 승격(plan_mode/market_depth/critic_policy/clarification_policy 4 정책 결정), copywriting을 단일 툴 노드로 강등, refinement를 validation에 흡수, clarification 통합. routing.py는 단순 dispatch + replan 가드 + skip 가드. PR4(Product Identity 승격)는 별도 트랙. 정책 단일 원천: `app/domain/critic_policy.py`. 839 BE + 65 FE green
+- **에이전틱성 리팩터 PR4-3 (2026-04-19)**: 회귀 테스트 보강 + 문서 + observability. `app/middleware/metrics.py` 신규 — in-process 카운터 + cold_start>20% / fallback>10% 임계 alert. `_emit_observability_metrics` 가 logger.info → emit_product_identity_run 으로 교체. catalog tool ToolMessage 응답에서 cold_start 자동 추출 → state.product_identity_catalog_cold_start. architecture.md 4+2+5 → 5+2+4 갱신 + 카탈로그 sync flow 다이어그램. 894 BE + 65 FE green
+- **에이전틱성 리팩터 PR4-2 (2026-04-19)**: product_identity_node 를 결정론 노드 → Tool Agent (ReAct) 로 승격. 신규 툴 3개 (lc_image_reanalyze_tool / lc_rag_product_catalog_tool / lc_ask_user_clarification_tool). LLM 이 confidence·정보 보강을 위해 자율 선택. budget guard (reanalyze 2회 / clarify 1회 / 전체 4회) + SHA256 1h 캐시 + 5단계 fallback chain (PR4-cleanup deterministic 100% 보존). `enable_product_identity_agent` opt-in flag (default=False). 884 BE green
+- **에이전틱성 리팩터 PR4-1 (2026-04-19)**: Product Identity 카탈로그 RAG 인프라. migration 005 (vector_search_catalog_hybrid + keyword_search_catalog_hybrid RPC + price_history.source_type + catalog_sync_cursor). app/db/product_catalog_store.py (3-tier fallback: vector→keyword→Python ILIKE) + app/services/catalog_sync_service.py (sessions(sold) → price_history sync, cursor 기반 incremental). `enable_catalog_hybrid` opt-in flag (default=False, CTO #1)
+- **에이전틱성 리팩터 PR1~3 (2026-04-19)**: 명목상 7 에이전트 → 실제 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류. critic을 Routing Agent로 승격(repair_action 7값), planner를 Strategy Agent로 승격(plan_mode/market_depth/critic_policy/clarification_policy 4 정책 결정), copywriting을 단일 툴 노드로 강등, refinement를 validation에 흡수, clarification 통합. routing.py는 단순 dispatch + replan 가드 + skip 가드. 정책 단일 원천: `app/domain/critic_policy.py`. 839 BE + 65 FE green
 - **CI 자동 배포 활성화 (2026-04-18)**: GitHub Secrets(EC2_HOST·EC2_USER·EC2_SSH_KEY·VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY) 등록, main push → appleboy/ssh-action 으로 EC2 롤링 재시작 자동화. 이전 "수동 SSH" 배포 경로는 fallback용으로만 유지
 - **프로덕션 로그인 UI (2026-04-18)**: Supabase Auth (이메일 + Google OAuth) + AuthContext + 보호 라우트, dev bypass 공존. `#/login` 라우트, UserMenu (우상단 이메일 + 로그아웃)
 - **Vision AI fallback 체인 (2026-04-18)**: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini fallback. `identify_product()` 가 provider 순회로 자동 복구
