@@ -136,12 +136,28 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd ~/sagupalgu
             git pull origin main
-            # Rolling restart: rebuild and restart backend first (Caddy keeps serving)
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend frontend
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d backend
-            # Wait for backend health before restarting frontend
+
+            # 1) frontend/.env 자동 생성 — Vite는 frontend/ 하위의 .env만 읽음
+            #    루트 .env에 VITE_SUPABASE_* 가 있으면 프론트로 추출
+            if [ ! -f frontend/.env ] && grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
+              grep -E '^VITE_SUPABASE_(URL|ANON_KEY)=' .env > frontend/.env
+              echo "✓ frontend/.env 생성됨"
+            fi
+
+            # 2) VISION_PROVIDER 기본값 정합화 — 코드 default=gemini 를 덮어쓰지 않도록
+            #    (과거 설정에 남아있던 openai 고정 제거, 한 번만 실행하면 끝)
+            if grep -qE '^VISION_PROVIDER=openai$' .env 2>/dev/null; then
+              sed -i 's/^VISION_PROVIDER=openai$/VISION_PROVIDER=gemini/' .env
+              echo "✓ VISION_PROVIDER openai → gemini"
+            fi
+
+            # 3) 백엔드 롤링 재시작 (Caddy 서빙 유지)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d --force-recreate backend
+
             echo "Waiting for backend health..."
             for i in $(seq 1 30); do
               if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T backend curl -sf http://localhost:8000/health > /dev/null 2>&1; then
@@ -150,9 +166,15 @@ jobs:
               fi
               sleep 1
             done
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d frontend
-            # Ensure Caddy picks up any config changes
+
+            # 4) 프론트엔드 — VITE_* 환경변수 변화나 소스 변경 반영 보장
+            #    --no-cache 로 stale 레이어 제거, --force-recreate 로 컨테이너 신규화
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache frontend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d --force-recreate frontend
+
+            # 5) Caddy 설정 반영
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d caddy
+
             echo "Deploy complete: $(date)"
 
       - name: Notify Discord on deploy
