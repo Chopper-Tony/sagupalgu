@@ -162,6 +162,17 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------
+    # Product Identity 카탈로그 (PR4)
+    # ------------------------------
+
+    # PR4-1: 옵션 D-하이브리드 카탈로그 RAG (sessions + price_history) 활성화.
+    # off로 toggle하면 hybrid_search_catalog 호출이 차단되고 기존 lc_rag_price_tool만 동작.
+    enable_catalog_hybrid: bool = Field(
+        default=True,
+        alias="ENABLE_CATALOG_HYBRID",
+    )
+
+    # ------------------------------
     # 이메일 알림 (Gmail SMTP)
     # ------------------------------
 
