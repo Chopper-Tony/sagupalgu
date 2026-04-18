@@ -153,10 +153,11 @@ jobs:
 
             COMPOSE="$DC -f docker-compose.yml -f docker-compose.prod.yml"
 
-            # 1) frontend/.env 자동 생성 — Vite는 frontend/ 하위의 .env만 읽음
-            if [ ! -f frontend/.env ] && grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
+            # 1) frontend/.env 자동 생성/갱신 — Vite는 frontend/ 하위의 .env만 읽음
+            #    루트 .env의 VITE_* 를 항상 truth source로 덮어써 stale 파일 방지
+            if grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
               grep -E '^VITE_SUPABASE_(URL|ANON_KEY)=' .env > frontend/.env
-              echo "✓ frontend/.env 생성됨"
+              echo "✓ frontend/.env 갱신됨 ($(wc -l < frontend/.env)줄)"
             fi
 
             # 2) VISION_PROVIDER 기본값 정합화 — 코드 default=gemini 를 덮어쓰지 않도록

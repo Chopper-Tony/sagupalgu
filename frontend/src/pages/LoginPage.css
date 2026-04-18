@@ -1,13 +1,18 @@
 .login-container {
+  flex: 1;
+  width: 100%;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-secondary);
   padding: 24px;
+  box-sizing: border-box;
 }
 
 .login-loading {
+  flex: 1;
+  width: 100%;
   min-height: 100vh;
   display: flex;
   align-items: center;
