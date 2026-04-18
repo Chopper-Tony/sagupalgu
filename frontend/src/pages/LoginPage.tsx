@@ -32,6 +32,8 @@ export function LoginPage() {
     try {
       if (mode === "signin") {
         await signInWithPassword(email, password);
+        // 로그인 성공 시 기본 화면으로 이동
+        window.location.hash = "#/";
       } else {
         await signUpWithPassword(email, password);
         setInfo(
