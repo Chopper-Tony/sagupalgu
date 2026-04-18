@@ -206,33 +206,56 @@ caddy:
 5. deploy        — EC2_HOST secret 설정 시만 SSH 접속 후 rolling restart
 ```
 
-### Rolling Restart 스크립트 (deploy job)
+### Rolling Restart 스크립트 (deploy job, 2026-04-18 보강)
 
 ```bash
+set -e
 cd ~/sagupalgu
 git pull origin main
 
-# 이미지 빌드
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend frontend
+# v2 플러그인 / v1 legacy 런타임 감지
+if docker compose version >/dev/null 2>&1; then DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
+else exit 1
+fi
+COMPOSE="$DC -f docker-compose.yml -f docker-compose.prod.yml"
 
-# 1) backend 먼저 교체 (Caddy가 계속 서빙)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d backend
+# 1) frontend/.env 생성 — GitHub Secrets 우선, EC2 .env fallback
+if [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_ANON_KEY" ]; then
+  cat > frontend/.env <<ENVEOF
+VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENVEOF
+elif grep -q '^VITE_SUPABASE_' .env 2>/dev/null; then
+  grep -E '^VITE_SUPABASE_(URL|ANON_KEY)=' .env > frontend/.env
+fi
 
-# 2) health 대기 (최대 30초)
+# 2) VISION_PROVIDER 정합화 (코드 default=gemini 덮어쓰기 방지)
+sed -i 's/^VISION_PROVIDER=openai$/VISION_PROVIDER=gemini/' .env 2>/dev/null || true
+
+# 3) backend 교체
+$COMPOSE build backend
+$COMPOSE up --no-deps -d --force-recreate backend
+
+# 4) health 대기 (최대 30s)
 for i in $(seq 1 30); do
-  if docker compose exec -T backend curl -sf http://localhost:8000/health > /dev/null 2>&1; then
-    echo "Backend healthy after ${i}s"
-    break
-  fi
+  $COMPOSE exec -T backend curl -sf http://localhost:8000/health > /dev/null 2>&1 && break
   sleep 1
 done
 
-# 3) frontend 교체
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d frontend
+# 5) frontend — 캐시 무효화 + 컨테이너 강제 재생성 (VITE_* 갱신 반영)
+$COMPOSE build --no-cache frontend
+$COMPOSE up --no-deps -d --force-recreate frontend
 
-# 4) Caddy 설정 반영
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d caddy
+# 6) Caddy — Caddyfile 볼륨 마운트 재로드 (--force-recreate 필수)
+$COMPOSE up --no-deps -d --force-recreate caddy
 ```
+
+**핵심 포인트 (2026-04-18 배포 디버깅 반영)**:
+- `set -e` — 이전엔 없어서 docker 오류가 silent fail 로 통과. 이제 첫 에러에서 중단
+- `--force-recreate` — 이미지 변경 없는 Caddyfile/env 변경 반영 보장
+- `--no-cache frontend` — 빌드 캐시로 인한 stale 번들 방지
+- `frontend/.dockerignore` 에서 `.env` 제외 해제 → Vite 가 `VITE_*` 를 번들에 인라인
 
 ### 알림
 
