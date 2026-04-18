@@ -2,18 +2,21 @@
 Agent 3 — 판매글 생성
 
 분류 (Target Architecture, 4+2+5):
-  copywriting_node  → Single Tool Node with deterministic fallback chain
-                      현재 PR1 시점에는 ReAct 패턴 유지 (LLM이 generate vs rewrite 자율 선택).
-                      PR2에서 단일 LLM 호출로 강등: state.rewrite_plan 유무로 분기,
-                      LLM 1회 호출 + 실패 시 ListingService → template fallback 체인.
-                      "Single Tool Node" 분류 유지 (selection은 critic이 담당, copywriting은 실행만).
-  refinement_node   → Deterministic Node (PR2에서 validation_rules_node에 흡수 후 삭제 예정)
-                      title/desc 길이·가격 0원 보강. LLM 호출 없음.
+  copywriting_node  → Single Tool Node (with deterministic fallback chain)
 
-내부 함수 분리:
-  _run_copywriting_agent()    — ReAct 에이전트 실행 (PR2에서 단일 LLM 호출로 단순화)
-  _extract_listing_payload()  — 에이전트 결과에서 listing dict 추출
-  _normalize_listing()        — 추출 결과를 CanonicalListingSchema 계약에 맞게 정규화
+  PR2에서 ReAct 패턴 제거. critic이 repair_action·rewrite_plan을 결정해
+  보내주면 copywriting은 그걸 실행만 한다 (selection 없음).
+
+  분기는 단일 if문:
+    - state.rewrite_plan.target ∈ {"title", "description", "full"} → 부분/전체 재작성
+    - state.rewrite_plan 없음 (신규 세션 또는 critic이 rewrite 안 보냄) → 신규 generate
+
+  fallback 체인 (단일 호출 실패 시 결정론):
+    1. LLM (ListingService) — 신규 generate 또는 rewrite
+    2. _apply_rewrite_instruction_rule_based — rewrite 지시가 있는데 LLM 다 실패
+    3. _build_template_listing — 최후의 결정론적 템플릿
+
+  refinement_node는 PR2에서 validation_agent.py에 흡수 후 삭제됨.
 """
 from __future__ import annotations
 
@@ -25,11 +28,9 @@ import logging
 
 from app.graph.seller_copilot_state import CanonicalListing, SellerCopilotState
 from app.graph.nodes.helpers import (
-    _build_react_llm,
     _log,
     _record_error,
     _record_node_timing,
-    _record_tool_call,
     _run_async,
     _safe_int,
     _start_timer,
@@ -40,7 +41,7 @@ from app.graph.nodes.helpers import (
 
 
 def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
-    """Agent 3 메인 노드. ReAct → fallback → 정책 기반 최종 결정."""
+    """단일 툴 노드. critic이 정해준 rewrite_plan을 실행하거나 신규 generate."""
     _timer = _start_timer()
     _log(state, "agent3:copywriting:start")
 
@@ -52,28 +53,41 @@ def copywriting_node(state: SellerCopilotState) -> SellerCopilotState:
 
     market_context = state.get("market_context") or {}
     strategy = state.get("strategy") or {}
-    rewrite_instruction = state.get("rewrite_instruction")
     image_paths = state.get("image_paths") or []
 
-    # 1단계: ReAct 에이전트 실행
-    new_listing = _run_copywriting_agent(state, product, market_context, strategy, image_paths, rewrite_instruction)
+    # critic이 정해준 rewrite_plan 우선 — 없으면 legacy rewrite_instruction fallback
+    rewrite_plan = state.get("rewrite_plan") or {}
+    rewrite_instruction = rewrite_plan.get("instruction") or state.get("rewrite_instruction")
+    rewrite_target = rewrite_plan.get("target")  # "title" | "description" | "full" | None
 
-    # 2단계: ReAct 실패 + rewrite 요청이면 fallback 재시도
-    if not new_listing and rewrite_instruction:
-        _log(state, "agent3:react_rewrite_failed → fallback_rewrite")
-        new_listing = _fallback_generate(state, product, market_context, strategy, image_paths, rewrite_instruction)
+    is_rewrite = bool(rewrite_instruction)
+    _log(
+        state,
+        f"agent3:mode={'rewrite' if is_rewrite else 'generate'} "
+        f"target={rewrite_target or 'n/a'} has_instruction={bool(rewrite_instruction)}",
+    )
 
-    # 3단계: 최종 listing 결정 (정책 기반)
+    new_listing = _call_listing_service(
+        state, product, market_context, strategy, image_paths,
+        rewrite_instruction, rewrite_target,
+    )
+
     state["canonical_listing"] = _resolve_final_listing(
         new_listing, state, product, strategy, market_context, image_paths, rewrite_instruction,
     )
-    if new_listing or rewrite_instruction:
+
+    # rewrite 실행 후 정리 — 같은 지시가 다음 사이클에 재실행되지 않게
+    if is_rewrite:
         state["rewrite_instruction"] = None
+        state["rewrite_plan"] = {}
 
     state["checkpoint"] = "B_draft_complete"
     state["status"] = "draft_generated"
     _record_node_timing(state, "copywriting", _timer)
     return state
+
+
+# ── 정책: 최종 listing 결정 ──────────────────────────────────────
 
 
 def _resolve_final_listing(
@@ -91,7 +105,7 @@ def _resolve_final_listing(
     ┌───────────────────────┬────────────────────────┬─────────────────────────────┐
     │ 조건                   │ 결과                    │ 근거                         │
     ├───────────────────────┼────────────────────────┼─────────────────────────────┤
-    │ new_listing 있음       │ normalize 후 사용       │ ReAct/fallback 성공          │
+    │ new_listing 있음       │ normalize 후 사용       │ LLM/fallback 성공            │
     │ rewrite + 기존 있음    │ 기존 유지 + 지시 반영   │ template 신규 생성 금지       │
     │ 기존 listing 없음      │ template 신규 생성      │ 최초 생성만 허용              │
     │ 기존 listing 있음      │ 기존 유지               │ 변경 없음                    │
@@ -99,107 +113,63 @@ def _resolve_final_listing(
     """
     existing = state.get("canonical_listing")
 
-    # 케이스 1: 새 listing 생성/재작성 성공
     if new_listing:
         _log(state, "agent3:policy:new_listing_accepted")
         return _normalize_listing(new_listing, product, strategy, image_paths)
 
-    # 케이스 2: rewrite 전체 실패 → 기존 listing 보존 + 지시사항 append
     if rewrite_instruction and existing:
-        _log(state, f"agent3:policy:rewrite_all_failed → preserving existing + instruction")
+        _log(state, "agent3:policy:rewrite_all_failed → preserving existing + instruction")
         patched = dict(existing)
         patched["description"] = f"{patched.get('description', '')}\n\n[판매자 수정 요청] {rewrite_instruction}".strip()
         return patched
 
-    # 케이스 3: 최초 생성도 실패 → template
     if not existing:
         _log(state, "agent3:policy:no_listing → template")
         return _build_template_listing(product, strategy, market_context, state)
 
-    # 케이스 4: 기존 listing 유지 (변경 없음)
     _log(state, "agent3:policy:existing_listing_preserved")
     return existing
 
 
-# ── 에이전트 실행 ─────────────────────────────────────────────────
+# ── 단일 LLM 호출 (Single Tool) + 결정론적 fallback 체인 ─────────
 
 
-def _run_copywriting_agent(
+def _call_listing_service(
     state: SellerCopilotState,
     product: Dict,
     market_context: Dict,
     strategy: Dict,
     image_paths: List[str],
     rewrite_instruction: Optional[str],
+    rewrite_target: Optional[str],
 ) -> Optional[Dict]:
-    """ReAct 에이전트를 실행하고 listing dict를 반환한다. 실패 시 fallback 체인."""
-    from app.tools.agentic_tools import lc_generate_listing_tool, lc_rewrite_listing_tool
+    """ListingService 단일 호출 (LLM 1회). 실패 시 결정론적 fallback 체인.
 
-    system_prompt, user_prompt = _build_prompts(state, product, market_context, strategy, image_paths, rewrite_instruction)
+    fallback 단계:
+      (1) LLM (ListingService.rewrite_listing 또는 build_canonical_listing)
+      (2) rewrite 지시가 있으면 _apply_rewrite_instruction_rule_based
+      (3) _build_template_listing (최후)
+    """
+    existing = state.get("canonical_listing")
 
-    try:
-        from langchain_core.messages import HumanMessage
-
-        llm = _build_react_llm()
-        if llm is None:
-            raise ValueError("LLM 초기화 실패 — API 키 확인 필요")
-
-        from langchain.agents import create_agent
-        agent = create_agent(
-            llm,
-            [lc_generate_listing_tool, lc_rewrite_listing_tool],
-            system_prompt=system_prompt,
-        )
-
-        _log(state, "agent3:react_agent:invoking LLM with tools=[generate_listing, rewrite_listing]")
-        msgs = [HumanMessage(content=user_prompt)]
-        result = _run_async(lambda: agent.ainvoke({"messages": msgs}))
-
-        # tool call 기록
-        for msg in result.get("messages", []):
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    _log(state, f"agent3:llm_selected_tool:{tc.get('name', '?')}")
-                    _record_tool_call(state, {
-                        "tool_name": tc.get("name", ""),
-                        "input": tc.get("args", {}),
-                        "output": None,
-                        "success": True,
-                    })
-
-        return _extract_listing_payload(result, state)
-
-    except Exception as e:
-        logging.getLogger(__name__).error("agent3 ReAct agent failed", exc_info=True)
-        _record_error(state, "copywriting_node", f"react_agent failed: {e}")
-        _log(state, f"agent3:react_agent:failed error={e} → returning None for node-level fallback")
-        return None
-
-
-def _fallback_generate(
-    state: SellerCopilotState,
-    product: Dict,
-    market_context: Dict,
-    strategy: Dict,
-    image_paths: List[str],
-    rewrite_instruction: Optional[str] = None,
-) -> Optional[Dict]:
-    """ReAct 실패 시 ListingService 직접 호출 → 그것도 실패 시 template."""
+    # ── (1) LLM 호출 ─────────────────────────────────────────────
     try:
         from app.services.listing_service import ListingService
         svc = ListingService()
 
-        # rewrite_instruction + 기존 listing이 있으면 재작성 시도
-        existing = state.get("canonical_listing")
         if rewrite_instruction and existing:
+            # rewrite_target에 따라 instruction에 컨텍스트 보강
+            target_hint = _build_target_hint(rewrite_target)
+            full_instruction = f"{target_hint} {rewrite_instruction}".strip() if target_hint else rewrite_instruction
+
             listing = _run_async(lambda: svc.rewrite_listing(
                 canonical_listing=existing,
-                rewrite_instruction=rewrite_instruction,
+                rewrite_instruction=full_instruction,
                 confirmed_product=product,
                 market_context=market_context,
                 strategy=strategy,
             ))
-            _log(state, "agent3:fallback:rewrite_service_call:success")
+            _log(state, f"agent3:llm:rewrite:success target={rewrite_target or 'full'}")
             return listing
 
         listing = _run_async(lambda: svc.build_canonical_listing(
@@ -208,21 +178,35 @@ def _fallback_generate(
             strategy=strategy,
             image_paths=image_paths,
         ))
-        _log(state, "agent3:fallback:direct_service_call:success")
+        _log(state, "agent3:llm:generate:success")
         return listing
-    except Exception as e2:
-        logging.getLogger(__name__).error("agent3 fallback generate failed", exc_info=True)
-        _record_error(state, "copywriting_node", f"fallback failed: {e2}")
-        # rewrite_instruction이 있는데 template로 빠지면 사용자 요청 소실
-        # → 기존 listing에 규칙 기반 반영 시도
-        existing = state.get("canonical_listing")
-        if rewrite_instruction and existing:
-            _log(state, f"agent3:fallback:failed → rule_based_rewrite instruction={rewrite_instruction[:50]}")
-            return _apply_rewrite_instruction_rule_based(existing, rewrite_instruction, product, strategy)
-        if rewrite_instruction and not existing:
-            _log(state, f"agent3:warning:rewrite_instruction_lost instruction={rewrite_instruction[:50]}")
-        _log(state, f"agent3:fallback:failed error={e2} → template")
-        return _build_template_listing(product, strategy, market_context, state)
+
+    except Exception as e:
+        logging.getLogger(__name__).error("agent3 LLM call failed", exc_info=True)
+        _record_error(state, "copywriting_node", f"llm failed: {e}")
+        _log(state, f"agent3:llm:failed error={e} → rule-based / template fallback")
+
+    # ── (2) rule-based rewrite ──────────────────────────────────
+    if rewrite_instruction and existing:
+        _log(state, f"agent3:fallback:rule_based_rewrite instruction={rewrite_instruction[:50]}")
+        return _apply_rewrite_instruction_rule_based(existing, rewrite_instruction, product, strategy)
+
+    if rewrite_instruction and not existing:
+        _log(state, f"agent3:warning:rewrite_instruction_lost instruction={rewrite_instruction[:50]}")
+
+    # ── (3) template ────────────────────────────────────────────
+    return _build_template_listing(product, strategy, market_context, state)
+
+
+def _build_target_hint(target: Optional[str]) -> str:
+    """rewrite_plan.target에 따라 LLM 지시 앞에 붙일 컨텍스트."""
+    if target == "title":
+        return "[제목만 재작성]"
+    if target == "description":
+        return "[설명만 재작성]"
+    if target == "full":
+        return "[전체 재작성]"
+    return ""
 
 
 # ── 규칙 기반 재작성 (LLM 완전 실패 시 최후 수단) ─────────────────
@@ -240,19 +224,15 @@ def _apply_rewrite_instruction_rule_based(
     patched = dict(existing)
     lower = instruction.lower()
 
-    # 가격 관련 지시: 숫자 추출 시도
-    import re as _re
-    price_match = _re.search(r'(\d[\d,]*)\s*원', instruction)
+    price_match = re.search(r'(\d[\d,]*)\s*원', instruction)
     if price_match and any(kw in lower for kw in ("가격", "원으로", "인하", "인상", "할인")):
         new_price = int(price_match.group(1).replace(",", ""))
         if new_price > 0:
             patched["price"] = new_price
 
-    # 설명 관련 지시
     desc = patched.get("description") or ""
     patched["description"] = f"{desc}\n\n[판매자 수정] {instruction}".strip()
 
-    # 최소 필수 키 보장
     patched.setdefault("title", f"{product.get('model', '상품')} 판매합니다")
     patched.setdefault("price", _safe_int(strategy.get("recommended_price"), 0))
     patched.setdefault("tags", [product.get("model", "상품")])
@@ -263,115 +243,13 @@ def _apply_rewrite_instruction_rule_based(
     return patched
 
 
-# ── 프롬프트 빌드 ────────────────────────────────────────────────
-
-
-def _build_prompts(
-    state: SellerCopilotState,
-    product: Dict,
-    market_context: Dict,
-    strategy: Dict,
-    image_paths: List[str],
-    rewrite_instruction: Optional[str],
-) -> tuple[str, str]:
-    """시스템 프롬프트와 유저 프롬프트를 빌드한다."""
-    existing_listing = state.get("canonical_listing")
-
-    existing_summary = ""
-    if existing_listing:
-        existing_summary = (
-            f"\n현재 판매글:\n"
-            f"- 제목: {existing_listing.get('title', '')}\n"
-            f"- 설명: {(existing_listing.get('description') or '')[:120]}...\n"
-            f"- 가격: {existing_listing.get('price', 0)}원"
-        )
-
-    if rewrite_instruction:
-        task_directive = (
-            f"\n[작업] 사용자 수정 요청: \"{rewrite_instruction}\"\n"
-            f"→ lc_rewrite_listing_tool을 호출해 기존 판매글을 수정하라."
-        )
-    else:
-        task_directive = (
-            "\n[작업] 수정 요청 없음 — 신규 판매글 생성.\n"
-            "→ lc_generate_listing_tool을 호출해 새 판매글을 생성하라."
-        )
-
-    prior_tool_calls = "\n".join([
-        f"- {tc.get('tool_name')}: {str(tc.get('input', {}))[:60]}"
-        for tc in (state.get("tool_calls") or [])[-3:]
-    ])
-
-    system_prompt = (
-        "당신은 중고거래 카피라이팅 전문 에이전트입니다.\n"
-        "주어진 상품 정보와 시장 데이터를 활용해 매력적인 판매글을 작성합니다.\n\n"
-        "규칙:\n"
-        "1. rewrite_instruction이 있으면 반드시 lc_rewrite_listing_tool을 호출한다.\n"
-        "2. rewrite_instruction이 없으면 반드시 lc_generate_listing_tool을 호출한다.\n"
-        "3. 툴 호출 결과(JSON)를 그대로 최종 응답으로 출력한다."
-    )
-
-    from app.domain.goal_strategy import get_copywriting_tone
-
-    goal = state.get("mission_goal", "balanced")
-    tone_instruction = get_copywriting_tone(goal)
-
-    selected_platforms = state.get("selected_platforms") or ["bunjang", "joongna"]
-    user_prompt = (
-        f"상품 정보:\n"
-        f"- 브랜드: {product.get('brand', '')}\n"
-        f"- 모델: {product.get('model', '')}\n"
-        f"- 카테고리: {product.get('category', '')}\n"
-        f"- 추천 가격: {_safe_int(strategy.get('recommended_price'), 0)}원\n"
-        f"- 이미지 경로: {json.dumps(image_paths, ensure_ascii=False)}\n"
-        f"- 플랫폼: {json.dumps(selected_platforms, ensure_ascii=False)}\n"
-        f"- 판매 목표: {goal}\n"
-        f"- 판매 전략 톤: {tone_instruction}\n"
-        f"{existing_summary}"
-        f"{task_directive}\n"
-        + (f"\n이전 툴 호출 기록:\n{prior_tool_calls}" if prior_tool_calls else "")
-    )
-
-    return system_prompt, user_prompt
-
-
-# ── 결과 추출 ─────────────────────────────────────────────────────
-
-
-def _extract_listing_payload(result: Dict, state: SellerCopilotState) -> Optional[Dict]:
-    """에이전트 결과 messages에서 listing dict를 추출한다."""
-    for msg in reversed(result.get("messages", [])):
-        content = getattr(msg, "content", "") or ""
-        if not content:
-            continue
-        try:
-            parsed = json.loads(content) if isinstance(content, str) else content
-            if isinstance(parsed, dict) and "title" in parsed:
-                _log(state, f"agent3:react_agent:listing_extracted title={parsed.get('title', '')[:40]}")
-                return parsed
-        except (json.JSONDecodeError, TypeError, ValueError):
-            pass
-
-    # regex fallback
-    final_content = str(result.get("messages", [{}])[-1].content or "") if result.get("messages") else ""
-    _log(state, f"agent3:react_agent:final_response={final_content[:100]}")
-    m = re.search(r'\{[^{}]*"title"[^{}]*\}', final_content, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-    return None
-
-
 # ── 정규화 ────────────────────────────────────────────────────────
 
 
 def _normalize_listing(
     listing: Dict, product: Dict, strategy: Dict, image_paths: list,
 ) -> Dict:
-    """ReAct/LLM 결과를 CanonicalListingSchema 계약에 맞게 정규화."""
+    """LLM 결과를 CanonicalListingSchema 계약에 맞게 정규화."""
     try:
         from app.domain.schemas import CanonicalListingSchema
         if listing.get("title"):
@@ -387,7 +265,6 @@ def _normalize_listing(
             return schema.model_dump()
     except (ValueError, TypeError, KeyError):
         pass
-    # fallback: 최소 필수 키 보장
     listing.setdefault("title", f"{product.get('model', '상품')} 판매합니다")
     listing.setdefault("description", "AI가 생성한 판매글 초안")
     listing.setdefault("price", _safe_int(strategy.get("recommended_price"), 0))
@@ -398,7 +275,7 @@ def _normalize_listing(
     return listing
 
 
-# ── 템플릿 / refinement ──────────────────────────────────────────
+# ── 템플릿 ─────────────────────────────────────────────────────────
 
 
 def _build_template_listing(
@@ -424,26 +301,10 @@ def _build_template_listing(
     )
 
 
+# refinement_node는 PR2에서 validation_agent.py로 흡수 후 삭제됨.
+# 호환을 위해 import 시점에 ImportError가 나지 않도록 alias만 남겨두고,
+# 호출되면 단순히 state를 그대로 반환 (validation_node가 이미 보강함).
 def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
-    """validation 실패 시 에이전트 4가 자동으로 listing을 수정"""
-    _log(state, "agent4:refinement:start")
-
-    canonical = dict(state.get("canonical_listing") or {})
-    market_context = state.get("market_context") or {}
-    strategy = state.get("strategy") or {}
-
-    description = (canonical.get("description") or "").strip()
-    if len(description) < 20:
-        canonical["description"] = (
-            description + "\n제품 상태는 실사진을 참고해 주세요. 빠른 거래 원합니다."
-        ).strip()
-
-    price = _safe_int(canonical.get("price"), 0)
-    if price <= 0:
-        median = _safe_int(market_context.get("median_price"), 0)
-        recommended = _safe_int(strategy.get("recommended_price"), 0)
-        canonical["price"] = recommended or (int(median * 0.97) if median > 0 else 0)
-
-    state["canonical_listing"] = canonical
-    _log(state, "agent4:refinement:done")
+    """Deprecated: validation_node가 흡수. 호출되면 no-op."""
+    _log(state, "agent3:refinement:deprecated_noop (validation_node가 보강 처리)")
     return state

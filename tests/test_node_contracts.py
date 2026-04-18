@@ -199,8 +199,10 @@ class TestPricingStrategyContract:
 
 class TestCopywritingContract:
     @pytest.mark.integration
-    @patch("app.graph.nodes.copywriting_agent._build_react_llm", return_value=None)
-    def test_fallback_satisfies_contract(self, _mock_llm):
+    def test_fallback_satisfies_contract(self):
+        """PR2: copywriting은 ReAct 제거. ListingService 호출 실패 시 template fallback이
+        contract를 만족하는지 검증."""
+        from unittest.mock import AsyncMock as _AsyncMock
         from app.graph.nodes.copywriting_agent import copywriting_node
 
         state = _make_minimal_state(
@@ -208,7 +210,9 @@ class TestCopywritingContract:
             market_context={"median_price": 500000, "sample_count": 5},
             strategy={"goal": "balanced", "recommended_price": 485000, "negotiation_policy": "small negotiation allowed"},
         )
-        result = copywriting_node(state)
+        with patch("app.services.listing_service.ListingService") as MockSvc:
+            MockSvc.return_value.build_canonical_listing = _AsyncMock(side_effect=Exception("LLM down"))
+            result = copywriting_node(state)
         violations = check_contract("copywriting_node", result)
         assert violations == [], f"Contract violations: {violations}"
 
