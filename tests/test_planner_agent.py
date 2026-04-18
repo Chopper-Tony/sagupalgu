@@ -73,41 +73,25 @@ class TestRuleBasedPlanning:
 
 
 class TestReplanRouting:
+    """PR2 변경: routing은 critic이 정한 repair_action만 본다.
+    replan 결정은 critic 내부(_decide_routing)에서 score·issues·retry로 한다."""
 
     @pytest.mark.unit
-    def test_rewrite_exhausted_triggers_replan(self):
-        state = {
-            "critic_score": 40,
-            "critic_retry_count": 2,
-            "max_critic_retries": 2,
-            "plan_revision_count": 0,
-            "max_replans": 1,
-            "rewrite_instruction": "수정해주세요",
-        }
+    def test_critic이_replan_결정시_planner로(self):
+        state = {"repair_action": "replan", "plan_revision_count": 0}
         assert route_after_critic(state) == "mission_planner_node"
 
     @pytest.mark.unit
-    def test_replan_exhausted_forces_pass(self):
-        state = {
-            "critic_score": 40,
-            "critic_retry_count": 2,
-            "max_critic_retries": 2,
-            "plan_revision_count": 1,
-            "max_replans": 1,
-        }
+    def test_replan_상한_도달시_강제_validation(self):
+        """plan_revision_count >= MAX_PLAN_REVISIONS면 critic이 replan 요청해도 강제 통과."""
+        from app.domain.critic_policy import MAX_PLAN_REVISIONS
+
+        state = {"repair_action": "replan", "plan_revision_count": MAX_PLAN_REVISIONS}
         assert route_after_critic(state) == "validation_node"
 
     @pytest.mark.unit
-    def test_rewrite_before_replan(self):
-        """rewrite 한도가 남아있으면 replan보다 rewrite 우선."""
-        state = {
-            "critic_score": 40,
-            "critic_retry_count": 1,
-            "max_critic_retries": 2,
-            "plan_revision_count": 0,
-            "max_replans": 1,
-            "rewrite_instruction": "수정",
-        }
+    def test_critic이_rewrite_결정시_copywriting으로(self):
+        state = {"repair_action": "rewrite_full"}
         assert route_after_critic(state) == "copywriting_node"
 
 
