@@ -21,7 +21,7 @@ LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
 - **게시**: 크롬 익스텐션 Content Script (CDP 이미지 업로드) + 모바일 복사/직접 올리기
 - **프론트엔드**: React 19 + TypeScript + Vite (7,080줄)
 - **알림**: Discord 웹훅 + Gmail SMTP (구매 문의 이메일 알림)
-- **배포**: Docker Compose + 서울 리전 EC2 (Elastic IP 43.201.188.57) + GitHub Actions CI/CD
+- **배포**: Docker Compose + 서울 리전 EC2 (Elastic IP 43.201.188.57) + GitHub Actions 자동 롤링 재시작 (main push 트리거)
 
 ## 주요 명령어
 
@@ -118,8 +118,11 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 
 ## 완료된 항목 (최근)
 
-- 프로덕션 로그인 UI: Supabase Auth (이메일 + Google OAuth) + AuthContext + 보호 라우트, dev bypass 공존
-- Vision AI fallback 체인: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini fallback
+- **CI 자동 배포 활성화 (2026-04-18)**: GitHub Secrets(EC2_HOST·EC2_USER·EC2_SSH_KEY·VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY) 등록, main push → appleboy/ssh-action 으로 EC2 롤링 재시작 자동화. 이전 "수동 SSH" 배포 경로는 fallback용으로만 유지
+- **프로덕션 로그인 UI (2026-04-18)**: Supabase Auth (이메일 + Google OAuth) + AuthContext + 보호 라우트, dev bypass 공존. `#/login` 라우트, UserMenu (우상단 이메일 + 로그아웃)
+- **Vision AI fallback 체인 (2026-04-18)**: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini fallback. `identify_product()` 가 provider 순회로 자동 복구
+- **익스텐션 팝업 로그인 링크 (2026-04-18, v1.2.0)**: 번개장터·중고나라 row 에 플랫폼 로그인 페이지 바로가기 추가, 연동됨 상태에서는 숨김
+- **publish_worker 컨테이너 제거 (2026-04-18)**: 번장/중나는 익스텐션 전담, 당근은 보류 → 워커에 도달하는 작업 0 건이라 제거. `publish_jobs` 테이블과 코드 파일은 보존 (당근 에뮬레이터 경로 재개 가능성)
 - 서울 리전 이전: Elastic IP 43.201.188.57 (고정, 재시작해도 안 바뀜)
 - AI 상품 챗봇: 마켓 상세 페이지에서 구매자 질문 AI 답변
 - 이메일 알림: 구매 문의 시 Gmail SMTP 알림 추가

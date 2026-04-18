@@ -16,19 +16,19 @@
 ## 아키텍처
 
 ```
-사용자 → (HTTPS) → Caddy(:443)
-                      ├── /api/*     → backend(:8000)
-                      ├── /health*   → backend(:8000)
-                      ├── /uploads/* → backend(:8000)
-                      └── /          → frontend(:80)
+사용자 → (HTTP :80) → Caddy → ├── /api/*     → backend(:8000)
+                              ├── /health*   → backend(:8000)
+                              ├── /uploads/* → backend(:8000)
+                              └── /          → frontend(:80, nginx)
 
 backend (단일):        FastAPI + LangGraph + 크롤링 (RUN_PUBLISH_WORKER=false)
+프론트:                  React 19 + Vite SPA, Supabase Auth 로그인
 게시:                   크롬 익스텐션 Content Script (사용자 브라우저)
 DB/Auth/Storage:        Supabase (외부)
 증적 스크린샷:           S3 보조 (선택)
 ```
 
-**설계 원칙**: AWS는 컴퓨트(EC2)만 사용. DB/Auth/Storage는 Supabase 유지. 번개장터·중고나라 게시는 크롬 익스텐션이 전담 — 서버 Playwright 없음.
+**설계 원칙**: AWS는 컴퓨트(EC2)만 사용. DB/Auth/Storage는 Supabase 유지. 번개장터·중고나라 게시는 크롬 익스텐션이 전담 — 서버 Playwright 없음. IP 기반 운영이라 Caddy `auto_https off` + `:80` 바인딩 (도메인 연결 시 HTTPS 활성화 블록 주석 해제).
 
 ---
 
@@ -104,27 +104,46 @@ curl https://<도메인>/health/ready
 
 ---
 
-## 4. 배포 (CI/CD 자동 또는 수동)
+## 4. 배포 (GitHub Actions 자동 — 기본 경로)
 
-### 자동 배포 (GitHub Actions)
-main branch push 시 자동 실행. `EC2_HOST` GitHub Secret 필요.
+**2026-04-18부터 main push → 자동 롤링 재시작 활성**. 수동 SSH 는 fallback/비상용으로만 사용.
 
-### 수동 배포 (Rolling Restart)
+### 필수 GitHub Secrets
+
+Settings → Secrets and variables → Actions 에 등록:
+
+| Secret | 용도 |
+|---|---|
+| `EC2_HOST` | `43.201.188.57` |
+| `EC2_USER` | `ec2-user` |
+| `EC2_SSH_KEY` | pem 파일 전체 내용 (BEGIN~END 포함) |
+| `VITE_SUPABASE_URL` | Supabase project URL (클라이언트 번들에 인라인) |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (클라이언트 번들에 인라인) |
+| `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`SECRET_ENCRYPTION_KEY` | 백엔드 테스트·type-sync 용 |
+| `OPENAI_API_KEY`·`GEMINI_API_KEY`·`UPSTAGE_API_KEY`·`DISCORD_WEBHOOK_URL` | 통합 테스트·알림용 |
+
+### 자동 배포 플로우 (`.github/workflows/ci.yml`)
+
+1. test · type-sync · frontend-build · docker-build 전부 green
+2. deploy job: appleboy/ssh-action 으로 EC2 SSH
+3. 원격 스크립트 실행:
+   - `docker compose` (v2) / `docker-compose` (v1 legacy) 런타임 감지
+   - `frontend/.env` 를 CI Secret 기반 heredoc 으로 재작성 (fallback: 루트 `.env` 추출)
+   - `VISION_PROVIDER=openai` 잔존 시 `gemini` 로 치환 (idempotent)
+   - backend 이미지 rebuild + `--force-recreate` 로 교체
+   - `/health` 최대 30s 대기
+   - frontend `--no-cache` 빌드 + `--force-recreate`
+   - Caddy `--force-recreate` (Caddyfile 볼륨 마운트 재로드)
+4. Discord 웹훅 배포 완료 알림
+
+### 수동 배포 (fallback)
+
+자동 배포 불가(CI 장애 등) 시에만:
 ```bash
+ssh -i sagupalgu-seoul-key.pem ec2-user@43.201.188.57
 cd ~/sagupalgu && git pull origin main
-
-# 1. 백엔드 먼저
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d backend
-
-# 2. 헬스체크 대기
-for i in $(seq 1 30); do
-  curl -sf http://localhost:8000/health && break
-  sleep 1
-done
-
-# 3. 프론트엔드 + Caddy
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d frontend caddy
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml build backend frontend
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d --force-recreate backend frontend caddy
 ```
 
 ---
@@ -140,9 +159,13 @@ python scripts/smoke_test.py --base-url https://<도메인>
 ```
 
 필수 체크:
+- [ ] GitHub Secrets 8종 등록 (EC2_* + VITE_SUPABASE_* + 백엔드 공통)
 - [ ] `ADMIN_API_KEY` 설정됨
-- [ ] `RUN_PUBLISH_WORKER=false` + `PUBLISH_USE_QUEUE=false`
-- [ ] 크롬 익스텐션 `host_permissions`이 운영 도메인과 일치
+- [ ] EC2 `.env` 에 `RUN_PUBLISH_WORKER=false` + `PUBLISH_USE_QUEUE=false`
+- [ ] Supabase 대시보드 Site URL / Redirect URLs 에 `http://43.201.188.57` 등록
+- [ ] Supabase → Providers → Google 활성 (Client ID/Secret 입력)
+- [ ] Google Cloud Console OAuth Redirect URI 에 `https://<ref>.supabase.co/auth/v1/callback`
+- [ ] 크롬 익스텐션 `host_permissions` 이 운영 도메인과 일치 (현재 `43.201.188.57`)
 - [ ] smoke test 성공
 
 ---
