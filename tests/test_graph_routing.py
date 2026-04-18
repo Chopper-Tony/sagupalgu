@@ -157,3 +157,74 @@ class TestRouteAfterPreListingClarification:
 
         state = {"pre_listing_done": True}
         assert route_after_pre_listing_clarification(state) == "market_intelligence_node"
+
+    def test_정보_충분_skip_허용_pricing으로(self):
+        """PR3: pre_listing 후 skip 허용 조건 충족 시 pricing으로 직진."""
+        from app.graph.routing import route_after_pre_listing_clarification
+
+        state = {
+            "pre_listing_done": True,
+            "market_depth": "skip",
+            "user_product_input": {"price": 500000},
+        }
+        assert route_after_pre_listing_clarification(state) == "pricing_strategy_node"
+
+
+# ── PR3 신규: route_after_planner + _skip_allowed 가드 ───────────────
+
+
+class TestRouteAfterPlannerSkipGuard:
+    """market_depth='skip' 가드 — 4 조건."""
+
+    def test_skip_아니면_market(self):
+        from app.graph.routing import route_after_planner
+
+        assert route_after_planner({"market_depth": "crawl_plus_rag"}) == "market_intelligence_node"
+        assert route_after_planner({"market_depth": "crawl_only"}) == "market_intelligence_node"
+
+    def test_skip_사용자가격_있으면_pricing(self):
+        """조건 1: user_product_input.price."""
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "skip", "user_product_input": {"price": 500000}}
+        assert route_after_planner(state) == "pricing_strategy_node"
+
+    def test_skip_이전_market_context_있으면_pricing(self):
+        """조건 2: replan 케이스 — market_context 잔존."""
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "skip", "market_context": {"sample_count": 5, "median_price": 500000}}
+        assert route_after_planner(state) == "pricing_strategy_node"
+
+    def test_skip_shallow_저위험_카테고리_pricing(self):
+        """조건 3: plan_mode=shallow + LOW_RISK_SKIP_CATEGORIES."""
+        from app.graph.routing import route_after_planner
+
+        state = {
+            "market_depth": "skip",
+            "plan_mode": "shallow",
+            "confirmed_product": {"category": "clothing"},
+        }
+        assert route_after_planner(state) == "pricing_strategy_node"
+
+    def test_skip_미충족_silent_crawl_only_fallback(self):
+        """모든 조건 미충족 → silent crawl_only 강등 + skip_rejected_reason 기록."""
+        from app.graph.routing import route_after_planner
+
+        state = {
+            "market_depth": "skip",
+            "plan_mode": "deep",
+            "confirmed_product": {"category": "electronics"},
+        }
+        result = route_after_planner(state)
+        assert result == "market_intelligence_node"
+        assert state["market_depth"] == "crawl_only"
+        assert state["skip_rejected_reason"]
+        assert any("skip_rejected" in log for log in state.get("debug_logs", []))
+
+    def test_skip_허용시_debug_log_기록(self):
+        from app.graph.routing import route_after_planner
+
+        state = {"market_depth": "skip", "user_product_input": {"price": 100000}}
+        route_after_planner(state)
+        assert any("skip_allowed" in log for log in state.get("debug_logs", []))

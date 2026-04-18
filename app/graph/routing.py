@@ -10,10 +10,17 @@ PR2 변경:
   - critic Routing Agent가 repair_action·failure_mode·rewrite_plan을 결정,
     여기서는 그 결정을 노드 이름으로 매핑만 한다.
   - 임계값 상수는 app/domain/critic_policy.py로 단일 원천화 (중복 제거).
+
+PR3 변경:
+  - planner Strategy Agent가 결정한 market_depth를 보고 시세 단계를 skip할지 결정.
+  - skip은 _skip_allowed() 가드를 통과해야만 실제 적용 (남용 차단).
+  - 미통과 시 silent crawl_only fallback + skip_rejected_reason 기록.
 """
 from __future__ import annotations
 
-from app.domain.critic_policy import MAX_PLAN_REVISIONS
+from typing import Optional, Tuple
+
+from app.domain.critic_policy import LOW_RISK_SKIP_CATEGORIES, MAX_PLAN_REVISIONS
 from app.graph.seller_copilot_state import SellerCopilotState
 
 MAX_VALIDATION_RETRIES = 2
@@ -26,10 +33,14 @@ def route_after_product_identity(state: SellerCopilotState) -> str:
 
 
 def route_after_pre_listing_clarification(state: SellerCopilotState) -> str:
-    """정보 부족이면 END (사용자 답변 대기), 충분하면 market으로."""
+    """정보 부족이면 END (사용자 답변 대기), 충분하면 market_depth 정책에 따라 분기.
+
+    PR3 변경: market_depth='skip' + _skip_allowed() 통과 시 pricing으로 직진.
+    그렇지 않으면 market_intelligence_node. route_after_planner와 동일 로직 위임.
+    """
     if state.get("needs_user_input", False) and not state.get("pre_listing_done", False):
         return "__end__"
-    return "market_intelligence_node"
+    return route_after_planner(state)
 
 
 def route_after_critic(state: SellerCopilotState) -> str:
@@ -71,6 +82,57 @@ def route_after_critic(state: SellerCopilotState) -> str:
 
     # 알 수 없는 repair_action — critic_parse_error 같은 fallback과 동일 안전망
     return "validation_node"
+
+
+def route_after_planner(state: SellerCopilotState) -> str:
+    """planner 후 분기 — market_depth='skip'이면 _skip_allowed() 가드를 통과해야 시세 건너뜀.
+
+    PR3 신규.
+    skip은 다음 조건 중 하나 이상 충족 시만 허용 (남용 방지):
+      1. 사용자가 가격을 명시 입력 (user_product_input.price)
+      2. 이전 market_context가 잔존 (replan 케이스)
+      3. plan_mode='shallow' AND 카테고리가 LOW_RISK_SKIP_CATEGORIES
+
+    미충족 시 silent crawl_only로 강등 + skip_rejected_reason 기록.
+    이는 planner LLM이 근거 없이 skip을 선택해도 안전망이 있다는 보장.
+    """
+    depth = state.get("market_depth", "crawl_plus_rag")
+    if depth != "skip":
+        return "market_intelligence_node"
+
+    allowed, reason = _skip_allowed(state)
+    if not allowed:
+        # silent fallback: skip → crawl_only로 강등
+        state["market_depth"] = "crawl_only"
+        state["skip_rejected_reason"] = reason
+        state.setdefault("debug_logs", []).append(f"routing:skip_rejected reason={reason} → crawl_only")
+        return "market_intelligence_node"
+
+    # skip 허용 — 시세 단계 건너뛰고 pricing으로 직진
+    state.setdefault("debug_logs", []).append("routing:skip_allowed → pricing_strategy_node")
+    return "pricing_strategy_node"
+
+
+def _skip_allowed(state: SellerCopilotState) -> Tuple[bool, Optional[str]]:
+    """market_depth='skip' 허용 여부 + 미허용 사유.
+
+    조건 1: 사용자가 가격을 명시 입력
+    조건 2: 이전 market_context가 잔존 (replan)
+    조건 3: plan_mode='shallow' AND 카테고리가 LOW_RISK_SKIP_CATEGORIES
+    """
+    user_input = state.get("user_product_input") or {}
+    if user_input.get("price"):
+        return True, None
+
+    if state.get("market_context"):
+        return True, None
+
+    plan_mode = state.get("plan_mode", "balanced")
+    category = (state.get("confirmed_product") or {}).get("category", "")
+    if plan_mode == "shallow" and category in LOW_RISK_SKIP_CATEGORIES:
+        return True, None
+
+    return False, "no_user_price_no_prev_context_not_low_risk_shallow"
 
 
 def route_after_validation(state: SellerCopilotState) -> str:

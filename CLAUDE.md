@@ -4,7 +4,7 @@
 
 중고거래(번개장터, 중고나라) 자동 게시 + 자체 마켓 플랫폼.
 이미지 → AI 분석 → 가격 산정 → 카피라이팅 → 게시 → 복구의 파이프라인을
-LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
+LangGraph 결정 그래프로 구현. **4 에이전트 + 2 단일툴 + 5 결정론 노드** (PR1~3 리팩터 결과).
 
 게시는 크롬 익스텐션 Content Script 방식 (서버 Playwright → 계정 정지로 전환).
 자체 마켓(`#/market`, `#/my-listings`)에서 판매 상태 관리 + 문의 응답 + 셀러 코파일럿 제공.
@@ -118,6 +118,7 @@ cd ~/sagupalgu && git pull && docker-compose up --build -d
 
 ## 완료된 항목 (최근)
 
+- **에이전틱성 리팩터 PR1~3 (2026-04-19)**: 명목상 7 에이전트 → 실제 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류. critic을 Routing Agent로 승격(repair_action 7값), planner를 Strategy Agent로 승격(plan_mode/market_depth/critic_policy/clarification_policy 4 정책 결정), copywriting을 단일 툴 노드로 강등, refinement를 validation에 흡수, clarification 통합. routing.py는 단순 dispatch + replan 가드 + skip 가드. PR4(Product Identity 승격)는 별도 트랙. 정책 단일 원천: `app/domain/critic_policy.py`. 839 BE + 65 FE green
 - **CI 자동 배포 활성화 (2026-04-18)**: GitHub Secrets(EC2_HOST·EC2_USER·EC2_SSH_KEY·VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY) 등록, main push → appleboy/ssh-action 으로 EC2 롤링 재시작 자동화. 이전 "수동 SSH" 배포 경로는 fallback용으로만 유지
 - **프로덕션 로그인 UI (2026-04-18)**: Supabase Auth (이메일 + Google OAuth) + AuthContext + 보호 라우트, dev bypass 공존. `#/login` 라우트, UserMenu (우상단 이메일 + 로그아웃)
 - **Vision AI fallback 체인 (2026-04-18)**: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini fallback. `identify_product()` 가 provider 순회로 자동 복구
