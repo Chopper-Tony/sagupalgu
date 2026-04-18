@@ -304,7 +304,14 @@ def _build_template_listing(
 # refinement_node는 PR2에서 validation_agent.py로 흡수 후 삭제됨.
 # 호환을 위해 import 시점에 ImportError가 나지 않도록 alias만 남겨두고,
 # 호출되면 단순히 state를 그대로 반환 (validation_node가 이미 보강함).
+#
+# TODO(PR4-cleanup): seller_copilot_nodes.py shim·외부 import 호환을 다 정리한 뒤
+#   이 deprecated stub과 nodes/__init__.py의 refinement_node export를 함께 제거한다.
+#   PR3은 planner Strategy Agent에 집중하므로 이 정리는 PR4에서 한다.
 def refinement_node(state: SellerCopilotState) -> SellerCopilotState:
-    """Deprecated: validation_node가 흡수. 호출되면 no-op."""
+    """Deprecated (PR2 흡수): validation_node가 보강 담당. 호출되면 no-op.
+
+    제거 시점: PR4 (PR3은 planner 작업 집중, 외부 import 호환 정리는 PR4에서).
+    """
     _log(state, "agent3:refinement:deprecated_noop (validation_node가 보강 처리)")
     return state

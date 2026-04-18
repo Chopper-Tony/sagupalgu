@@ -15,7 +15,53 @@ Single source of truth for the agentic decision graph policy.
 """
 from __future__ import annotations
 
-from typing import Dict, FrozenSet, List
+from typing import Dict, FrozenSet, List, Literal
+
+
+# ── repair_action 타입 (CTO PR2 #1: enum 고정) ────────────────────────
+# critic Routing Agent가 결정하는 다음 액션. routing.py가 이 값으로 dispatch.
+# critic / routing / tests 전반에서 문자열 분산 대신 이 타입을 import해 사용.
+# 추가/변경은 반드시 critic 프롬프트·routing dispatch·테스트를 함께 수정.
+RepairAction = Literal[
+    "pass",
+    "rewrite_title",
+    "rewrite_description",
+    "rewrite_full",
+    "reprice",
+    "clarify",
+    "replan",
+]
+
+
+# ── failure_mode taxonomy (CTO PR2 #2) ────────────────────────────────
+# state.failure_mode에 기록되는 사유. 운영/디버깅 추적용.
+# 자유 문자열로 두면 grep·관제·알람 어려워지므로 사전 정의 + 분류 주석.
+#
+# 분류:
+#   1. system failure_mode    — 인프라/파싱/한도 같은 시스템 안전망 발동.
+#                               운영 알람 후보 (반복되면 LLM·정책 점검 신호).
+#   2. critic decision        — critic이 의도적으로 분류한 listing 약점.
+#                               정상 동작 신호 (rewrite/clarify 트리거).
+SystemFailureMode = Literal[
+    "critic_parse_error",          # critic LLM 응답 JSON 파싱 실패 → safety net via validation_rules
+    "replan_limit_reached",        # MAX_PLAN_REVISIONS 도달 → 강제 통과
+    "max_critic_retries_reached",  # MAX_CRITIC_RETRIES 도달 → 강제 통과
+    "missing_listing",             # canonical_listing 자체가 없음 → safety net
+]
+CriticDecisionFailureMode = Literal[
+    "title_weak",
+    "description_weak",
+    "price_off",
+    "info_missing",
+    "untrusted_seller",
+    "general_quality",
+]
+FailureMode = Literal[
+    # system
+    "critic_parse_error", "replan_limit_reached", "max_critic_retries_reached", "missing_listing",
+    # critic decision
+    "title_weak", "description_weak", "price_off", "info_missing", "untrusted_seller", "general_quality",
+]
 
 
 # ── critic 프롬프트 가이드라인 ────────────────────────────────────────

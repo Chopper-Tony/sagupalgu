@@ -28,11 +28,11 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, get_args
 
 import logging
 
-from app.domain.critic_policy import CRITIC_PASS_THRESHOLD
+from app.domain.critic_policy import CRITIC_PASS_THRESHOLD, RepairAction
 from app.graph.seller_copilot_state import SellerCopilotState
 from app.graph.nodes.helpers import (
     _build_react_llm,
@@ -45,15 +45,8 @@ from app.graph.nodes.helpers import (
 )
 
 
-_VALID_REPAIR_ACTIONS = {
-    "pass",
-    "rewrite_title",
-    "rewrite_description",
-    "rewrite_full",
-    "reprice",
-    "clarify",
-    "replan",
-}
+# RepairAction Literal에서 자동 도출 — 새 액션 추가 시 동기화 자동 보장
+_VALID_REPAIR_ACTIONS = frozenset(get_args(RepairAction))
 
 _REWRITE_TARGETS = {"title", "description", "full"}
 
