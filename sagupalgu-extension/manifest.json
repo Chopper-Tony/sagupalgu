@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "사구팔구 플랫폼 연동",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "번개장터/중고나라 계정을 사구팔구 서비스에 연결하고, 중고나라 자동 게시를 지원합니다.",
   "permissions": ["cookies", "activeTab", "scripting", "debugger"],
   "host_permissions": [
