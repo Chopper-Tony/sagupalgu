@@ -141,4 +141,6 @@ def _finalize(state: SellerCopilotState, canonical: Dict, issues: List[Validatio
     state["checkpoint"] = "B_complete" if passed else "B_validation_failed"
 
 
-# PR4-cleanup: validation_node alias 제거. def 자체가 validation_rules_node로 rename됨.
+# PR4-cleanup REMOVED:
+#   - validation_node (alias) → use validation_rules_node
+# alias 다시 추가 금지 (architecture.md "노드 이름 일관성 원칙" 참조).

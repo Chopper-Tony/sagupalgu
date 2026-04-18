@@ -95,6 +95,25 @@ market_depth='skip'은 아래 조건 중 1개 이상 충족 시만 실제 적용
 - **System** (안전망 발동, 운영 알람 후보): `critic_parse_error`, `replan_limit_reached`, `max_critic_retries_reached`, `missing_listing`
 - **Critic Decision** (정상 동작): `title_weak`, `description_weak`, `price_off`, `info_missing`, `untrusted_seller`, `general_quality`
 
+## 노드 이름 일관성 원칙 (PR4-cleanup)
+
+리팩터 시리즈에서 alias/deprecated stub를 모두 제거한 뒤 정착된 단일 이름 체계.
+이 원칙이 흔들리면 라우팅이 KeyError로 깨지거나, 분류와 export가 어긋나 디버깅이 어려워진다.
+
+1. **`routing.py` 반환 문자열은 graph builder의 `add_node` 정식 이름과 1:1 매칭**한다.
+   legacy 이름은 더 이상 허용하지 않는다. 단 한 가지 예외 — `route_after_product_identity`
+   가 `pre_listing_clarification_node`를 반환하는 경로는 graph builder dict가 통합
+   `clarification_node`로 매핑한다 (last legacy seam).
+   - **TODO(post-PR5)**: 이 마지막 seam도 제거해 routing이 직접 `clarification_node`를 반환하게.
+2. **`nodes/__init__.py` `__all__` 분류**는 본 문서의 분류표와 동일하게 유지한다
+   (Strategy / Tool / Routing / Single Tool / Deterministic / Side-effect).
+   새 노드 추가 시 본 문서·`__all__`·`CLAUDE.md` 세 곳을 같은 PR에서 갱신.
+3. **Deprecated alias 부활 금지**: PR1 알리아스(`product_identity_node` 등)와
+   deprecated stub(`refinement_node`, `pre_listing_clarification_node`,
+   `product_agent.clarification_node`)은 PR4-cleanup에서 제거됨. 호환성 위해
+   `# REMOVED: use <new_name>` 주석은 각 모듈 끝에 남아있다 — 이것이 실수로
+   다시 alias로 변환되지 않게.
+
 > 그래프 책임: 판매글 패키지 생성까지.
 > 게시·복구·판매후최적화는 SessionService가 노드 함수 직접 호출.
 

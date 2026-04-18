@@ -64,6 +64,11 @@ def build_seller_copilot_graph():
     # product_gate → (needs_user_input: clarification(product 모드) / 충분: clarification(pre_listing 모드))
     # 통합 clarification_node가 state로 모드 자동 분기. routing.py 반환값을
     # "pre_listing_clarification_node" (legacy)에서 "clarification_node"로 매핑.
+    #
+    # TODO(post-PR5) — last legacy seam:
+    #   routing.py:route_after_product_identity가 직접 "clarification_node"를 반환하게
+    #   바꾸고, 이 dict의 "pre_listing_clarification_node" 항목 제거.
+    #   architecture.md "노드 이름 일관성 원칙" 참조.
     graph.add_conditional_edges(
         "product_gate_node",
         route_after_product_identity,

@@ -85,7 +85,11 @@ def product_gate_node(state: SellerCopilotState) -> SellerCopilotState:
     return state
 
 
-# PR4-cleanup: deprecated clarification_node wrapper 제거.
-#   호출은 app.graph.nodes.clarification_node:clarification_node로 직접.
-# PR4-cleanup: product_identity_node alias 제거.
-#   def 자체가 product_gate_node로 rename됨.
+# ─────────────────────────────────────────────────────────────────────
+# PR4-cleanup REMOVED (호출 시 ImportError 발생 — 의도된 동작):
+#   - product_identity_node (alias) → use product_gate_node
+#   - clarification_node (deprecated wrapper) →
+#       use app.graph.nodes.clarification_node.clarification_node
+# 이유: 알리아스/wrapper가 영구 호환 layer로 굳지 않게 PR4-cleanup에서 완전 제거.
+# 다시 alias를 추가하지 말 것 (architecture.md "노드 이름 일관성 원칙" 참조).
+# ─────────────────────────────────────────────────────────────────────

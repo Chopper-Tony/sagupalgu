@@ -65,4 +65,6 @@ def post_sale_policy_node(state: SellerCopilotState) -> SellerCopilotState:
     return state
 
 
-# PR4-cleanup: post_sale_optimization_node alias 제거. def 자체가 post_sale_policy_node로 rename됨.
+# PR4-cleanup REMOVED:
+#   - post_sale_optimization_node (alias) → use post_sale_policy_node
+# alias 다시 추가 금지 (architecture.md "노드 이름 일관성 원칙" 참조).

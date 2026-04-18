@@ -179,4 +179,6 @@ def pricing_rule_node(state: SellerCopilotState) -> SellerCopilotState:
     return state
 
 
-# PR4-cleanup: pricing_strategy_node alias 제거. def 자체가 pricing_rule_node로 rename됨.
+# PR4-cleanup REMOVED:
+#   - pricing_strategy_node (alias) → use pricing_rule_node
+# alias 다시 추가 금지 (architecture.md "노드 이름 일관성 원칙" 참조).

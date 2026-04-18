@@ -301,5 +301,7 @@ def _build_template_listing(
     )
 
 
-# PR4-cleanup: refinement_node deprecated wrapper 제거.
-#   validation_rules_node가 보강을 흡수했으니 더 이상 별도 호출 경로 불필요.
+# PR4-cleanup REMOVED:
+#   - refinement_node (deprecated no-op wrapper) → use validation_rules_node
+#     (보강 로직이 PR2에서 validation에 흡수됨)
+# alias/wrapper 다시 추가 금지 (architecture.md "노드 이름 일관성 원칙" 참조).
