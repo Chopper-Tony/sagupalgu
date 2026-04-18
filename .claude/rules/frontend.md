@@ -60,7 +60,7 @@ paths:
 - 모바일 = 사이드바 숨김 + `+` 버튼으로 세션 자동 생성 + 업로드
 - 모바일 placeholder: 짧은 버전 (`PLACEHOLDER_MOBILE[mode]`)
 - **게시 분기**:
-  - 데스크톱: 크롬 익스텐션 자동 게시 (`postMessage` → Content Script)
+  - 데스크톱: 크롬 익스텐션 자동 게시 (`postMessage` → Content Script). `PublishResultCard` 가 `useAuth().session.access_token` 을 postMessage payload 에 포함 → 익스텐션이 백엔드 `/publish-data` 인증 호출 가능 (#251)
   - 모바일: 판매글 전체 복사 버튼 + 플랫폼 `products/new` 직접 올리기 링크 (`PLATFORM_WRITE`)
 
 ## 테마
@@ -69,8 +69,8 @@ paths:
 - 하드코딩 색상 금지 — 모두 CSS 변수로 추상화
 
 ## 테스트
-- vitest 60개 (hooks, lib, 타입 계약)
-- 주요 대상: `useWishlist`, `useRecentlyViewed`, `hashRouting`, `sessionStatusUiMap`, `market-types`, `session-types`, `api-methods`
+- vitest 67개 (hooks, lib, 컴포넌트, 타입 계약)
+- 주요 대상: `useWishlist`, `useRecentlyViewed`, `hashRouting`, `sessionStatusUiMap`, `market-types`, `session-types`, `api-methods`, `PublishResultCard` (postMessage JWT)
 - FE/BE 타입 동기화: `scripts/generate_api_types.py --check` CI 필수
 
 ## 배포
