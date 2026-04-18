@@ -38,7 +38,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "FETCH_AND_PUBLISH") {
-    handleFetchAndPublish(msg.sessionId, msg.platform, msg.serverUrl)
+    handleFetchAndPublish(msg.sessionId, msg.platform, msg.serverUrl, msg.accessToken)
       .then((result) => sendResponse({ success: true, data: result }))
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
@@ -217,12 +217,20 @@ async function handleBunjangPublish(publishData, sessionId, serverUrl) {
 /**
  * 웹앱 자동 게시 버튼용: 서버에서 데이터 fetch → 플랫폼별 게시 실행.
  * publish_bridge.js에서 호출됨.
+ *
+ * accessToken (#251): prod 로그인 사용자 Supabase JWT.
+ * 토큰 없으면 백엔드가 dev-user 로 처리 → 세션 소유자 mismatch → 404.
  */
-async function handleFetchAndPublish(sessionId, platform, serverUrl) {
+async function handleFetchAndPublish(sessionId, platform, serverUrl, accessToken) {
   const url = serverUrl || DEFAULT_SERVER_URL;
 
-  // 서버에서 게시 데이터 가져오기
-  const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`);
+  // 서버에서 게시 데이터 가져오기 (인증 필요)
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+
+  const resp = await fetch(`${url}/api/v1/sessions/${sessionId}/publish-data`, { headers });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
     throw new Error(body.detail || `서버 에러: ${resp.status}`);

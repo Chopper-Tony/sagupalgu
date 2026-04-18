@@ -18,19 +18,21 @@
     const msg = event.data;
     if (!msg || msg.type !== "SAGUPALGU_PUBLISH") return;
 
-    const { sessionId, platform, serverUrl } = msg;
+    const { sessionId, platform, serverUrl, accessToken } = msg;
     if (!sessionId || !platform) return;
 
-    console.log(`[사구팔구 Bridge] 게시 요청 수신: platform=${platform}, sessionId=${sessionId}`);
+    console.log(`[사구팔구 Bridge] 게시 요청 수신: platform=${platform}, sessionId=${sessionId}, hasToken=${!!accessToken}`);
 
     // background.js에 FETCH_AND_PUBLISH 메시지 전달
     // background가 서버에서 데이터를 가져와 게시까지 처리
+    // accessToken (#251): prod Supabase JWT — 인증 필요 엔드포인트 호출용
     chrome.runtime.sendMessage(
       {
         type: "FETCH_AND_PUBLISH",
         sessionId,
         platform,
         serverUrl: serverUrl || window.location.origin,
+        accessToken: accessToken || null,
       },
       (response) => {
         window.postMessage({

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { PlatformResult, CanonicalListing } from "../../types";
 import { platformLabel } from "../../lib/sessionStatusUiMap";
+import { useAuth } from "../../contexts/AuthContext";
 import "./PublishResultCard.css";
 
 interface PublishResultCardProps {
@@ -30,6 +31,7 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
   const extensionResults = results.filter((r) => isExtensionRequired(r));
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const { session: authSession } = useAuth();
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768);
@@ -60,11 +62,14 @@ export function PublishResultCard({ results, sessionId, listing, onUpdateSaleSta
   }
 
   const handleAutoPublish = (platform: string) => {
+    // #251: prod 로그인 사용자의 JWT 를 익스텐션 → 백엔드 fetch 로 전달.
+    // 토큰 없으면 백엔드가 dev-user 로 처리해 세션 소유자 mismatch → 404.
     window.postMessage({
       type: "SAGUPALGU_PUBLISH",
       sessionId,
       platform,
       serverUrl: window.location.origin,
+      accessToken: authSession?.access_token ?? null,
     }, "*");
   };
 
