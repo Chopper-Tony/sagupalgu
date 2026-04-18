@@ -182,8 +182,9 @@ jobs:
             $COMPOSE build --no-cache frontend
             $COMPOSE up --no-deps -d --force-recreate frontend
 
-            # 5) Caddy 설정 반영
-            $COMPOSE up --no-deps -d caddy
+            # 5) Caddy 설정 반영 — Caddyfile 은 볼륨 마운트라 이미지 변경이 없어도
+            #    --force-recreate 로 컨테이너 재생성해야 config 재로드됨
+            $COMPOSE up --no-deps -d --force-recreate caddy
 
             echo "Deploy complete: $(date)"
 
