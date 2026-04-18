@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { UserMenu } from "./components/UserMenu";
 import { AppShell } from "./components/layout/AppShell";
 import { SessionSidebar } from "./components/layout/SessionSidebar";
 import { ChatWindow } from "./components/chat/ChatWindow";
@@ -7,7 +8,9 @@ import { ChatComposer } from "./components/chat/ChatComposer";
 import { MarketPage } from "./pages/MarketPage";
 import { MarketDetailPage } from "./pages/MarketDetailPage";
 import { MyListingsPage } from "./pages/MyListingsPage";
+import { LoginPage } from "./pages/LoginPage";
 import { useSession } from "./hooks/useSession";
+import { useAuth } from "./contexts/AuthContext";
 import { createActionHandler } from "./hooks/useSessionActions";
 import { api } from "./lib/api";
 import { getStatusUiConfig, statusLabel } from "./lib/sessionStatusUiMap";
@@ -26,15 +29,21 @@ const nextId = () => String(++_idCounter);
 // friendlyError, handleSendText, handleAction은 useSessionActions 훅으로 분리
 
 export default function App() {
-  // 해시 라우팅: #/market → 마켓 목록, #/market/{id} → 마켓 상세
-  const [page, setPage] = useState<"chat" | "market" | "market-detail" | "my-listings">("chat");
+  // 해시 라우팅: #/market, #/market/{id}, #/my-listings, #/login
+  const [page, setPage] = useState<
+    "chat" | "market" | "market-detail" | "my-listings" | "login"
+  >("chat");
   const [marketDetailId, setMarketDetailId] = useState<string | null>(null);
+  const { user, loading: authLoading, configured: authConfigured } = useAuth();
 
   useEffect(() => {
     const parseHash = () => {
       const hash = window.location.hash;
       const detailMatch = hash.match(/^#\/market\/(.+)$/);
-      if (detailMatch) {
+      if (hash === "#/login") {
+        setPage("login");
+        setMarketDetailId(null);
+      } else if (detailMatch) {
         setPage("market-detail");
         setMarketDetailId(detailMatch[1]);
       } else if (hash === "#/market") {
@@ -52,6 +61,13 @@ export default function App() {
     window.addEventListener("hashchange", parseHash);
     return () => window.removeEventListener("hashchange", parseHash);
   }, []);
+
+  // 로그인 후 #/login 이면 기본 화면으로 복귀
+  useEffect(() => {
+    if (user && page === "login") {
+      window.location.hash = "#/";
+    }
+  }, [user, page]);
 
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -149,10 +165,25 @@ export default function App() {
   });
   const { handleSendText, handleAction } = actions;
 
+  // 인증 게이트 — prod + Supabase 설정 환경에서만 적용
+  // (dev 환경은 X-Dev-User-Id bypass로 기존 플로우 유지)
+  const requireAuth = authConfigured && !import.meta.env.DEV;
+  const needsAuth = page === "chat" || page === "my-listings";
+
+  if (page === "login") {
+    return <><ThemeToggle /><LoginPage /></>;
+  }
+  if (requireAuth && authLoading && needsAuth) {
+    return <div className="auth-gate-loading">인증 확인 중…</div>;
+  }
+  if (requireAuth && !user && needsAuth) {
+    return <><ThemeToggle /><LoginPage /></>;
+  }
+
   // 마켓/대시보드 페이지는 별도 렌더링
-  if (page === "market") return <><ThemeToggle /><MarketPage /></>;
-  if (page === "market-detail" && marketDetailId) return <><ThemeToggle /><MarketDetailPage sessionId={marketDetailId} /></>;
-  if (page === "my-listings") return <><ThemeToggle /><MyListingsPage /></>;
+  if (page === "market") return <><ThemeToggle /><UserMenu /><MarketPage /></>;
+  if (page === "market-detail" && marketDetailId) return <><ThemeToggle /><UserMenu /><MarketDetailPage sessionId={marketDetailId} /></>;
+  if (page === "my-listings") return <><ThemeToggle /><UserMenu /><MyListingsPage /></>;
 
   const sidebarSessions = sessions.map((s) => ({
     id: s.id,
@@ -161,7 +192,7 @@ export default function App() {
   }));
 
   return (
-    <><ThemeToggle />
+    <><ThemeToggle /><UserMenu />
     <AppShell
       sidebar={
         <SessionSidebar

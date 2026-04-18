@@ -8,7 +8,11 @@ paths:
 ## 구조
 - `src/types/` — `session.ts`, `ui.ts`, `market.ts` (SaleStatus, MarketItem, InquiryItem, MyListingItem)
 - `src/lib/sessionStatusUiMap.ts` — 13개 상태 → CardType·ComposerMode·polling SSOT
-- `src/lib/api.ts` — axios 클라이언트, baseURL `/api/v1`, timeout 120초, dev 환경 `X-Dev-User-Id` 자동 주입
+- `src/lib/api.ts` — axios 클라이언트, baseURL `/api/v1`, timeout 120초. prod: Supabase JWT `Authorization: Bearer` 주입 + 401 → `#/login` 리다이렉트. dev: `X-Dev-User-Id` bypass 유지
+- `src/lib/supabase.ts` — Supabase 클라이언트 싱글턴 (`VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY` 필요)
+- `src/contexts/AuthContext.tsx` — user·session 상태 + signInWithPassword·signUpWithPassword·signInWithGoogle·signOut. `onAuthStateChange` 구독
+- `src/pages/LoginPage.tsx` — 이메일/비밀번호 + Google OAuth 로그인 UI
+- `src/components/UserMenu.tsx` — 로그인 사용자 표시 + 로그아웃 버튼 (Supabase 설정 환경에서만 노출)
 - `src/hooks/useSession.ts` — SSE 실시간 + 스마트 폴링 fallback
 - `src/hooks/useSessionActions.ts` — **모든 세션 액션 단일 집중 (CTO P1)**
 - `src/hooks/useWishlist.ts`, `useRecentlyViewed.ts` — localStorage 기반
@@ -18,10 +22,16 @@ paths:
 - `src/pages/` — MarketPage, MarketDetailPage, MyListingsPage
 
 ## 해시 라우팅
-- `#/` — 셀러 코파일럿 (채팅 UI)
-- `#/market` — 마켓 목록
-- `#/market/{id}` — 마켓 상세 (AI 상품 챗봇 포함)
-- `#/my-listings` — 판매자 대시보드 (문의 관리, 재등록, 코파일럿)
+- `#/` — 셀러 코파일럿 (채팅 UI, 인증 필요)
+- `#/login` — 로그인 페이지 (이메일 + Google OAuth)
+- `#/market` — 마켓 목록 (공개)
+- `#/market/{id}` — 마켓 상세 (공개, AI 상품 챗봇 포함)
+- `#/my-listings` — 판매자 대시보드 (인증 필요)
+
+## 인증 게이트
+- prod + Supabase 설정 환경: `#/` 과 `#/my-listings` 진입 전 로그인 필수. 미로그인 시 LoginPage 리다이렉트
+- dev 환경: `X-Dev-User-Id` bypass로 인증 게이트 건너뜀 (기존 개발 플로우 유지)
+- 401 응답: api interceptor가 `#/login` 으로 자동 이동
 
 ## 카드 렌더링
 - 상태 변화 시 useEffect가 자동으로 카드 push (수동 pushItem 중복 금지)
