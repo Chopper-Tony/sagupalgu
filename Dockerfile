@@ -16,6 +16,7 @@ RUN playwright install chromium --with-deps
 
 # 소스 복사
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 COPY legacy_spikes/ ./legacy_spikes/
 COPY migrations/ ./migrations/
 
