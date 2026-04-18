@@ -1,14 +1,24 @@
 """
-Agent 6 — Listing Critic 에이전트
+Agent 6 — Listing Critic (PR2에서 Routing Agent로 승격 예정)
 
-판매글 품질을 구매자 관점에서 평가하고,
-rewrite가 필요하면 구체적 수정 지시를 생성한다.
+분류 (Target Architecture, 4+2+5):
+  listing_critic_node → Routing Agent (PR2 승격 후)
+                        현재는 score만 산출하고 routing.py 외부 if문이 분기 결정.
+                        PR2에서 LLM이 repair_action·failure_mode·rewrite_plan 을 직접 결정,
+                        routing.py는 단순 dispatch로 축소.
 
-출력:
+출력 (PR1 시점):
   critic_score: 0~100
   critic_feedback: [{type, impact, reason}]
   critic_rewrite_instructions: [str]
-  → routing: "pass" | "rewrite" | "recover"
+  → routing.py 외부 if문이 score 임계값으로 분기 ("pass" | "rewrite" | "replan")
+
+출력 (PR2 이후 예정):
+  critic_score: 관측용으로만 유지 (UI·workflow_meta 호환성)
+  repair_action: "pass" | "rewrite_title" | "rewrite_description" | "rewrite_full" | "reprice" | "clarify" | "replan"
+  failure_mode: "title_weak" | "price_off" | "info_missing" | "critic_parse_error" | ...
+  rewrite_plan: {target, instruction}
+  → routing.py 단순 dispatch (state["repair_action"]만 본다)
 """
 from __future__ import annotations
 

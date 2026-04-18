@@ -1,8 +1,11 @@
 """
 Agent 4 (검증) — 판매글 품질 검사
 
-노드:
-  validation_node  — listing 필수 필드·가격·길이 검사
+분류 (Target Architecture, 4+2+5):
+  validation_node  → Deterministic Node (PR1 알리아스: validation_rules_node)
+                     listing 필수 필드·가격·길이 검사. LLM 호출 없음.
+                     PR2에서 copywriting_agent.refinement_node의 보강 로직 흡수 예정
+                     (자동 보강 가능 → 보강 후 재검증, 불가능 → critic 힌트).
 """
 from __future__ import annotations
 
@@ -52,3 +55,8 @@ def validation_node(state: SellerCopilotState) -> SellerCopilotState:
 
     _log(state, f"agent4:validation:passed={passed} issues={len(issues)} retry={state.get('validation_retry_count')}")
     return state
+
+
+# ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
+# 동작 변화 0. PR2에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
+validation_rules_node = validation_node

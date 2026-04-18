@@ -174,11 +174,24 @@ class SellerCopilotState(TypedDict, total=False):
     pre_listing_done: bool                          # 질문 완료 여부
 
     # ── Critic / Rewrite 루프 ────────────────────────────────────────
-    critic_score: int                           # 0~100
+    critic_score: int                           # 0~100 (PR2 이후: 관측용. 라우팅은 repair_action이 담당)
     critic_feedback: List[Dict[str, Any]]       # [{type, impact, reason}]
     critic_rewrite_instructions: List[str]      # critic이 발행한 수정 지시
     critic_retry_count: int                     # rewrite 재시도 횟수
     max_critic_retries: int                     # rewrite 최대 횟수 (기본 2)
+
+    # ── PR1 신규: Routing Agent / Strategy Agent 결정 출력 ──────────
+    # PR2: critic이 repair_action·failure_mode·rewrite_plan 을 산출
+    # PR3: planner가 plan_mode·market_depth·critic_policy·clarification_policy 를 산출
+    # PR1에서는 필드 자리만 잡아둔다 (어디서도 아직 채우지 않음)
+    repair_action: str                          # "pass" | "rewrite_title" | "rewrite_description" | "rewrite_full" | "reprice" | "clarify" | "replan"
+    failure_mode: Optional[str]                 # critic 내부 분류 (예: "title_weak", "critic_parse_error", "replan_limit_reached")
+    rewrite_plan: Dict[str, Any]                # {target: "title|description|full", instruction: str}
+    plan_mode: str                              # "shallow" | "balanced" | "deep"
+    market_depth: str                           # "skip" | "crawl_only" | "crawl_plus_rag"
+    critic_policy: str                          # "minimal" | "normal" | "strict" — critic 프롬프트 엄격도
+    clarification_policy: str                   # "ask_early" | "ask_late"
+    skip_rejected_reason: Optional[str]         # market_depth=skip 가드 미충족 시 사유 (PR3)
 
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
@@ -257,4 +270,13 @@ def create_initial_state(
         error_history=[],
         last_error=None,
         debug_logs=[],
+        # PR1 신규 필드 기본값 (PR2·3에서 채워질 때까지 baseline)
+        repair_action="",
+        failure_mode=None,
+        rewrite_plan={},
+        plan_mode="balanced",
+        market_depth="crawl_plus_rag",
+        critic_policy="normal",
+        clarification_policy="ask_early",
+        skip_rejected_reason=None,
     )
