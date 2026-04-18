@@ -59,4 +59,5 @@ def validation_node(state: SellerCopilotState) -> SellerCopilotState:
 
 # ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────
 # 동작 변화 0. PR2에서 신 이름이 routing.py·graph builder에서 사용되기 시작.
+# TODO(PR3-cleanup): graph builder가 신 이름으로 완전 전환되면 이 알리아스 제거.
 validation_rules_node = validation_node
