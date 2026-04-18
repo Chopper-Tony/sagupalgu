@@ -14,7 +14,7 @@ LangGraph Agentic Workflow로 구현. 7 에이전트 / 10 툴 / 3 Agentic Loop.
 
 - **백엔드**: FastAPI + Pydantic v2 (12,400줄)
 - **워크플로우**: LangGraph (`app/graph/`), `langchain.agents.create_agent` + bind_tools
-- **Vision AI**: OpenAI gpt-4.1-mini (기본) / Gemini 2.5 Flash
+- **Vision AI**: Gemini 2.5 Flash (기본) → OpenAI gpt-4.1-mini (fallback)
 - **Listing LLM**: OpenAI gpt-4.1-mini → Gemini → Solar (fallback 체인)
 - **DB**: Supabase (PostgreSQL + pgvector, 385건 시세 데이터)
 - **이미지**: Supabase Storage (Public 버킷 `product-images`)

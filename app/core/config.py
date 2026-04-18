@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # ------------------------------
 
     vision_provider: Literal["openai", "gemini"] = Field(
-        default="openai",
+        default="gemini",
         alias="VISION_PROVIDER",
     )
 
