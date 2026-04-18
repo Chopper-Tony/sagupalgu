@@ -33,29 +33,8 @@ services:
 
   backend:
     environment:
-      - RUN_PUBLISH_WORKER=false  # API 전용 — 워커 미시작
-
-  worker:
-    build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
-    environment:
-      - RUN_PUBLISH_WORKER=true
-      - PUBLISH_USE_QUEUE=true
-      - MAX_CONCURRENT_BROWSERS=1  # 초기 안전값 (t3.small 2GB 기준)
-    env_file:
-      - .env
-    volumes:
-      - ./sessions:/app/sessions
-      - ./screenshots:/app/screenshots
-      - ./uploads:/app/uploads
-    depends_on:
-      backend:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 1536M  # Playwright 브라우저 + 앱 (OOM 방지)
-    restart: unless-stopped
+      - RUN_PUBLISH_WORKER=false  # 워커 컨테이너 제거 — 백엔드 내부 워커도 미시작
+      - PUBLISH_USE_QUEUE=false   # 큐 경로 비활성 — 번장/중나는 익스텐션 직접 게시
 
   frontend:
     ports: !reset []

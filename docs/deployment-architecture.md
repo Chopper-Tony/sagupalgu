@@ -60,31 +60,21 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - `legacy_spikes/`를 이미지에 포함 (게시 어댑터에서 재사용)
 - `sessions`, `screenshots`, `uploads` 디렉터리는 호스트 볼륨으로 마운트되어 영속
 
-### 2개 서비스로 분리 (M125)
+### 단일 backend 서비스 (publish_worker 컨테이너 제거)
 
-`docker-compose.prod.yml`에서 동일 이미지를 두 번 띄운다:
+번개장터·중고나라 게시는 크롬 익스텐션 Content Script 방식으로 전환됐고 당근마켓은 Android 에뮬레이터 경로로 이관 예정이라, 서버 Playwright 큐를 돌리는 `worker` 컨테이너는 실제 처리 작업이 0건이었다. 운영 단순화를 위해 제거.
 
 ```yaml
 backend:
   environment:
-    - RUN_PUBLISH_WORKER=false  # API 전용 — 워커 미시작
-
-worker:
-  build: .
-  command: uvicorn app.main:app --host 0.0.0.0 --port 8001
-  environment:
-    - RUN_PUBLISH_WORKER=true
-    - PUBLISH_USE_QUEUE=true
-    - MAX_CONCURRENT_BROWSERS=1   # t3.medium 4GB 기준 안전값 (워커 컨테이너 한정)
-  deploy:
-    resources:
-      limits:
-        memory: 1536M             # Playwright OOM 방지
+    - RUN_PUBLISH_WORKER=false  # 백엔드 내부 워커 루프 미시작
+    - PUBLISH_USE_QUEUE=false   # 큐 경로 비활성 — 익스텐션 직접 게시
 ```
 
-**역할 분리**
-- `backend` 컨테이너: REST API + SSE 응답 전담
-- `worker` 컨테이너: `publish_jobs` 테이블 폴링 → per-account lock 확보 → Playwright 게시 실행
+**게시 경로**
+- 번개장터·중고나라: 크롬 익스텐션 Content Script가 사용자 브라우저에서 직접 등록
+- 당근마켓: 보류 (추후 Appium/ADB 기반 모바일 자동화로 재개 시 별도 설계)
+- `publish_jobs` 테이블과 `publish_worker.py` 파일은 삭제하지 않고 보존 (향후 재활용 가능성)
 
 ### 헬스체크 — `docker-compose.yml`
 
@@ -264,7 +254,6 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up --no-deps -d 
 
 # 로그 확인
 docker compose logs -f backend
-docker compose logs -f worker
 
 # 상태 확인
 docker compose ps
@@ -279,19 +268,18 @@ curl https://<domain>/health/ready | jq
 |---|---|---|
 | HTTPS/라우팅 | **Caddy** (`caddy:2-alpine`) | TLS 자동화 + 경로 분배 |
 | 프론트 | **nginx + Vite 빌드물** | SPA 정적 서빙 (멀티스테이지) |
-| API | **uvicorn + FastAPI** | 오케스트레이션 전용 (`RUN_PUBLISH_WORKER=false`) |
-| Worker | **동일 이미지 재사용** | Playwright 게시 (`RUN_PUBLISH_WORKER=true`, 메모리 1536M 제한) |
+| API | **uvicorn + FastAPI** | REST + SSE + 크롤링 + LangGraph 오케스트레이션 (`RUN_PUBLISH_WORKER=false`, `PUBLISH_USE_QUEUE=false`) |
+| 게시 | **크롬 익스텐션 Content Script** | 번개장터·중고나라는 사용자 브라우저에서 직접 등록 (서버 Playwright 미사용) |
 | DB | **Supabase** (외부) | 컨테이너 밖 — PostgreSQL + pgvector |
 | 보조 스토리지 | **S3** | 게시 증적 스크린샷만 (fire-and-forget) |
 
 ### 핵심 설계 결정
 
-1. **Monorepo + 단일 compose stack**: 프론트·백엔드·워커가 같은 서버에서 돌아서 단일 t3.medium으로 운용 가능
+1. **Monorepo + 단일 compose stack**: 프론트·백엔드가 같은 서버에서 돌아서 단일 t3.medium으로 운용 가능
 2. **서울 리전 + Elastic IP 고정**: `ap-northeast-2` + `43.201.188.57` — 재시작/재배포해도 IP 불변, 익스텐션 URL 수동 갱신 불필요
-3. **워커 프로세스 분리**: 게시 부하가 API 응답성을 방해하지 않음 (M125)
+3. **게시는 크롬 익스텐션 전담**: 서버 Playwright는 계정 정지 이슈로 폐기, Content Script가 사용자 세션을 통해 직접 등록 → 서버 부하 최소화
 4. **Caddy 앞단**: HTTPS 종단과 경로 분배를 Caddy가 모두 담당 → nginx는 SPA 서빙에만 집중
-5. **동일 이미지 재사용**: backend와 worker가 같은 Dockerfile로 빌드되어 환경변수만 다름 → 일관성 확보
-6. **Rolling restart**: backend → health wait → frontend → caddy 순서로 무중단 배포
+5. **Rolling restart**: backend → health wait → frontend → caddy 순서로 무중단 배포
 
 ---
 
