@@ -118,7 +118,41 @@ class TestHybridSearchCatalog:
     """vector + keyword fallback. Supabase RPC + OpenAI embedding mock."""
 
     @pytest.mark.integration
-    async def test_vector_hit_정상(self):
+    async def test_vector_hit_많음_cold_start_False(self):
+        """3건 이상 + top_conf >= 0.5 → cold_start=False (CTO #4 명시 임계값)."""
+        from app.db import product_catalog_store
+
+        rpc_rows = [
+            {"id": "1", "brand": "Apple", "model": "iPhone 15", "category": "smartphone",
+             "title": "iPhone", "price": 900000, "platform": "bunjang",
+             "condition": "good", "source_type": "crawled", "similarity": 0.85},
+            {"id": "2", "brand": "Apple", "model": "iPhone 15 Pro", "category": "smartphone",
+             "title": "iPhone Pro", "price": 1200000, "platform": "sagupalgu_market",
+             "condition": "sold", "source_type": "sell_session", "similarity": 0.78},
+            {"id": "3", "brand": "Apple", "model": "iPhone 15 Plus", "category": "smartphone",
+             "title": "iPhone Plus", "price": 1000000, "platform": "joongna",
+             "condition": "good", "source_type": "crawled", "similarity": 0.72},
+        ]
+        mock_supabase = MagicMock()
+        mock_supabase.rpc.return_value.execute.return_value.data = rpc_rows
+
+        with patch("app.db.product_catalog_store.get_embedding", new=AsyncMock(return_value=[0.1] * 1536)):
+            with patch("app.db.client.get_supabase", return_value=mock_supabase):
+                result = await product_catalog_store.hybrid_search_catalog(
+                    "Apple", "iPhone 15", "smartphone", api_key="sk-test"
+                )
+
+        assert result["source_count"] == 3
+        assert result["cold_start"] is False
+        assert result["cold_start_reason"] is None
+        assert result["fallback_path"] == "vector"
+        assert result["top_match_confidence"] == pytest.approx(0.85)
+        assert result["source_breakdown"]["crawled"] == 2
+        assert result["source_breakdown"]["sell_session"] == 1
+
+    @pytest.mark.integration
+    async def test_vector_hit_적으면_cold_start_True_hit_count(self):
+        """매치 2건뿐 (< 3) → cold_start=True (CTO #4: hit count 기준)."""
         from app.db import product_catalog_store
 
         rpc_rows = [
@@ -139,23 +173,46 @@ class TestHybridSearchCatalog:
                 )
 
         assert result["source_count"] == 2
-        assert result["cold_start"] is False
-        assert result["top_match_confidence"] == pytest.approx(0.85)
-        assert result["source_breakdown"]["crawled"] == 1
-        assert result["source_breakdown"]["sell_session"] == 1
-        assert len(result["matches"]) == 2
+        assert result["cold_start"] is True
+        assert "hit_count=2<3" in (result["cold_start_reason"] or "")
+
+    @pytest.mark.integration
+    async def test_top_conf_낮으면_cold_start_True_confidence(self):
+        """top similarity < 0.5 → cold_start=True (CTO #4: confidence 기준)."""
+        from app.db import product_catalog_store
+
+        # 4건 (>= COLD_START_MIN_HITS) 이지만 top_conf 0.42 (< 0.5)
+        rpc_rows = [
+            {"id": str(i), "brand": "X", "model": "Y", "category": "etc",
+             "title": "T", "price": 100, "platform": "p",
+             "condition": "u", "source_type": "crawled", "similarity": 0.42 - i * 0.05}
+            for i in range(4)
+        ]
+        mock_supabase = MagicMock()
+        mock_supabase.rpc.return_value.execute.return_value.data = rpc_rows
+
+        with patch("app.db.product_catalog_store.get_embedding", new=AsyncMock(return_value=[0.1] * 1536)):
+            with patch("app.db.client.get_supabase", return_value=mock_supabase):
+                result = await product_catalog_store.hybrid_search_catalog(
+                    "X", "Y", "etc", api_key="sk-test"
+                )
+
+        assert result["source_count"] == 4
+        assert result["cold_start"] is True
+        assert "top_similarity" in (result["cold_start_reason"] or "")
 
     @pytest.mark.integration
     async def test_vector_0건이면_keyword_fallback(self):
+        """vector RPC 빈결과 → keyword RPC fallback. fallback_path='keyword' 기록."""
         from app.db import product_catalog_store
 
         keyword_rows = [
-            {"id": "k1", "brand": "Apple", "model": "iPhone 15", "category": "smartphone",
+            {"id": f"k{i}", "brand": "Apple", "model": "iPhone 15", "category": "smartphone",
              "title": "iPhone", "price": 900000, "platform": "bunjang",
-             "condition": "unknown", "source_type": "crawled"},
+             "condition": "unknown", "source_type": "crawled"}
+            for i in range(3)
         ]
         mock_supabase = MagicMock()
-        # 첫 호출(vector)은 빈 결과, 두 번째 호출(keyword)은 결과 있음
         vector_call = MagicMock()
         vector_call.execute.return_value.data = []
         keyword_call = MagicMock()
@@ -168,9 +225,43 @@ class TestHybridSearchCatalog:
                     "Apple", "iPhone 15", "smartphone", api_key="sk-test"
                 )
 
-        assert result["source_count"] == 1
-        assert result["cold_start"] is False  # keyword가 채웠으므로
-        assert mock_supabase.rpc.call_count == 2  # vector + keyword 둘 다 호출
+        assert result["source_count"] == 3
+        assert result["fallback_path"] == "keyword"
+        assert mock_supabase.rpc.call_count == 2
+
+    @pytest.mark.integration
+    async def test_RPC_둘다_실패시_python_ilike_fallback(self):
+        """CTO #2: RPC 자체가 깨졌을 때(migration 미적용) Python ILIKE 보루."""
+        from app.db import product_catalog_store
+
+        ilike_rows = [
+            {"id": f"p{i}", "brand": "Apple", "model": "iPhone 15", "category": "smartphone",
+             "title": "iPhone", "price": 900000, "platform": "bunjang",
+             "condition": "unknown", "source_type": "crawled"}
+            for i in range(3)
+        ]
+        mock_supabase = MagicMock()
+        # 두 RPC 호출 모두 예외 (migration 미적용 시뮬레이션)
+        mock_supabase.rpc.side_effect = Exception("function vector_search_catalog_hybrid does not exist")
+        # .table().select().ilike()...execute()는 정상 동작
+        table_chain = (
+            mock_supabase.table.return_value
+            .select.return_value
+            .ilike.return_value
+            .ilike.return_value
+            .order.return_value
+            .limit.return_value
+        )
+        table_chain.execute.return_value.data = ilike_rows
+
+        with patch("app.db.product_catalog_store.get_embedding", new=AsyncMock(return_value=[0.1] * 1536)):
+            with patch("app.db.client.get_supabase", return_value=mock_supabase):
+                result = await product_catalog_store.hybrid_search_catalog(
+                    "Apple", "iPhone 15", "", api_key="sk-test"
+                )
+
+        assert result["source_count"] == 3
+        assert result["fallback_path"] == "python_ilike"
 
     @pytest.mark.integration
     async def test_cold_start_true_when_둘다_빈(self):
