@@ -1,6 +1,6 @@
 # 배포 가이드 — AWS EC2 (서울 리전) + Docker Compose
 
-## 현재 배포 상태 (2026-04-15)
+## 현재 배포 상태 (2026-04-18)
 
 | 항목 | 값 |
 |------|-----|
@@ -22,13 +22,13 @@
                       ├── /uploads/* → backend(:8000)
                       └── /          → frontend(:80)
 
-backend (API 전용):     RUN_PUBLISH_WORKER=false
-worker  (게시 전용):     RUN_PUBLISH_WORKER=true + Playwright
+backend (단일):        FastAPI + LangGraph + 크롤링 (RUN_PUBLISH_WORKER=false)
+게시:                   크롬 익스텐션 Content Script (사용자 브라우저)
 DB/Auth/Storage:        Supabase (외부)
 증적 스크린샷:           S3 보조 (선택)
 ```
 
-**설계 원칙**: AWS는 컴퓨트(EC2)만 사용. DB/Auth/Storage는 Supabase 유지.
+**설계 원칙**: AWS는 컴퓨트(EC2)만 사용. DB/Auth/Storage는 Supabase 유지. 번개장터·중고나라 게시는 크롬 익스텐션이 전담 — 서버 Playwright 없음.
 
 ---
 
@@ -83,7 +83,7 @@ JOONGNA_PASSWORD=<중고나라 비밀번호>
 ADMIN_API_KEY=<운영자 API 키>
 DOMAIN_NAME=sagupalgu.example.com
 ENVIRONMENT=prod
-PUBLISH_USE_QUEUE=true
+PUBLISH_USE_QUEUE=false   # 익스텐션 직접 게시 — 서버 큐 미사용
 ```
 
 ---
@@ -91,7 +91,7 @@ PUBLISH_USE_QUEUE=true
 ## 3. 서비스 실행
 
 ```bash
-# 프로덕션 모드 (Caddy HTTPS + API/Worker 분리)
+# 프로덕션 모드 (Caddy HTTPS + 단일 backend)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # 상태 확인
@@ -141,9 +141,8 @@ python scripts/smoke_test.py --base-url https://<도메인>
 
 필수 체크:
 - [ ] `ADMIN_API_KEY` 설정됨
-- [ ] `RUN_PUBLISH_WORKER` backend=false / worker=true
-- [ ] `MAX_CONCURRENT_BROWSERS=1` (초기 안전값)
-- [ ] docker memory limit 적용 (worker 1536M)
+- [ ] `RUN_PUBLISH_WORKER=false` + `PUBLISH_USE_QUEUE=false`
+- [ ] 크롬 익스텐션 `host_permissions`이 운영 도메인과 일치
 - [ ] smoke test 성공
 
 ---
@@ -152,11 +151,11 @@ python scripts/smoke_test.py --base-url https://<도메인>
 
 | 지표 | 현재 한계 | Scale 기준 |
 |------|----------|-----------|
-| 동시 게시 | 1건 (MAX_CONCURRENT_BROWSERS=1) | queue 대기 > 5건 |
-| 동시 사용자 | ~5~10명 | API 응답 > 3초 |
-| 메모리 | 4GB (t3.medium) | worker OOM 발생 시 |
+| 동시 게시 | 익스텐션 분산 처리 (사용자 브라우저별 1건) | 서버 측 병목 없음 |
+| 동시 활성 사용자 | ~15~25명 | API 응답 > 3초 |
+| 메모리 | 4GB (t3.medium) | backend OOM 발생 시 |
 
-Scale 대응: worker 별도 EC2 분리 또는 t3.large 이상 업그레이드.
+Scale 대응: `_connect_tokens` Supabase 이전 후 uvicorn `--workers 2` 증설 → t3.large 업그레이드 순.
 
 ---
 
@@ -165,9 +164,9 @@ Scale 대응: worker 별도 EC2 분리 또는 t3.large 이상 업그레이드.
 | 상황 | 대응 |
 |------|------|
 | API 죽음 | `docker compose restart backend` → health 확인 |
-| Worker stuck | `docker compose restart worker` + admin `/release-stuck` |
+| Caddy TLS 실패 | `docker compose logs caddy` → DNS·도메인 확인 |
 | Supabase 장애 | 서비스 degraded (fallback 없음) |
-| Playwright 실패율 증가 | admin API로 플랫폼 pause |
+| 익스텐션 게시 실패율 증가 | 번개장터·중고나라 DOM 변경 의심 → Content Script 업데이트 후 웹스토어 재배포 |
 | OOM | `restart: unless-stopped`로 자동 재시작 |
 
 ---
@@ -177,21 +176,21 @@ Scale 대응: worker 별도 EC2 분리 또는 t3.large 이상 업그레이드.
 ```bash
 # 실시간 로그
 docker compose logs -f backend
-docker compose logs -f worker
+docker compose logs -f caddy
 
 # 리소스 사용량
 docker stats
 
 # 추적 포인트
-# - publish_jobs.status (pending/running/completed/failed)
+# - sell_sessions.status (13개 상태 전이)
 # - session_transition 로그 (from → to)
-# - publish_job_success duration_ms
+# - 익스텐션 게시 결과 콜백 (/api/v1/sessions/{id}/extension-publish-result)
 ```
 
 중요 지표:
-- 게시 성공률: completed / (completed + failed)
-- 평균 게시 시간: publish_job_success duration_ms
-- retry 비율: retry_scheduled / total
+- 세션 완주율: completed / (completed + failed)
+- 평균 LLM 처리 시간 (Vision + listing 생성)
+- 익스텐션 게시 성공률 (콜백 기반)
 
 ---
 
