@@ -201,6 +201,11 @@ class SellerCopilotState(TypedDict, total=False):
     skip_rejected_reason: Optional[str]         # PR3 _skip_allowed() 미충족 시 사유 기록
     skip_attempted: bool                        # PR3 (CTO #2): planner가 skip 시도했는지 (시도 안 함 vs 시도+거절 구분)
 
+    # PR4-2: product_identity_agent (Tool Agent) ReAct 호출 이력
+    # 한 세션 내 reanalyze/clarify 호출 카운트 추적용 budget guard.
+    product_identity_tool_calls: List[str]
+    product_identity_failure_mode: Optional[str]   # parse_error / contract_violation / budget_exceeded 등
+
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
 
@@ -289,4 +294,6 @@ def create_initial_state(
         clarification_policy=DEFAULT_CLARIFICATION_POLICY,
         skip_rejected_reason=None,
         skip_attempted=False,
+        product_identity_tool_calls=[],
+        product_identity_failure_mode=None,
     )
