@@ -16,9 +16,9 @@ RUN playwright install chromium --with-deps
 
 # 소스 복사
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 COPY legacy_spikes/ ./legacy_spikes/
 COPY migrations/ ./migrations/
-COPY scripts/ ./scripts/
 
 # 세션/스크린샷 디렉터리
 RUN mkdir -p sessions screenshots uploads
