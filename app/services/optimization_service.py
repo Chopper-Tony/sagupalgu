@@ -27,6 +27,7 @@ class OptimizationService:
                 "tool_calls": [...],
             }
         """
+        # TODO(PR4-cleanup): post_sale_policy_node로 import 전환 (현재 mock 타깃 호환 위해 구 이름 유지).
         from app.graph.nodes.optimization_agent import post_sale_optimization_node
         from app.graph.seller_copilot_state import create_initial_state
 

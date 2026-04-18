@@ -1,16 +1,33 @@
-# 에이전트 · 툴 · 그래프 아키텍처
+# 에이전트 · 툴 · 그래프 아키텍처 (4 + 2 + 5)
 
-## 7 에이전트
+> PR1~3 리팩터 결과. 명목상 7 에이전트 → 실제 selection을 수행하는 4 에이전트 + 2 단일툴 + 5 결정론으로 재분류.
+> 정책 단일 원천: `app/domain/critic_policy.py`.
 
-| # | 에이전트 | 유형 | 노드 | 핵심 동작 |
-|---|---------|------|------|----------|
-| 0 | Mission Planner | LLM+Fallback | `mission_planner_node` | 세션 상태 해석 → 실행 계획 생성. replan 시 비평 피드백 반영 |
-| 1 | 상품 식별 | Deterministic | `product_identity_node`, `clarification_node` | Vision AI 호출 → confidence 체크 → 사용자 확정/입력 |
-| 2 | 시세·가격 전략 | ReAct | `market_intelligence_node`, `pricing_strategy_node` | LLM이 크롤링·RAG 툴 자율 선택. sample_count < 3이면 RAG 추가 |
-| 3 | 판매글 생성 | ReAct | `copywriting_node`, `refinement_node` | rewrite_instruction 유무로 generate/rewrite 자율 선택 |
-| 4 | 검증·복구 | ReAct | `validation_node`, `recovery_node` | 진단→패치→Discord 알림 순서 자율 결정 |
-| 5 | 판매 후 최적화 | Deterministic | `post_sale_optimization_node` | 경과 일수별 가격 인하·재게시 제안 |
-| 6 | Listing Critic | LLM+Fallback | `listing_critic_node` | 구매자 관점 비평. score < 70 → rewrite 루프 (최대 2회) |
+## 4 에이전트 (selection 수행)
+
+| 분류 | 노드 | 결정 책임 |
+|---|---|---|
+| **Strategy Agent** | `mission_planner_node` | 4 정책 필드 결정: plan_mode / market_depth / critic_policy / clarification_policy. POLICY_COMBO_RULES 위반 정규화. replan 시 strict 강화 |
+| **Tool Agent (ReAct)** | `market_intelligence_node` | lc_market_crawl_tool + lc_rag_price_tool 자율 선택. market_depth='crawl_only'면 RAG 제외 |
+| **Routing Agent** | `listing_critic_node` | LLM이 score + repair_action(7값) + failure_mode + rewrite_plan 결정. critic_policy로 엄격도 동적 |
+| **Tool Agent (ReAct)** | `recovery_node` | lc_diagnose / lc_auto_patch / lc_discord_alert 자율 선택 |
+
+## 2 단일 툴 노드 (LLM 호출하나 selection 없음)
+
+| 노드 | 동작 | 비고 |
+|---|---|---|
+| `copywriting_node` | critic이 정해준 rewrite_plan(target/instruction)을 실행. rewrite_plan 없으면 신규 generate. ListingService → rule-based → template fallback 체인 (결정론 안전망) | "Single Tool Node with deterministic fallback chain" |
+| `clarification_node` | state로 모드 자동 분기 (product 식별 대기 / pre_listing 질문 생성). clarification_policy로 적극성 조절 | PR3 통합 (구 `pre_listing_clarification_node` + `product_agent.clarification_node`) |
+
+## 5 결정론 노드 (LLM 없음)
+
+| 노드 (PR1 알리아스) | 동작 |
+|---|---|
+| `product_identity_node` (= `product_gate_node`) | Vision 결과·사용자 입력으로 상품 확정 |
+| `pricing_strategy_node` (= `pricing_rule_node`) | goal_strategy 모듈 기반 규칙 산정 |
+| `validation_node` (= `validation_rules_node`) | 필수 필드·길이·가격 검사 + **자동 보강 흡수** (description 짧음 / price 0원) + repair_action_hint |
+| `post_sale_optimization_node` (= `post_sale_policy_node`) | sale_status 기반 price_optimization_tool 결정론적 호출 |
+| `package_builder_node` | canonical → 플랫폼별 패키지 (번개장터 수수료 3.5% 보전 등) |
 
 ## 10 툴
 
@@ -27,20 +44,56 @@
 | `diagnose_publish_failure_tool` | 4 | fallback용 |
 | `price_optimization_tool` | 5 | 규칙 기반 가격 최적화 |
 
-## 그래프 플로우
+## 그래프 플로우 (PR3 이후)
 
 ```
-START → mission_planner → product_identity
+START → planner (Strategy: 4 정책) → product_identity
   ├─ needs_user_input → clarification → END
   └─ confirmed → pre_listing_clarification
        ├─ needs_more_info → END (사용자 대기)
-       └─ enough_info → market_intelligence (ReAct)
-              → pricing_strategy → copywriting (ReAct)
-              → listing_critic
-                  ├─ pass (≥70) → validation → package → END
-                  ├─ rewrite (retry<2) → copywriting ← REWRITE LOOP
-                  └─ replan → mission_planner ← REPLAN LOOP
+       └─ enough_info → [route_after_planner: market_depth 분기]
+              ├─ skip 가드 통과 → pricing_strategy ← SKIP PATH
+              └─ 그 외 → market_intelligence (ReAct, Tool Agent)
+                          → pricing_strategy → copywriting (Single Tool Node)
+                          → listing_critic (Routing Agent: repair_action 결정)
+                              ├─ pass               → validation → package → END
+                              ├─ rewrite_*          → copywriting   ← REWRITE LOOP
+                              ├─ reprice            → pricing_strategy ← REPRICE LOOP
+                              ├─ clarify            → clarification → END
+                              └─ replan             → planner       ← REPLAN LOOP
 ```
+
+## repair_action 라우팅 (PR2)
+
+| repair_action | 다음 노드 | 의미 |
+|---|---|---|
+| `pass` | validation_node | 품질 충분 |
+| `rewrite_title` / `rewrite_description` / `rewrite_full` | copywriting_node | 부분/전체 재작성 |
+| `reprice` | pricing_strategy_node | 가격만 재산정 |
+| `clarify` | clarification_node | 사용자 추가 정보 요청 |
+| `replan` | mission_planner_node | plan 수정 (MAX_PLAN_REVISIONS=2 가드) |
+
+## 정책 매트릭스 (PR3 planner 산출)
+
+| | shallow | balanced | deep |
+|---|---|---|---|
+| 의미 | 빠른 경로, 정보 풍부 | 기본 | 정보 부족 / replan |
+| critic_policy 허용 (POLICY_COMBO_RULES) | minimal, normal | minimal, normal, strict | normal, strict |
+| 권장 market_depth | skip / crawl_only | crawl_plus_rag | crawl_plus_rag |
+| 권장 clarification_policy | ask_late | ask_early | ask_early |
+
+## Skip 가드 (PR3 _skip_allowed)
+
+market_depth='skip'은 아래 조건 중 1개 이상 충족 시만 실제 적용. 미충족 시 silent crawl_only fallback + `skip_rejected_reason` 기록.
+
+1. `state.user_product_input.price` 존재
+2. `state.market_context` 잔존 (replan 케이스)
+3. `plan_mode == "shallow"` AND `confirmed_product.category in LOW_RISK_SKIP_CATEGORIES`
+
+## Failure Mode Taxonomy (PR2)
+
+- **System** (안전망 발동, 운영 알람 후보): `critic_parse_error`, `replan_limit_reached`, `max_critic_retries_reached`, `missing_listing`
+- **Critic Decision** (정상 동작): `title_weak`, `description_weak`, `price_off`, `info_missing`, `untrusted_seller`, `general_quality`
 
 > 그래프 책임: 판매글 패키지 생성까지.
 > 게시·복구·판매후최적화는 SessionService가 노드 함수 직접 호출.

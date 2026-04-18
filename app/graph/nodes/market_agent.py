@@ -42,22 +42,34 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         return state
 
     # ── ReAct 에이전트: LLM이 툴을 자율 선택 ────────────────────
+    # PR3: market_depth='crawl_only'면 RAG 도구 제외 (planner가 빠른 경로 선택한 경우).
     from app.tools.agentic_tools import lc_market_crawl_tool, lc_rag_price_tool
+
+    market_depth = state.get("market_depth", "crawl_plus_rag")
+    if market_depth == "crawl_only":
+        bound_tools = [lc_market_crawl_tool]
+        tool_rule = "1. lc_market_crawl_tool을 호출해 현재 매물 시세를 수집한다 (RAG 도구는 이번 세션에서 비활성화)."
+        _log(state, "agent2:market_depth=crawl_only → RAG tool excluded")
+    else:
+        bound_tools = [lc_market_crawl_tool, lc_rag_price_tool]
+        tool_rule = (
+            "1. lc_market_crawl_tool을 먼저 호출해 현재 매물 시세를 수집한다.\n"
+            "2. 결과의 sample_count가 3 미만이면 lc_rag_price_tool을 추가로 호출해 보완한다."
+        )
 
     brand = product.get("brand", "")
     model = product.get("model", "")
     category = product.get("category", "")
 
-    system_prompt = """당신은 중고거래 시세 분석 전문가입니다.
+    system_prompt = f"""당신은 중고거래 시세 분석 전문가입니다.
 주어진 상품의 현재 시세를 조사하고 가격 전략 수립에 필요한 정보를 수집합니다.
 
 반드시 따라야 할 규칙:
-1. lc_market_crawl_tool을 먼저 호출해 현재 매물 시세를 수집한다.
-2. 결과의 sample_count가 3 미만이면 lc_rag_price_tool을 추가로 호출해 보완한다.
+{tool_rule}
 3. 모든 수집이 끝나면 최종 JSON을 반환한다.
 
 최종 응답 형식 (JSON만, 설명 없이):
-{"median_price": 숫자, "price_band": [최저, 최고], "sample_count": 숫자, "crawler_sources": ["플랫폼명"]}"""
+{{"median_price": 숫자, "price_band": [최저, 최고], "sample_count": 숫자, "crawler_sources": ["플랫폼명"]}}"""
 
     user_prompt = f"""상품 정보:
 - 브랜드: {brand}
@@ -78,11 +90,11 @@ def market_intelligence_node(state: SellerCopilotState) -> SellerCopilotState:
         from langchain.agents import create_agent
         agent = create_agent(
             llm,
-            [lc_market_crawl_tool, lc_rag_price_tool],
+            bound_tools,
             system_prompt=system_prompt,
         )
 
-        _log(state, "agent2:react_agent:invoking LLM with tools=[market_crawl, rag_price]")
+        _log(state, f"agent2:react_agent:invoking LLM with {len(bound_tools)} tool(s)")
         msgs = [HumanMessage(content=user_prompt)]
         result = _run_async(lambda: agent.ainvoke({"messages": msgs}))
 

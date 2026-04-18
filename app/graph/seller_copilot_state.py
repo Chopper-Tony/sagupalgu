@@ -199,6 +199,7 @@ class SellerCopilotState(TypedDict, total=False):
     critic_policy: str                          # PR3 planner output. "minimal" | "normal" | "strict" — critic 프롬프트 엄격도
     clarification_policy: str                   # PR3 planner output. "ask_early" | "ask_late"
     skip_rejected_reason: Optional[str]         # PR3 _skip_allowed() 미충족 시 사유 기록
+    skip_attempted: bool                        # PR3 (CTO #2): planner가 skip 시도했는지 (시도 안 함 vs 시도+거절 구분)
 
     # 도구 호출 이력 (어떤 도구를 왜 선택했는지 추적)
     tool_calls: List[ToolCall]
@@ -287,4 +288,5 @@ def create_initial_state(
         critic_policy=DEFAULT_CRITIC_POLICY,
         clarification_policy=DEFAULT_CLARIFICATION_POLICY,
         skip_rejected_reason=None,
+        skip_attempted=False,
     )

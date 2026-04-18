@@ -67,12 +67,15 @@ def build_seller_copilot_graph():
 
     graph.add_edge("clarification_node", END)
 
-    # Pre-listing clarification → (충분: market / 부족: END 사용자 답변 대기)
+    # Pre-listing clarification → (충분: market 또는 pricing_skip / 부족: END)
+    # PR3: route_after_pre_listing_clarification이 내부적으로 route_after_planner를 호출,
+    # market_depth='skip' + _skip_allowed() 통과 시 pricing_strategy_node로 직진.
     graph.add_conditional_edges(
         "pre_listing_clarification_node",
         route_after_pre_listing_clarification,
         {
             "market_intelligence_node": "market_intelligence_node",
+            "pricing_strategy_node": "pricing_strategy_node",
             "__end__": END,
         },
     )

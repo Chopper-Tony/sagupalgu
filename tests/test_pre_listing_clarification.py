@@ -2,6 +2,7 @@
 Pre-listing Clarification 노드 + 라우팅 테스트.
 """
 import pytest
+from unittest.mock import patch
 
 from app.graph.nodes.clarification_listing_agent import (
     _detect_missing_info,
@@ -139,3 +140,92 @@ class TestPreListingClarificationNode:
         result = pre_listing_clarification_node(state)
         assert result["pre_listing_done"] is True
         assert len(result.get("pre_listing_questions", [])) == 0
+
+
+# ── PR3 신규: clarification 통합 entry point + clarification_policy ────
+
+
+class TestUnifiedClarificationNode:
+    """PR3: clarification_node가 state로 모드 자동 분기 (product / pre_listing)."""
+
+    @pytest.mark.integration
+    def test_product_모드_low_confidence_단순_대기(self, base_state):
+        """confirmed_product confidence 낮음 → LLM 호출 없이 사용자 입력 대기."""
+        from app.graph.nodes.clarification_node import clarification_node
+
+        state = {
+            **base_state,
+            "needs_user_input": True,
+            "confirmed_product": {"brand": "?", "model": "?", "confidence": 0.3},
+            "pre_listing_done": False,
+        }
+        result = clarification_node(state)
+        assert result["checkpoint"] == "A_needs_user_input"
+        assert result["status"] == "awaiting_product_confirmation"
+
+    @pytest.mark.integration
+    def test_pre_listing_모드_ask_early_질문생성(self, base_state):
+        """confirmed_product 충분 + ask_early → 질문 생성."""
+        from app.graph.nodes.clarification_node import clarification_node
+
+        state = {
+            **base_state,
+            "needs_user_input": False,
+            "confirmed_product": {"brand": "Apple", "model": "iPhone 15", "confidence": 0.9},
+            "pre_listing_done": False,
+            "pre_listing_answers": {},
+            "clarification_policy": "ask_early",
+        }
+        with patch("app.graph.nodes.clarification_node._build_react_llm", return_value=None):
+            result = clarification_node(state)
+
+        # 질문 생성됐거나 (정보 부족) 또는 done (정보 충분)
+        if result.get("pre_listing_questions"):
+            assert result["needs_user_input"] is True
+
+    @pytest.mark.integration
+    def test_pre_listing_모드_ask_late_자동_진행(self, base_state):
+        """ask_late 정책 → 정보 부족이라도 질문 안 하고 done 처리."""
+        from app.graph.nodes.clarification_node import clarification_node
+
+        state = {
+            **base_state,
+            "needs_user_input": False,
+            "confirmed_product": {"brand": "Apple", "model": "iPhone 15", "confidence": 0.9},
+            "pre_listing_done": False,
+            "pre_listing_answers": {},   # 답이 비어있어 missing 발생
+            "clarification_policy": "ask_late",
+        }
+        result = clarification_node(state)
+
+        assert result["pre_listing_done"] is True
+        assert result["pre_listing_questions"] == []
+
+    def test_pre_listing_already_done_noop(self, base_state):
+        """이미 done이면 변경 없음."""
+        from app.graph.nodes.clarification_node import clarification_node
+
+        state = {**base_state, "pre_listing_done": True, "needs_user_input": False}
+        result = clarification_node(state)
+        assert result["pre_listing_done"] is True
+
+    def test_legacy_pre_listing_alias_위임(self, base_state):
+        """clarification_listing_agent.pre_listing_clarification_node가 통합 entry point로 위임."""
+        from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
+
+        state = {**base_state, "pre_listing_done": True, "needs_user_input": False}
+        result = pre_listing_clarification_node(state)
+        assert result["pre_listing_done"] is True
+
+    def test_legacy_product_alias_위임(self, base_state):
+        """product_agent.clarification_node가 통합 entry point로 위임."""
+        from app.graph.nodes.product_agent import clarification_node as product_clarification
+
+        state = {
+            **base_state,
+            "needs_user_input": True,
+            "confirmed_product": {"confidence": 0.3},
+            "pre_listing_done": False,
+        }
+        result = product_clarification(state)
+        assert result["checkpoint"] == "A_needs_user_input"

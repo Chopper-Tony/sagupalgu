@@ -87,11 +87,15 @@ def product_identity_node(state: SellerCopilotState) -> SellerCopilotState:
 
 
 def clarification_node(state: SellerCopilotState) -> SellerCopilotState:
-    """사용자 입력 대기 — 이 노드에서 graph는 END로 중단되고 사용자 응답을 기다린다"""
-    _log(state, "agent1:clarification:waiting_for_user_input")
-    state["checkpoint"] = "A_needs_user_input"
-    state["status"] = "awaiting_product_confirmation"
-    return state
+    """Deprecated (PR3): clarification_node.py 통합 entry point로 위임.
+
+    PR3 이전: product 식별 단계의 단순 대기 노드.
+    PR3 이후: 통합 entry point가 state로 모드 자동 분기 (product / pre_listing).
+
+    제거 시점: PR4 (graph builder가 신 노드로 전환된 뒤).
+    """
+    from app.graph.nodes.clarification_node import clarification_node as _unified
+    return _unified(state)
 
 
 # ── PR1 알리아스 (Target Architecture: 4+2+5 재분류) ──────────────────

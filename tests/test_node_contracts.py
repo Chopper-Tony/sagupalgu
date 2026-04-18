@@ -144,8 +144,10 @@ class TestProductIdentityContract:
 
 class TestPreListingClarificationContract:
     @pytest.mark.integration
-    @patch("app.graph.nodes.clarification_listing_agent._build_react_llm", return_value=None)
+    @patch("app.graph.nodes.clarification_node._build_react_llm", return_value=None)
     def test_rule_based_fallback_satisfies_contract(self, _mock_llm):
+        """PR3: pre_listing_clarification_node는 통합된 clarification_node로 위임.
+        mock 타깃은 새 통합 모듈."""
         from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
 
         state = _make_minimal_state(

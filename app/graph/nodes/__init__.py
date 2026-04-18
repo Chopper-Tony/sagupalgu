@@ -4,7 +4,6 @@ app.graph.nodes 패키지 — 에이전트별 노드 모듈.
 하위 호환을 위해 seller_copilot_nodes.py가 이 패키지에서 re-export.
 """
 from app.graph.nodes.product_agent import (
-    clarification_node,
     product_gate_node,        # PR1 알리아스: product_identity_node
     product_identity_node,
 )
@@ -18,6 +17,10 @@ from app.graph.nodes.copywriting_agent import (
     copywriting_node,
     refinement_node,
 )
+# PR3 통합: clarification_node는 새 단일 entry point에서 가져온다.
+# product_agent.clarification_node와 clarification_listing_agent.pre_listing_clarification_node는
+# 모두 이 통합 함수로 위임되는 deprecated wrapper.
+from app.graph.nodes.clarification_node import clarification_node
 from app.graph.nodes.clarification_listing_agent import pre_listing_clarification_node
 from app.graph.nodes.critic_agent import listing_critic_node
 from app.graph.nodes.planner_agent import mission_planner_node

@@ -127,3 +127,117 @@ class TestMissionPlannerNode:
         with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
             result = mission_planner_node(state)
         assert result["plan"].get("focus")
+
+
+# ── PR3 신규: Strategy Agent 4 정책 필드 ────────────────────────────
+
+
+class TestPlannerPolicyFields:
+    """planner가 4 정책 필드를 산출하는지 (rule-based fallback 기반)."""
+
+    @pytest.mark.integration
+    def test_4_정책필드_baseline_생성(self, base_state):
+        state = {**base_state, "plan_revision_count": 0, "max_replans": 1,
+                 "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {}}
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
+
+        assert result["plan_mode"] in {"shallow", "balanced", "deep"}
+        assert result["market_depth"] in {"skip", "crawl_only", "crawl_plus_rag"}
+        assert result["critic_policy"] in {"minimal", "normal", "strict"}
+        assert result["clarification_policy"] in {"ask_early", "ask_late"}
+
+    @pytest.mark.integration
+    def test_정보풍부_사용자가격_있으면_skip_시도(self, base_state):
+        """rule-based fallback: confirmed_product 충실 + user_price → market_depth=skip 후보."""
+        state = {**base_state, "plan_revision_count": 0, "max_replans": 1,
+                 "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {},
+                 "user_product_input": {"price": 800000}}
+        # market_context도 충분히 존재한다고 가정 (base_state)
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
+
+        assert result["plan_mode"] == "shallow"
+        assert result["market_depth"] == "skip"
+
+    @pytest.mark.integration
+    def test_replan시_critic_policy_강화(self, base_state):
+        """replan + missing 정보 → plan_mode=deep + critic_policy strict 쪽으로."""
+        state = {**base_state, "plan_revision_count": 1, "max_replans": 2,
+                 "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {},
+                 "critic_feedback": [{"type": "trust", "impact": "high", "reason": "신뢰 부족"}]}
+        with patch("app.graph.nodes.planner_agent._build_react_llm", return_value=None):
+            result = mission_planner_node(state)
+
+        assert result["plan_mode"] == "deep"
+        assert result["critic_policy"] in {"normal", "strict"}
+
+    @pytest.mark.unit
+    def test_조합_제약_위반_정규화(self, base_state):
+        """LLM이 shallow + strict 같은 모순 조합 산출 시 normal로 강등."""
+        state = {**base_state, "plan_revision_count": 0, "max_replans": 1,
+                 "decision_rationale": [], "missing_information": [], "mission_goal": "balanced", "plan": {}}
+
+        bad_plan = {
+            "plan": {"steps": ["s1"], "focus": "x"},
+            "mission_goal": "balanced",
+            "rationale": ["test"],
+            "missing_information": [],
+            "plan_mode": "shallow",
+            "market_depth": "crawl_only",
+            "critic_policy": "strict",   # shallow와 충돌
+            "clarification_policy": "ask_early",
+        }
+        with patch("app.graph.nodes.planner_agent._run_llm_planning", return_value=bad_plan):
+            result = mission_planner_node(state)
+
+        # shallow + strict는 정규화로 normal/minimal 중 하나
+        from app.domain.critic_policy import POLICY_COMBO_RULES
+        assert result["critic_policy"] in POLICY_COMBO_RULES["shallow"]["critic_policy"]
+
+
+# ── PR3 신규: 정책 매트릭스 회귀 (8 조합) ──────────────────────────
+
+
+_POLICY_MATRIX = [
+    ("shallow", "crawl_only", "minimal", "ask_late"),
+    ("shallow", "skip", "minimal", "ask_late"),         # skip 허용 후보
+    ("balanced", "crawl_plus_rag", "normal", "ask_early"),  # baseline
+    ("balanced", "crawl_only", "normal", "ask_early"),
+    ("deep", "crawl_plus_rag", "strict", "ask_early"),
+    ("deep", "crawl_plus_rag", "normal", "ask_early"),
+    # 위반 조합 (정규화 fallback 검증)
+    ("shallow", "crawl_plus_rag", "strict", "ask_early"),  # 모순 → 정규화
+    ("deep", "crawl_plus_rag", "minimal", "ask_early"),    # deep+minimal 위반 → 정규화
+]
+
+
+class TestPolicyMatrix:
+    """planner가 어떤 4정책 조합을 받아도 graph가 깨지지 않고 정규화·routing이 안전한지."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("plan_mode,market_depth,critic_policy,clarification_policy", _POLICY_MATRIX)
+    def test_routing_dispatch_안전(self, plan_mode, market_depth, critic_policy, clarification_policy):
+        """모든 정책 조합에서 route_after_planner + route_after_critic 안전 동작."""
+        from app.graph.routing import route_after_critic, route_after_planner
+
+        state = {
+            "plan_mode": plan_mode,
+            "market_depth": market_depth,
+            "critic_policy": critic_policy,
+            "clarification_policy": clarification_policy,
+            "user_product_input": {"price": 100000},  # skip 허용 조건
+            "confirmed_product": {"category": "clothing"},
+            "plan_revision_count": 0,
+            "repair_action": "pass",
+        }
+        # route_after_planner는 market 또는 pricing 둘 중 하나
+        result1 = route_after_planner(state)
+        assert result1 in {"market_intelligence_node", "pricing_strategy_node"}
+
+        # route_after_critic은 6갈래 중 하나
+        result2 = route_after_critic(state)
+        assert result2 in {
+            "validation_node", "copywriting_node", "pricing_strategy_node",
+            "clarification_node", "mission_planner_node",
+        }
