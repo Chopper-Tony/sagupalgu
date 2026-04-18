@@ -31,6 +31,13 @@
     .status-connected { background: #d1fae5; color: #065f46; }
     .status-expired { background: #fef3c7; color: #92400e; }
     .status-disconnected { background: #f3f4f6; color: #6b7280; }
+    .platform-login-link {
+      font-size: 11px;
+      color: #2563eb;
+      text-decoration: none;
+      margin-right: 6px;
+    }
+    .platform-login-link:hover { text-decoration: underline; }
     .btn {
       padding: 6px 14px;
       border: none;
@@ -70,6 +77,7 @@
     <div class="section-label">플랫폼 연결</div>
     <div class="platform-row">
       <span class="platform-name">번개장터</span>
+      <a id="login-link-bunjang" class="platform-login-link" href="https://m.bunjang.co.kr/login" target="_blank" rel="noopener">로그인</a>
       <span id="status-bunjang" class="platform-status status-disconnected">미연동</span>
       <div class="btn-group">
         <button class="btn connect-btn" id="btn-bunjang" data-platform="bunjang">연결</button>
@@ -78,6 +86,7 @@
     </div>
     <div class="platform-row">
       <span class="platform-name">중고나라</span>
+      <a id="login-link-joongna" class="platform-login-link" href="https://web.joongna.com/signin?type=default" target="_blank" rel="noopener">로그인</a>
       <span id="status-joongna" class="platform-status status-disconnected">미연동</span>
       <div class="btn-group">
         <button class="btn connect-btn" id="btn-joongna" data-platform="joongna">연결</button>
