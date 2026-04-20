@@ -103,13 +103,9 @@ tmp_processed/
 .ipynb_checkpoints/
 
 # =========================
-# Docs (내부 전용 문서 — git 추적 제외)
+# Private docs (개인 대화/세션 로그 — git 추적 제외)
 # =========================
-docs/*
-!docs/api-contract.md
-!docs/architecture.md
-!docs/deployment.md
-!docs/deployment-architecture.md
+private_docs/
 
 # =========================
 # Misc
